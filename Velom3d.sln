@@ -1,0 +1,19 @@
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Velom3d", "Velom3d.csproj", "{873B5364-11B4-4E1F-8445-D83C9DD766FE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+	Debug|Any CPU = Debug|Any CPU
+	ExportDebug|Any CPU = ExportDebug|Any CPU
+	ExportRelease|Any CPU = ExportRelease|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{873B5364-11B4-4E1F-8445-D83C9DD766FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{873B5364-11B4-4E1F-8445-D83C9DD766FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{873B5364-11B4-4E1F-8445-D83C9DD766FE}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU
+		{873B5364-11B4-4E1F-8445-D83C9DD766FE}.ExportDebug|Any CPU.Build.0 = ExportDebug|Any CPU
+		{873B5364-11B4-4E1F-8445-D83C9DD766FE}.ExportRelease|Any CPU.ActiveCfg = ExportRelease|Any CPU
+		{873B5364-11B4-4E1F-8445-D83C9DD766FE}.ExportRelease|Any CPU.Build.0 = ExportRelease|Any CPU
+	EndGlobalSection
+EndGlobal
