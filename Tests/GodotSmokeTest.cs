@@ -7,7 +7,7 @@ namespace Velom3d.Tests;
 /// <summary>
 /// Vérifie que tout fonctionne dans le moteur (autoload, signaux, écran de connexion) sur le simulateur :
 ///   godot --headless --path . res://Tests/GodotSmokeTest.tscn
-/// La logique pure est testée plus finement par dotnet test (dossier tests/).
+/// La logique pure est testée plus finement par dotnet test (dossier UnitTests/).
 /// </summary>
 public partial class GodotSmokeTest : Node
 {

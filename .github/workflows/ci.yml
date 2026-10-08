@@ -20,7 +20,7 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - name: Tests unitaires (décodage, fusion, liste d'appareils)
-        run: dotnet test tests/Velom3d.Sensors.Tests
+        run: dotnet test UnitTests/Velom3d.Sensors.Tests
       - name: Build du jeu
         run: dotnet build Velom3d.csproj -warnaserror
 

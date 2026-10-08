@@ -7,7 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Tests xUnit (projet séparé) et plugin Android : hors de l'assembly du jeu. -->
-    <Compile Remove="tests/**" />
+    <Compile Remove="UnitTests/**" />
     <Compile Remove="android-plugin/**" />
   </ItemGroup>
 </Project>

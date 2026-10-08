@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Tests de la logique capteurs, sans Godot : dotnet test tests/Velom3d.Sensors.Tests -->
+  <!-- Tests de la logique capteurs, sans Godot : dotnet test UnitTests/Velom3d.Sensors.Tests -->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>

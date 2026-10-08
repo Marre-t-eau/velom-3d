@@ -47,6 +47,6 @@ iOS : pas encore de plugin. Un plugin iOS (CoreBluetooth) qui expose le même si
 ## Tests
 
 ```
-dotnet test tests/Velom3d.Sensors.Tests
+dotnet test UnitTests/Velom3d.Sensors.Tests
 dotnet build Velom3d.csproj && godot --headless --import --path . && godot --headless --path . res://Tests/GodotSmokeTest.tscn
 ```

@@ -46,9 +46,9 @@ class Velom3dBlePlugin(godot: Godot) : GodotPlugin(godot) {
     private val lastSeen = HashMap<String, Long>()
     private var scanning = false
 
-    private val context: Context? get() = activity?.applicationContext
+    private val appContext: Context? get() = activity?.applicationContext
     private val adapter: BluetoothAdapter?
-        get() = context?.getSystemService(BluetoothManager::class.java)?.adapter
+        get() = appContext?.getSystemService(BluetoothManager::class.java)?.adapter
 
     override fun getPluginName() = "Velom3dBle"
 
@@ -72,7 +72,7 @@ class Velom3dBlePlugin(godot: Godot) : GodotPlugin(godot) {
 
     @UsedByGodot
     fun hasPermissions(): Boolean {
-        val ctx = context ?: return false
+        val ctx = appContext ?: return false
         return requiredPermissions().all { ctx.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
     }
 
@@ -159,7 +159,7 @@ class Velom3dBlePlugin(godot: Godot) : GodotPlugin(godot) {
     fun connectDevice(address: String) {
         main.post {
             if (links.containsKey(address)) return@post
-            val ctx = context
+            val ctx = appContext
             val device = try {
                 adapter?.getRemoteDevice(address)
             } catch (e: IllegalArgumentException) {
