@@ -3,5 +3,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net9.0</TargetFramework>
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Tests xUnit (projet séparé) et plugin Android : hors de l'assembly du jeu. -->
+    <Compile Remove="tests/**" />
+    <Compile Remove="android-plugin/**" />
+  </ItemGroup>
 </Project>
