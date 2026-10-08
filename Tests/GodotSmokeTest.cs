@@ -1,5 +1,6 @@
 using System.Linq;
 using Godot;
+using Velom3d.Screens;
 using Velom3d.Sensors;
 
 namespace Velom3d.Tests;
@@ -19,17 +20,31 @@ public partial class GodotSmokeTest : Node
     {
         var hub = SensorHub.Instance;
 
-        // 1. L'écran de connexion se charge et liste les appareils de démo.
-        var screen = GD.Load<PackedScene>("res://Screens/DeviceConnection/DeviceConnectionScreen.tscn").Instantiate();
+        // 1. Sans Bluetooth natif (ordinateur), l'écran le dit et ne cherche rien.
+        var scenePath = "res://Screens/DeviceConnection/DeviceConnectionScreen.tscn";
+        var screen = GD.Load<PackedScene>(scenePath).Instantiate<DeviceConnectionScreen>();
         AddChild(screen);
-        await Wait(4.0);
-        Check(hub.Backend is SimulatedBackend, "Sans plugin natif, l'écran passe en mode démo");
-        Check(hub.Devices.Sorted.Count == 3, $"Trois appareils de démo listés ({hub.Devices.Sorted.Count})");
-        Check(!hub.IsScanning, "Le scan se termine");
+        await Wait(0.5);
+        Check(hub.Backend is null && hub.Devices.Sorted.Count == 0, "Sans plugin natif, aucun appareil inventé");
         screen.QueueFree();
         await Wait(0.1);
 
-        // 2. Connexion et pilotage du trainer via l'autoload.
+        // 2. Avec un transport branché, l'écran liste les appareils et réutilise ses lignes
+        //    quand les annonces Bluetooth se répètent (sinon le défilement au doigt casse).
+        hub.UseBackend(new SimulatedBackend { ScanDelayS = 0.1, ConnectDelayS = 0.0 });
+        screen = GD.Load<PackedScene>(scenePath).Instantiate<DeviceConnectionScreen>();
+        AddChild(screen);
+        await Wait(1.0);
+        Check(hub.Devices.Sorted.Count == 3, $"Trois appareils listés ({hub.Devices.Sorted.Count})");
+        var row = screen.RowFor(SimulatedBackend.Trainer);
+        hub.Devices.Found(SimulatedBackend.Trainer, "", [], -30, 99.0); // nouvelle annonce, signal différent
+        await Wait(0.1);
+        Check(row is not null && screen.RowFor(SimulatedBackend.Trainer) == row && IsInstanceValid(row),
+            "Une nouvelle annonce met la ligne à jour sans la recréer");
+        screen.QueueFree();
+        await Wait(0.1);
+
+        // 3. Connexion et pilotage du trainer via l'autoload.
         var sim = new SimulatedBackend { ScanDelayS = 0.0, ConnectDelayS = 0.0 };
         hub.UseBackend(sim);
         Check(hub.Devices.Sorted.Count == 0, "Changer de transport oublie les anciens appareils");

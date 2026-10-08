@@ -55,12 +55,13 @@ public sealed class DeviceList
         _ => "Appareil Bluetooth",
     };
 
-    /// <summary>Appareils triés : connectés d'abord, puis par rôle, puis par signal le plus fort.</summary>
+    /// <summary>Appareils triés : connectés d'abord, puis par rôle, puis par nom. Pas par signal :
+    /// le RSSI varie à chaque annonce et la liste sauterait sous le doigt.</summary>
     public IReadOnlyList<DeviceEntry> Sorted =>
         _devices.Values
             .OrderBy(d => d.State == LinkState.Available ? 1 : 0)
             .ThenBy(d => d.Kind)
-            .ThenByDescending(d => d.Rssi)
+            .ThenBy(d => d.DisplayName, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(d => d.Address, StringComparer.Ordinal)
             .ToList();
 

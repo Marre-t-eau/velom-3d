@@ -3,7 +3,8 @@ using Godot;
 
 namespace Velom3d.Sensors;
 
-/// <summary>Faux home trainer, fausses pédales et fausse ceinture cardio, pour développer sans matériel.</summary>
+/// <summary>Faux home trainer, fausses pédales et fausse ceinture cardio, pour les tests automatiques
+/// (Tests/GodotSmokeTest). L'écran de connexion ne s'en sert pas.</summary>
 public partial class SimulatedBackend : SensorBackend
 {
     public const string Trainer = "SIM:TRAINER";

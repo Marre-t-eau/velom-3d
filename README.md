@@ -10,7 +10,7 @@ et s'y connecte : home trainer (FTMS), capteur de puissance, ceinture cardio.
 ```
  capteurs BLE ──► backend ──(octets bruts)──► SensorHub (autoload "Sensors") ──► écrans du jeu
                   ├─ NativeBleBackend   (plugin Android « Velom3dBle »)
-                  └─ SimulatedBackend   (appareils de démo, sans matériel)
+                  └─ SimulatedBackend   (faux appareils, pour les tests automatiques)
 ```
 
 - `Sensors/Core/` : C# pur, sans Godot (décodage BLE, commandes FTMS, fusion des mesures,
@@ -21,12 +21,8 @@ et s'y connecte : home trainer (FTMS), capteur de puissance, ceinture cardio.
 - `android-plugin/` : sources Kotlin du plugin Android (scan, connexion, notifications, écriture).
 - `addons/velom3d_ble/` : greffon d'éditeur qui ajoute le plugin aux exports Android.
 
-Sans plugin natif (éditeur, ordinateur), l'écran bascule seul sur les appareils de démo.
-
-## Lancer
-
-Ouvrir le projet dans Godot 4.7 .NET, compiler, lancer (F5) : l'écran de connexion s'ouvre
-en mode démo.
+L'écran n'utilise que le vrai Bluetooth : sur ordinateur ou dans l'éditeur, il indique que le
+Bluetooth est indisponible. Pour l'essayer, exporter sur un téléphone Android (ci-dessous).
 
 ## Export Android avec le Bluetooth natif
 

@@ -6,8 +6,9 @@ namespace Velom3d.Screens;
 
 /// <summary>
 /// Premier écran : recherche et connexion du home trainer, du capteur de puissance et de la
-/// ceinture cardio. Pensé pour le tactile (grandes cibles, liste qui défile au doigt).
-/// Sans plugin Bluetooth natif (éditeur, ordinateur), il bascule sur des appareils de démo.
+/// ceinture cardio, par le Bluetooth du téléphone. Pensé pour le tactile (grandes cibles,
+/// liste qui défile au doigt). Sans plugin Bluetooth natif (éditeur, ordinateur), l'écran
+/// l'indique et ne cherche rien.
 /// </summary>
 public partial class DeviceConnectionScreen : Control
 {
@@ -20,38 +21,41 @@ public partial class DeviceConnectionScreen : Control
 
     static readonly DeviceKind[] SlotKinds = [DeviceKind.Trainer, DeviceKind.PowerMeter, DeviceKind.HeartRate];
 
+    sealed record Row(PanelContainer Panel, Label Name, Label Detail, Button Button);
+
     readonly Dictionary<DeviceKind, (PanelContainer Panel, Label Name, Label Value)> _slots = new();
+    readonly Dictionary<string, Row> _rows = new();
     Button _scanButton = null!;
-    CheckButton _demoToggle = null!;
     Label _status = null!;
     VBoxContainer _list = null!;
     Label _empty = null!;
 
     SensorHub Sensors => SensorHub.Instance;
-    bool NativeAvailable => NativeBleBackend.IsAvailable;
+
+    /// <summary>Ligne affichée pour un appareil (pour les tests).</summary>
+    internal Control? RowFor(string address) => _rows.GetValueOrDefault(address)?.Panel;
 
     public override void _Ready()
     {
         BuildUi();
         Sensors.DevicesChanged += Refresh;
         Sensors.StatusMessage += ShowStatus;
-        UseDemo(!NativeAvailable);
+        if (NativeBleBackend.IsAvailable) Sensors.UseBackend(new NativeBleBackend());
+        // Sans plugin natif, seul un transport déjà branché (tests automatiques) peut servir.
+        if (Sensors.Backend is null)
+        {
+            _scanButton.Disabled = true;
+            ShowStatus("Bluetooth indisponible ici : lancez le jeu sur un téléphone Android.");
+            Refresh();
+            return;
+        }
+        Sensors.StartScan();
     }
 
     public override void _ExitTree()
     {
         Sensors.DevicesChanged -= Refresh;
         Sensors.StatusMessage -= ShowStatus;
-    }
-
-    void UseDemo(bool demo)
-    {
-        _demoToggle.SetPressedNoSignal(demo);
-        Sensors.UseBackend(demo ? new SimulatedBackend() : new NativeBleBackend());
-        ShowStatus(demo
-            ? NativeAvailable ? "Mode démo : appareils simulés." : "Bluetooth natif indisponible ici : appareils de démo."
-            : "");
-        Sensors.StartScan();
     }
 
     public override void _Process(double delta)
@@ -72,57 +76,86 @@ public partial class DeviceConnectionScreen : Control
         }
     }
 
+    /// <summary>Met les lignes à jour sur place : les recréer à chaque annonce Bluetooth
+    /// (plusieurs par seconde) annulerait le geste de défilement en cours.</summary>
     void Refresh()
     {
         _scanButton.Text = Sensors.IsScanning ? "Arrêter la recherche" : "Rechercher";
 
-        foreach (var child in _list.GetChildren())
-            if (child != _empty) child.QueueFree();
-
         var devices = Sensors.Devices.Sorted;
+        var present = new HashSet<string>();
+        foreach (var d in devices) present.Add(d.Address);
+        foreach (var gone in new List<string>(_rows.Keys))
+        {
+            if (present.Contains(gone)) continue;
+            _rows[gone].Panel.QueueFree();
+            _rows.Remove(gone);
+        }
+
+        for (int i = 0; i < devices.Count; i++)
+        {
+            var d = devices[i];
+            if (!_rows.TryGetValue(d.Address, out var row))
+            {
+                row = CreateRow(d.Address);
+                _rows[d.Address] = row;
+                _list.AddChild(row.Panel);
+            }
+            UpdateRow(row, d);
+            _list.MoveChild(row.Panel, i + 1); // l'index 0 est le message « liste vide »
+        }
+
         _empty.Visible = devices.Count == 0;
-        _empty.Text = Sensors.IsScanning
-            ? "Recherche en cours… Pédalez quelques tours pour réveiller le home trainer."
-            : "Aucun appareil trouvé. Vérifiez qu'ils sont allumés et que le Bluetooth est activé, puis relancez la recherche.";
-        foreach (var d in devices) _list.AddChild(DeviceRow(d));
+        _empty.Text = Sensors.Backend is null ? ""
+            : Sensors.IsScanning
+                ? "Recherche en cours… Pédalez quelques tours pour réveiller le home trainer."
+                : "Aucun appareil trouvé. Vérifiez qu'ils sont allumés et que le Bluetooth est activé, puis relancez la recherche.";
     }
 
-    Control DeviceRow(DeviceEntry d)
+    Row CreateRow(string address)
     {
-        var panel = new PanelContainer();
-        SetPanelColor(panel, d.State == LinkState.Connected ? CardConnected : Card);
-        var row = new HBoxContainer();
+        // Pass partout : un glissé qui commence sur une ligne ou un bouton doit faire défiler la liste.
+        var panel = new PanelContainer { MouseFilter = MouseFilterEnum.Pass };
+        var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Pass };
         row.AddThemeConstantOverride("separation", 16);
         panel.AddChild(row);
 
-        var text = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        text.AddChild(MakeLabel(d.DisplayName, 24));
-        var detail = MakeLabel($"{DeviceList.KindLabel(d.Kind)}  ·  signal {SignalLabel(d.Rssi)}", 18);
+        var text = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass };
+        var name = MakeLabel("", 24);
+        text.AddChild(name);
+        var detail = MakeLabel("", 18);
         detail.Modulate = Muted;
         text.AddChild(detail);
         row.AddChild(text);
 
         var button = new Button
         {
-            Text = d.State switch
-            {
-                LinkState.Connected => "Déconnecter",
-                LinkState.Connecting => "Connexion…",
-                _ => "Connecter",
-            },
-            Disabled = d.State == LinkState.Connecting,
             CustomMinimumSize = new Vector2(220, 72),
             SizeFlagsVertical = SizeFlags.ShrinkCenter,
+            MouseFilter = MouseFilterEnum.Pass,
         };
         button.AddThemeFontSizeOverride("font_size", 22);
-        string address = d.Address;
         button.Pressed += () =>
         {
             if (Sensors.Devices.Get(address)?.State == LinkState.Connected) Sensors.DisconnectDevice(address);
             else Sensors.ConnectDevice(address);
         };
         row.AddChild(button);
-        return panel;
+        return new Row(panel, name, detail, button);
+    }
+
+    void UpdateRow(Row row, DeviceEntry d)
+    {
+        SetPanelColor(row.Panel, d.State == LinkState.Connected ? CardConnected : Card);
+        row.Name.Text = d.DisplayName;
+        row.Detail.Text = $"{DeviceList.KindLabel(d.Kind)}  ·  signal {SignalLabel(d.Rssi)}";
+        row.Button.Text = d.State switch
+        {
+            LinkState.Connected => "Déconnecter",
+            LinkState.Connecting => "Connexion…",
+            _ => "Connecter",
+        };
+        row.Button.Disabled = d.State == LinkState.Connecting;
     }
 
     static string SignalLabel(int rssi) => rssi switch
@@ -142,7 +175,7 @@ public partial class DeviceConnectionScreen : Control
 
     void OnScanPressed()
     {
-        if (!_demoToggle.ButtonPressed) ShowStatus("");
+        ShowStatus("");
         if (Sensors.IsScanning) Sensors.StopScan();
         else Sensors.StartScan();
     }
@@ -198,15 +231,6 @@ public partial class DeviceConnectionScreen : Control
         _scanButton.AddThemeFontSizeOverride("font_size", 24);
         _scanButton.Pressed += OnScanPressed;
         actions.AddChild(_scanButton);
-        _demoToggle = new CheckButton
-        {
-            Text = "Mode démo",
-            Disabled = !NativeAvailable,
-            TooltipText = NativeAvailable ? "Utiliser des appareils simulés" : "Pas de Bluetooth natif sur cette plateforme",
-        };
-        _demoToggle.AddThemeFontSizeOverride("font_size", 22);
-        _demoToggle.Toggled += UseDemo;
-        actions.AddChild(_demoToggle);
 
         _status = MakeLabel("", 20);
         _status.Modulate = Warning;
@@ -217,9 +241,11 @@ public partial class DeviceConnectionScreen : Control
         {
             SizeFlagsVertical = SizeFlags.ExpandFill,
             HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            // Au doigt : un petit mouvement suffit à faire défiler plutôt qu'à appuyer.
+            ScrollDeadzone = 12,
         };
         root.AddChild(scroll);
-        _list = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        _list = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass };
         _list.AddThemeConstantOverride("separation", 12);
         scroll.AddChild(_list);
         _empty = MakeLabel("", 20);
@@ -229,7 +255,7 @@ public partial class DeviceConnectionScreen : Control
 
     static Label MakeLabel(string text, int size)
     {
-        var label = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart };
+        var label = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart, MouseFilter = MouseFilterEnum.Pass };
         label.AddThemeFontSizeOverride("font_size", size);
         return label;
     }

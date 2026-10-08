@@ -236,15 +236,25 @@ public class DeviceListTests
     }
 
     [Fact]
-    public void Sorted_puts_connected_first_then_role_then_signal()
+    public void Sorted_puts_connected_first_then_role_then_name()
     {
         var l = new DeviceList();
         l.Found("hr", "HRM", ["180d"], -40, 0);
-        l.Found("pm-far", "Pédales", ["1818"], -80, 0);
-        l.Found("pm-near", "Pédales 2", ["1818"], -50, 0);
+        l.Found("pm-b", "Pédales B", ["1818"], -50, 0);
+        l.Found("pm-a", "Pédales A", ["1818"], -80, 0);
         l.Found("kickr", "KICKR", ["1826"], -90, 0);
         l.MarkConnected("hr", []);
-        Assert.Equal(["hr", "kickr", "pm-near", "pm-far"], l.Sorted.Select(d => d.Address));
+        Assert.Equal(["hr", "kickr", "pm-a", "pm-b"], l.Sorted.Select(d => d.Address));
+    }
+
+    [Fact]
+    public void Signal_changes_do_not_reorder_the_list()
+    {
+        var l = new DeviceList();
+        l.Found("a", "Pédales A", ["1818"], -80, 0);
+        l.Found("b", "Pédales B", ["1818"], -50, 0);
+        l.Found("a", "", [], -40, 1);
+        Assert.Equal(["a", "b"], l.Sorted.Select(d => d.Address));
     }
 
     [Fact]
