@@ -24,6 +24,32 @@ et s'y connecte : home trainer (FTMS), capteur de puissance, ceinture cardio.
 L'écran n'utilise que le vrai Bluetooth : sur ordinateur ou dans l'éditeur, il indique que le
 Bluetooth est indisponible. Pour l'essayer, exporter sur un téléphone Android (ci-dessous).
 
+## Écrans
+
+```
+Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînement structuré (grisé, à venir)
+                                            ├─ Sortie libre ──Terminer──► Bilan
+                                            ├─ Mes sorties ──► Bilan d'une sortie
+                                            └─ Capteurs (retour à la connexion)
+```
+
+- **Sortie libre** (`Screens/FreeRide/`) : parcours plat, deux modes.
+  *Puissance imposée* : le trainer impose les watts (ERG), réglables de 10 en 10 en roulant.
+  *Simulation réaliste* : le trainer reçoit pente 0 %, Crr 0,004 (pneus route) et
+  ½·ρ·CdA = 0,25 kg/m (CdA 0,40 m², mains aux cocottes) ; il durcit avec la vitesse.
+  Dans les deux cas, la vitesse et la distance viennent du même modèle physique
+  (`Rides/Core/BikePhysics.cs`), avec le poids du cycliste + 8 kg de vélo.
+- **Bilan** (`Screens/RideSummary/`) : durée, distance, puissances moyenne / normalisée / max,
+  TSS, facteur d'intensité, calories (travail en kJ ÷ 4,184 ÷ 24 % de rendement), cadence,
+  vitesse, FC ; temps par zone de puissance (Coggan) ; courbes puissance, cadence, vitesse
+  (avec la pente quand elle varie) et fréquence cardiaque.
+- **Mes sorties** (`Screens/RideHistory/`) : toutes les sorties, la plus récente en haut.
+
+Les sorties sont enregistrées sur l'appareil, dans `user://rides/` : `{id}.json` (en-tête et
+résumé) et `{id}.csv` (une ligne par seconde, lisible dans un tableur), plus `profile.json`
+(FTP, poids, dernier mode). Pendant une sortie, enregistrement toutes les 30 s et à la mise en
+arrière-plan. Le calcul (`Rides/Core/`) ne dépend pas de Godot et est testé par `dotnet test`.
+
 ## Export Android avec le Bluetooth natif
 
 1. Construire le plugin (JDK 17 et SDK Android requis) :

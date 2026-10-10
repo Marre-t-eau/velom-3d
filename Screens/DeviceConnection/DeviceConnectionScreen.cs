@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using Velom3d.Sensors;
 
@@ -8,7 +9,7 @@ namespace Velom3d.Screens;
 /// Premier écran : recherche et connexion du home trainer, du capteur de puissance et de la
 /// ceinture cardio, par le Bluetooth du téléphone. Pensé pour le tactile (grandes cibles,
 /// liste qui défile au doigt). Sans plugin Bluetooth natif (éditeur, ordinateur), l'écran
-/// l'indique et ne cherche rien.
+/// l'indique et ne cherche rien. « Continuer » mène au menu principal.
 /// </summary>
 public partial class DeviceConnectionScreen : Control
 {
@@ -26,6 +27,7 @@ public partial class DeviceConnectionScreen : Control
     readonly Dictionary<DeviceKind, (PanelContainer Panel, Label Name, Label Value)> _slots = new();
     readonly Dictionary<string, Row> _rows = new();
     Button _scanButton = null!;
+    Button _continueButton = null!;
     Label _status = null!;
     VBoxContainer _list = null!;
     Label _empty = null!;
@@ -40,7 +42,8 @@ public partial class DeviceConnectionScreen : Control
         BuildUi();
         Sensors.DevicesChanged += Refresh;
         Sensors.StatusMessage += ShowStatus;
-        if (NativeBleBackend.IsAvailable) Sensors.UseBackend(new NativeBleBackend());
+        // Retour depuis le menu : on garde le transport, sinon les appareils seraient déconnectés.
+        if (NativeBleBackend.IsAvailable && Sensors.Backend is not NativeBleBackend) Sensors.UseBackend(new NativeBleBackend());
         // Sans plugin natif, seul un transport déjà branché (tests automatiques) peut servir.
         if (Sensors.Backend is null)
         {
@@ -61,8 +64,14 @@ public partial class DeviceConnectionScreen : Control
         Sensors.StatusMessage -= ShowStatus;
     }
 
+    public override void _Notification(int what)
+    {
+        if (what == NotificationWMGoBackRequest) GetTree().Quit();
+    }
+
     public override void _Process(double delta)
     {
+        _continueButton.Text = Sensors.Devices.Sorted.Any(d => d.State == LinkState.Connected) ? "Continuer" : "Continuer sans capteur";
         foreach (var kind in SlotKinds)
         {
             var (panel, name, value) = _slots[kind];
@@ -234,6 +243,14 @@ public partial class DeviceConnectionScreen : Control
         _scanButton.AddThemeFontSizeOverride("font_size", 24);
         _scanButton.Pressed += OnScanPressed;
         actions.AddChild(_scanButton);
+        _continueButton = new Button { Text = "Continuer", CustomMinimumSize = new Vector2(320, 72), SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        _continueButton.AddThemeFontSizeOverride("font_size", 24);
+        _continueButton.Pressed += () =>
+        {
+            Sensors.StopScan();
+            Navigator.GoTo(this, Navigator.Menu);
+        };
+        actions.AddChild(_continueButton);
 
         _status = MakeLabel("", 20);
         _status.Modulate = Warning;

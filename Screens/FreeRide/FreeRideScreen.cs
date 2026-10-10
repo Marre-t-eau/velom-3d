@@ -1,0 +1,315 @@
+using System;
+using Godot;
+using Velom3d.Rides;
+using Velom3d.Sensors;
+
+namespace Velom3d.Screens;
+
+/// <summary>
+/// Sortie libre sur le plat. Deux façons de faire résister le home trainer :
+/// puissance imposée (ERG, réglable en roulant) ou simulation réaliste (pente nulle, pneus et
+/// air : le trainer durcit avec la vitesse). La vitesse affichée vient du même modèle physique.
+/// La sortie est enregistrée sur l'appareil, et toutes les 30 s au cas où l'appli serait coupée.
+/// </summary>
+public partial class FreeRideScreen : Screen
+{
+    const double AutosaveEveryS = 30.0;
+    const int PowerStep = 10;
+
+    RiderProfile _profile = null!;
+    RideMode _mode;
+    int _target;
+
+    Control _setup = null!, _riding = null!;
+    Button _ergChoice = null!, _simChoice = null!;
+    Control _targetRow = null!;
+    Label _targetValue = null!, _ftpValue = null!, _massValue = null!, _trainerHint = null!;
+
+    Label _clock = null!, _modeLabel = null!, _power = null!, _powerTitle = null!, _cadence = null!, _hr = null!;
+    Label _speed = null!, _distance = null!, _avgPower = null!, _rideTarget = null!;
+    Control _ergControls = null!;
+    Button _pauseButton = null!, _finishButton = null!;
+    double _finishArmedUntil = -1, _sinceAutosave;
+
+    /// <summary>Enregistrement en cours (null avant le départ), exposé aux tests.</summary>
+    internal RideRecorder? Recorder { get; private set; }
+
+    SensorHub Hub => SensorHub.Instance;
+    static double Now => Time.GetTicksMsec() / 1000.0;
+
+    public override void _Ready()
+    {
+        _profile = Store.LoadProfile();
+        _mode = _profile.LastMode;
+        _target = Math.Clamp(_profile.LastTargetPowerW, 50, 1000);
+        var root = Ui.BuildPage(this);
+        _setup = BuildSetup(root);
+        _riding = BuildRiding(root);
+        _riding.Visible = false;
+        RefreshSetup();
+    }
+
+    public override void _ExitTree() => DisplayServer.ScreenSetKeepOn(false);
+
+    // --- Réglages avant le départ ---
+
+    Control BuildSetup(Container root)
+    {
+        var page = new VBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
+        page.AddThemeConstantOverride("separation", 18);
+        root.AddChild(page);
+        page.AddChild(Ui.Label("Sortie libre", 40));
+        page.AddChild(Ui.Label("Parcours plat. Choisissez comment le home trainer vous résiste.", 20, Ui.Muted));
+
+        var content = Ui.AddScroll(page);
+        var modes = Ui.Row();
+        content.AddChild(modes);
+        _ergChoice = ModeChoice(modes, "Puissance imposée",
+            "Le trainer impose les watts choisis, quelle que soit la cadence (mode ERG).", RideMode.TargetPower);
+        _simChoice = ModeChoice(modes, "Simulation réaliste",
+            "La résistance suit la vitesse : roulement des pneus et frottement de l'air, sur le plat.", RideMode.Simulation);
+
+        _targetRow = Stepper(content, "Puissance cible", out _targetValue, d => _target = Math.Clamp(_target + d * PowerStep, 50, 1000));
+
+        content.AddChild(Ui.Label("Vos réglages (pour la vitesse, le TSS et l'IF)", 22, Ui.Muted));
+        Stepper(content, "FTP", out _ftpValue, d => _profile.FtpW = Math.Clamp(_profile.FtpW + d * 5, 50, 600));
+        Stepper(content, "Poids du cycliste", out _massValue, d => _profile.RiderMassKg = Math.Clamp(_profile.RiderMassKg + d, 30, 200));
+
+        _trainerHint = Ui.Label("", 20, Ui.Warning);
+        content.AddChild(_trainerHint);
+
+        var actions = Ui.Row();
+        page.AddChild(actions);
+        actions.AddChild(Ui.Button("Retour", OnBack));
+        var start = Ui.Button("Démarrer", () => Start(_mode, _target));
+        start.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        actions.AddChild(start);
+        return page;
+    }
+
+    Button ModeChoice(Container parent, string title, string detail, RideMode mode)
+    {
+        var button = Ui.Button("", () => { _mode = mode; RefreshSetup(); }, 0, 150);
+        button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        Ui.MakeSelectable(button);
+        var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore, Alignment = BoxContainer.AlignmentMode.Center };
+        box.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        box.OffsetLeft = 20;
+        box.OffsetRight = -20;
+        var name = Ui.Label(title, 26);
+        name.MouseFilter = MouseFilterEnum.Ignore;
+        var hint = Ui.Label(detail, 17, Ui.Muted);
+        hint.MouseFilter = MouseFilterEnum.Ignore;
+        box.AddChild(name);
+        box.AddChild(hint);
+        button.AddChild(box);
+        parent.AddChild(button);
+        return button;
+    }
+
+    /// <summary>Ligne « libellé  [−]  valeur  [+] ».</summary>
+    Control Stepper(Container parent, string title, out Label value, Action<int> change)
+    {
+        var panel = Ui.Panel(Ui.Card);
+        var row = Ui.Row();
+        panel.AddChild(row);
+        var label = Ui.Label(title, 24);
+        label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        label.VerticalAlignment = VerticalAlignment.Center;
+        row.AddChild(label);
+        row.AddChild(Ui.Button("−", () => { change(-1); RefreshSetup(); }, 96, 72, 32));
+        value = Ui.Label("", 30);
+        value.CustomMinimumSize = new Vector2(150, 0);
+        value.HorizontalAlignment = HorizontalAlignment.Center;
+        value.VerticalAlignment = VerticalAlignment.Center;
+        row.AddChild(value);
+        row.AddChild(Ui.Button("+", () => { change(+1); RefreshSetup(); }, 96, 72, 32));
+        parent.AddChild(panel);
+        return panel;
+    }
+
+    void RefreshSetup()
+    {
+        _ergChoice.ButtonPressed = _mode == RideMode.TargetPower;
+        _simChoice.ButtonPressed = _mode == RideMode.Simulation;
+        _targetRow.Visible = _mode == RideMode.TargetPower;
+        _targetValue.Text = $"{_target} W";
+        _ftpValue.Text = $"{_profile.FtpW} W";
+        _massValue.Text = $"{_profile.RiderMassKg:0} kg";
+        _trainerHint.Text = Hub.TrainerAddress == ""
+            ? "Aucun home trainer pilotable connecté : la sortie enregistrera vos capteurs sans régler la résistance."
+            : "";
+    }
+
+    // --- Pendant la sortie ---
+
+    Control BuildRiding(Container root)
+    {
+        var page = new VBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
+        page.AddThemeConstantOverride("separation", 16);
+        root.AddChild(page);
+
+        var header = Ui.Row();
+        page.AddChild(header);
+        _clock = Ui.Label("0:00", 52);
+        _clock.AutowrapMode = TextServer.AutowrapMode.Off;
+        header.AddChild(_clock);
+        _modeLabel = Ui.Label("", 20, Ui.Muted);
+        _modeLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        _modeLabel.VerticalAlignment = VerticalAlignment.Center;
+        _modeLabel.HorizontalAlignment = HorizontalAlignment.Right;
+        header.AddChild(_modeLabel);
+
+        var content = Ui.AddScroll(page, 14);
+        var row1 = Ui.Row(14);
+        content.AddChild(row1);
+        _power = Ui.Tile(row1, "Puissance", Ui.PowerColor, 52);
+        _powerTitle = (Label)_power.GetParent().GetChild(0);
+        _cadence = Ui.Tile(row1, "Cadence", Ui.CadenceColor, 52);
+        _hr = Ui.Tile(row1, "Fréquence cardiaque", Ui.HeartRateColor, 52);
+        var row2 = Ui.Row(14);
+        content.AddChild(row2);
+        _speed = Ui.Tile(row2, "Vitesse", Ui.SpeedColor);
+        _distance = Ui.Tile(row2, "Distance", Ui.Muted);
+        _avgPower = Ui.Tile(row2, "Puissance moyenne", Ui.PowerColor);
+
+        var erg = Ui.Row();
+        erg.Alignment = BoxContainer.AlignmentMode.Center;
+        content.AddChild(erg);
+        erg.AddChild(Ui.Button($"−{PowerStep} W", () => ChangeTarget(-PowerStep), 200, 96, 30));
+        _rideTarget = Ui.Label("", 34);
+        _rideTarget.CustomMinimumSize = new Vector2(260, 0);
+        _rideTarget.HorizontalAlignment = HorizontalAlignment.Center;
+        _rideTarget.VerticalAlignment = VerticalAlignment.Center;
+        erg.AddChild(_rideTarget);
+        erg.AddChild(Ui.Button($"+{PowerStep} W", () => ChangeTarget(+PowerStep), 200, 96, 30));
+        _ergControls = erg;
+
+        var actions = Ui.Row();
+        page.AddChild(actions);
+        _pauseButton = Ui.Button("Pause", TogglePause);
+        _pauseButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        actions.AddChild(_pauseButton);
+        _finishButton = Ui.Button("Terminer", OnFinishPressed);
+        _finishButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        actions.AddChild(_finishButton);
+        return page;
+    }
+
+    internal void Start(RideMode mode, int targetW)
+    {
+        _mode = mode;
+        _target = targetW;
+        _profile.LastMode = mode;
+        _profile.LastTargetPowerW = targetW;
+        Store.SaveProfile(_profile);
+
+        Recorder = new RideRecorder(mode, _profile, DateTimeOffset.Now, targetW);
+        if (Hub.TrainerAddress != "")
+        {
+            if (mode == RideMode.TargetPower) Hub.SetTargetPower(targetW);
+            else ApplySimulation();
+        }
+        _modeLabel.Text = mode == RideMode.TargetPower ? "Puissance imposée · plat" : "Simulation réaliste · plat";
+        _ergControls.Visible = mode == RideMode.TargetPower;
+        _setup.Visible = false;
+        _riding.Visible = true;
+        DisplayServer.ScreenSetKeepOn(true);
+    }
+
+    /// <summary>Pente nulle ; le trainer applique les mêmes pneus et la même traînée que la vitesse affichée.</summary>
+    void ApplySimulation()
+    {
+        var physics = Recorder!.Physics;
+        Hub.SetGrade(physics.GradePct, physics.WindMps, physics.Crr, physics.WindResistanceCoefficient);
+    }
+
+    void ChangeTarget(int delta)
+    {
+        if (Recorder is null) return;
+        Recorder.TargetPowerW = Math.Clamp(Recorder.TargetPowerW + delta, 50, 1000);
+        _profile.LastTargetPowerW = Recorder.TargetPowerW;
+        if (Hub.TrainerAddress != "") Hub.SetTargetPower(Recorder.TargetPowerW);
+    }
+
+    void TogglePause()
+    {
+        if (Recorder is null) return;
+        if (Recorder.IsPaused) Recorder.Resume(); else Recorder.Pause();
+        _pauseButton.Text = Recorder.IsPaused ? "Reprendre" : "Pause";
+    }
+
+    /// <summary>Deux appuis pour terminer : un doigt qui glisse ne coupe pas une sortie.</summary>
+    void OnFinishPressed()
+    {
+        if (Now > _finishArmedUntil)
+        {
+            _finishArmedUntil = Now + 3.0;
+            return;
+        }
+        Finish();
+    }
+
+    internal void Finish()
+    {
+        if (Recorder is null) return;
+        var ride = Recorder.Finish();
+        Recorder = null;
+        // On rend la main au cycliste : plus de consigne ERG après la sortie.
+        if (Hub.TrainerAddress != "") Hub.SetGrade(0.0);
+        DisplayServer.ScreenSetKeepOn(false);
+        if (ride.Samples.Count == 0)
+        {
+            Navigator.GoTo(this, Navigator.Menu);
+            return;
+        }
+        Store.Save(ride);
+        Store.SaveProfile(_profile);
+        var summary = Navigator.Create<RideSummaryScreen>(Navigator.Summary);
+        summary.Ride = ride;
+        summary.JustFinished = true;
+        Navigator.GoTo(this, summary);
+    }
+
+    public override void _Process(double delta)
+    {
+        if (Recorder is null) return;
+        Recorder.Tick(delta, Hub.Power, Hub.Cadence, Hub.HeartRate);
+
+        _sinceAutosave += delta;
+        if (_sinceAutosave >= AutosaveEveryS) Autosave();
+
+        _clock.Text = Ui.Duration(Recorder.ElapsedS);
+        _power.Text = $"{Hub.Power} W";
+        _powerTitle.Text = Recorder.Ride.Info.Mode == RideMode.TargetPower ? $"Puissance · cible {Recorder.TargetPowerW} W" : "Puissance";
+        _cadence.Text = $"{Hub.Cadence:0} tr/min";
+        _hr.Text = Hub.HeartRate > 0 ? $"{Hub.HeartRate} bpm" : "--";
+        _speed.Text = $"{Recorder.SpeedKmh:0.0} km/h";
+        _distance.Text = Ui.Km(Recorder.DistanceM);
+        _avgPower.Text = Recorder.ElapsedS > 0 ? $"{Recorder.AveragePowerW:0} W" : "--";
+        _rideTarget.Text = $"Cible {Recorder.TargetPowerW} W";
+        _finishButton.Text = Now <= _finishArmedUntil ? "Confirmer la fin" : "Terminer";
+        _pauseButton.Text = Recorder.IsPaused ? "Reprendre" : "Pause";
+    }
+
+    void Autosave()
+    {
+        _sinceAutosave = 0;
+        if (Recorder is not { Ride.Samples.Count: > 0 }) return;
+        Recorder.Ride.Summarize();
+        Store.Save(Recorder.Ride);
+    }
+
+    public override void _Notification(int what)
+    {
+        base._Notification(what);
+        // L'appli passe en arrière-plan : Android peut la tuer, on enregistre.
+        if (what == NotificationApplicationPaused) Autosave();
+    }
+
+    protected override void OnBack()
+    {
+        if (Recorder is null) Navigator.GoTo(this, Navigator.Menu);
+        else if (!Recorder.IsPaused) TogglePause(); // pendant la sortie, Retour met en pause sans rien perdre
+    }
+}

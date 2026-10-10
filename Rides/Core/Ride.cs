@@ -1,0 +1,60 @@
+using System;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
+
+namespace Velom3d.Rides;
+
+public enum RideMode
+{
+    /// <summary>Mode ERG : le trainer impose la puissance choisie.</summary>
+    TargetPower,
+    /// <summary>Mode simulation : la résistance vient de la pente, des pneus et de l'air.</summary>
+    Simulation,
+}
+
+/// <summary>Une mesure par seconde de sortie (pauses exclues).</summary>
+public readonly record struct RideSample(
+    double TimeS, int PowerW, double CadenceRpm, int HeartRateBpm,
+    double SpeedKmh, double DistanceM, double GradePct, int TargetPowerW);
+
+/// <summary>Réglages du cycliste qui servent au calcul de la vitesse, du TSS et de l'IF.</summary>
+public sealed class RiderProfile
+{
+    public int FtpW { get; set; } = 200;
+    public double RiderMassKg { get; set; } = 75.0;
+    public double BikeMassKg { get; set; } = 8.0;
+    public RideMode LastMode { get; set; } = RideMode.Simulation;
+    public int LastTargetPowerW { get; set; } = 150;
+
+    [JsonIgnore] public double TotalMassKg => RiderMassKg + BikeMassKg;
+}
+
+/// <summary>En-tête d'une sortie : ce qu'il faut pour la liste, sans les mesures.</summary>
+public sealed class RideInfo
+{
+    public string Id { get; set; } = "";
+    public DateTimeOffset StartedAt { get; set; }
+    public RideMode Mode { get; set; }
+    public int TargetPowerW { get; set; }
+    /// <summary>FTP au moment de la sortie : le TSS d'hier ne change pas si la FTP évolue.</summary>
+    public int FtpW { get; set; }
+    public double MassKg { get; set; }
+    public RideSummary Summary { get; set; } = new();
+}
+
+public sealed class Ride
+{
+    public RideInfo Info { get; }
+    public List<RideSample> Samples { get; }
+
+    public Ride(RideInfo info, List<RideSample>? samples = null)
+    {
+        Info = info;
+        Samples = samples ?? new List<RideSample>();
+    }
+
+    public static string NewId(DateTimeOffset startedAt) => startedAt.ToUniversalTime().ToString("yyyyMMdd-HHmmss");
+
+    /// <summary>Recalcule le résumé à partir des mesures.</summary>
+    public RideSummary Summarize() => Info.Summary = RideMetrics.Compute(Samples, Info.FtpW);
+}

@@ -1,12 +1,15 @@
+using System.IO;
 using System.Linq;
 using Godot;
+using Velom3d.Rides;
 using Velom3d.Screens;
 using Velom3d.Sensors;
 
 namespace Velom3d.Tests;
 
 /// <summary>
-/// Vérifie que tout fonctionne dans le moteur (autoload, signaux, écran de connexion) sur le simulateur :
+/// Vérifie que tout fonctionne dans le moteur (autoload, signaux, écrans de connexion, menu, sortie libre,
+/// bilan et historique) sur le simulateur :
 ///   godot --headless --path . res://Tests/GodotSmokeTest.tscn
 /// La logique pure est testée plus finement par dotnet test (dossier UnitTests/).
 /// </summary>
@@ -76,12 +79,83 @@ public partial class GodotSmokeTest : Node
         await Wait(3.0);
         Check(sim.Model.ErgMode && Mathf.Abs(hub.Power - 300) < 15, $"Mode ERG 300 W ({hub.Power} W)");
 
+        await RideScreens(sim);
+
         hub.DisconnectDevice(SimulatedBackend.Trainer);
         Check(hub.TrainerAddress == "" && hub.Devices.Get(SimulatedBackend.Trainer)?.State == LinkState.Available,
             "Déconnexion du trainer");
 
         GD.Print(_failures == 0 ? "\nTOUS LES TESTS PASSENT" : $"\n{_failures} ÉCHEC(S)");
         GetTree().Quit(_failures == 0 ? 0 : 1);
+    }
+
+    /// <summary>4. Menu, sortie libre en ERG puis en simulation, bilan et historique.
+    /// Les sorties vont dans un dossier jetable ; les changements d'écran sont interceptés.</summary>
+    async System.Threading.Tasks.Task RideScreens(SimulatedBackend sim)
+    {
+        var dir = ProjectSettings.GlobalizePath("user://test-rides-" + Time.GetTicksMsec());
+        Screen.Store = new RideStore(dir);
+        Node? next = null;
+        Navigator.Override = n => next = n;
+
+        var menu = Navigator.Create<MainMenuScreen>(Navigator.Menu);
+        AddChild(menu);
+        await Wait(0.1);
+        Check(menu.StructuredButton.Disabled && !menu.FreeRideButton.Disabled,
+            "Menu : entraînement structuré grisé, sortie libre disponible");
+        menu.FreeRideButton.EmitSignal(BaseButton.SignalName.Pressed);
+        await Wait(0.1);
+        Check(next is FreeRideScreen, "Le menu ouvre la sortie libre");
+        menu.QueueFree();
+
+        var ride = next as FreeRideScreen ?? Navigator.Create<FreeRideScreen>(Navigator.FreeRide);
+        next = null;
+        AddChild(ride);
+        await Wait(0.1);
+        ride.Start(RideMode.TargetPower, 220);
+        await Wait(3.5);
+        var rec = ride.Recorder!;
+        Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 220, $"Sortie ERG : consigne envoyée ({sim.Model.TargetPowerW} W)");
+        Check(rec.Ride.Samples.Count >= 3, $"Une mesure par seconde ({rec.Ride.Samples.Count})");
+        Check(rec.SpeedKmh > 5 && rec.DistanceM > 1, $"Le vélo virtuel avance ({rec.SpeedKmh:0.0} km/h, {rec.DistanceM:0} m)");
+        ride.Finish();
+        await Wait(0.3);
+        Check(!sim.Model.ErgMode, "Fin de sortie : le trainer n'impose plus de puissance");
+        Check(next is RideSummaryScreen, "Fin de sortie : ouverture du bilan");
+        ride.QueueFree();
+
+        if (next is RideSummaryScreen summary)
+        {
+            next = null;
+            AddChild(summary);
+            await Wait(0.2);
+            Check(summary.ChartCount == 4, $"Bilan : courbes puissance, cadence, vitesse, cardio ({summary.ChartCount})");
+            Check(summary.Ride.Info.Summary.Tss > 0 && summary.Ride.Info.Summary.Kcal > 0, "Bilan : TSS et calories calculés");
+            summary.QueueFree();
+        }
+
+        ride = Navigator.Create<FreeRideScreen>(Navigator.FreeRide);
+        AddChild(ride);
+        await Wait(0.1);
+        ride.Start(RideMode.Simulation, 0);
+        await Wait(1.5);
+        Check(!sim.Model.ErgMode && sim.Model.GradePct == 0 && Mathf.IsEqualApprox(sim.Model.Crr, 0.004)
+              && Mathf.IsEqualApprox(sim.Model.Cw, 0.25), $"Simulation : plat, pneus et air envoyés (Crr {sim.Model.Crr}, Cw {sim.Model.Cw})");
+        ride.Finish();
+        await Wait(0.2);
+        ride.QueueFree();
+        (next as Node)?.Free();
+        next = null;
+
+        var history = Navigator.Create<RideHistoryScreen>(Navigator.History);
+        AddChild(history);
+        await Wait(0.1);
+        Check(history.RideCount == 2, $"Historique : les deux sorties sont listées ({history.RideCount})");
+        Check(Screen.Store.LoadProfile().LastMode == RideMode.Simulation, "Le dernier mode choisi est retenu");
+        history.QueueFree();
+
+        Navigator.Override = null;
+        if (Directory.Exists(dir)) Directory.Delete(dir, true);
     }
 
     SignalAwaiter Wait(double s) => ToSignal(GetTree().CreateTimer(s), SceneTreeTimer.SignalName.Timeout);
