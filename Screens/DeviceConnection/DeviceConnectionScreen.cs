@@ -45,7 +45,10 @@ public partial class DeviceConnectionScreen : Control
         if (Sensors.Backend is null)
         {
             _scanButton.Disabled = true;
-            ShowStatus("Bluetooth indisponible ici : lancez le jeu sur un téléphone Android.");
+            ShowStatus(OS.GetName() == "Android"
+                ? "Le plugin Bluetooth n'est pas dans cette version de l'appli. À l'export : fichiers velom3d_ble-*.aar "
+                  + "dans addons/velom3d_ble/bin/, extension « Velom3d BLE » activée et « Use Gradle Build » coché."
+                : "Bluetooth indisponible ici : lancez le jeu sur un téléphone Android.");
             Refresh();
             return;
         }

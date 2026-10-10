@@ -25,9 +25,13 @@ class AndroidExportPlugin extends EditorExportPlugin:
 		return platform is EditorExportPlatformAndroid
 
 	func _get_android_libraries(platform: EditorExportPlatform, debug: bool) -> PackedStringArray:
+		# Sans Gradle Build, Godot ignore les AAR : le Bluetooth manquerait sans autre signe.
+		if not get_option("gradle_build/use_gradle_build"):
+			push_error("Velom3d BLE : cochez « Use Gradle Build » dans le préréglage Android, sinon l'appli n'aura pas le Bluetooth.")
+			return PackedStringArray()
 		var file := "velom3d_ble-%s.aar" % ("debug" if debug else "release")
 		if not FileAccess.file_exists(BIN_DIR + file):
-			push_warning("Velom3d BLE : %s introuvable. Construisez-le avec « cd android-plugin && ./gradlew assemble » ; l'export continue sans Bluetooth natif." % file)
+			push_error("Velom3d BLE : %s introuvable dans %s. Copiez-y les AAR (artefact « velom3d_ble-aar » de la CI, ou « cd android-plugin && ./gradlew assemble »), sinon l'appli n'aura pas le Bluetooth." % [file, BIN_DIR])
 			return PackedStringArray()
 		return PackedStringArray(["velom3d_ble/bin/" + file])
 
