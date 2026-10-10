@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  GODOT_VERSION: 4.7.2
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  csharp:
+    name: C# (tests + build du jeu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Tests unitaires (décodage, fusion, liste d'appareils)
+        run: dotnet test UnitTests/Velom3d.Sensors.Tests
+      - name: Build du jeu
+        run: dotnet build Velom3d.csproj -warnaserror
+
+  godot:
+    name: Godot (test dans le moteur, sans écran)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Installer Godot .NET
+        run: |
+          name="Godot_v${GODOT_VERSION}-stable_mono_linux_x86_64"
+          curl -sSLf -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/${name}.zip"
+          unzip -q godot.zip -d "$RUNNER_TEMP"
+          bin=$(find "$RUNNER_TEMP/$name" -maxdepth 1 -type f -name 'Godot_*' | head -1)
+          chmod +x "$bin"
+          echo "GODOT=$bin" >> "$GITHUB_ENV"
+          rm godot.zip
+      - name: Build et import
+        run: |
+          dotnet build Velom3d.csproj
+          "$GODOT" --headless --import --path . || true
+      - name: Test de l'écran de connexion et du simulateur
+        run: timeout 120 "$GODOT" --headless --path . res://Tests/GodotSmokeTest.tscn
+
+  android-plugin:
+    name: Plugin Android BLE
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build des AAR
+        working-directory: android-plugin
+        run: ./gradlew assemble --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: velom3d_ble-aar
+          path: addons/velom3d_ble/bin/*.aar
+          if-no-files-found: error

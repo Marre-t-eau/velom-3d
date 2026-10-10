@@ -11,8 +11,14 @@ config_version=5
 [application]
 
 config/name="Velom3d"
+config/description="Simulateur de vélo d'intérieur open source"
+run/main_scene="res://Screens/DeviceConnection/DeviceConnectionScreen.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
+
+[autoload]
+
+Sensors="*res://Sensors/SensorHub.cs"
 
 [display]
 
@@ -22,6 +28,10 @@ window/stretch/aspect="expand"
 [dotnet]
 
 project/assembly_name="Velom3d"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/velom3d_ble/plugin.cfg")
 
 [physics]
 
