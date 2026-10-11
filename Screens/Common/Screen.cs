@@ -14,6 +14,14 @@ public abstract partial class Screen : Control
     }
     static RideStore? _store;
 
+    /// <summary>Entraînements structurés enregistrés sur l'appareil. Remplaçable par les tests.</summary>
+    public static WorkoutStore Workouts
+    {
+        get => _workouts ??= new WorkoutStore(ProjectSettings.GlobalizePath("user://workouts"));
+        set => _workouts = value;
+    }
+    static WorkoutStore? _workouts;
+
     protected abstract void OnBack();
 
     public override void _Notification(int what)

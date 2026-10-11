@@ -15,7 +15,7 @@ namespace Velom3d.Rides;
 /// </summary>
 public sealed class RideStore
 {
-    const string CsvHeader = "time_s,power_w,cadence_rpm,heart_rate_bpm,speed_kmh,distance_m,grade_pct,target_power_w";
+    const string CsvHeader = "time_s,power_w,cadence_rpm,heart_rate_bpm,speed_kmh,distance_m,grade_pct,target_power_w,target_cadence_rpm";
 
     public string Directory { get; }
 
@@ -31,7 +31,7 @@ public sealed class RideStore
         var csv = new StringBuilder(CsvHeader).Append('\n');
         foreach (var s in ride.Samples)
             csv.Append(string.Create(CultureInfo.InvariantCulture,
-                $"{s.TimeS:0.##},{s.PowerW},{s.CadenceRpm:0.#},{s.HeartRateBpm},{s.SpeedKmh:0.##},{s.DistanceM:0.#},{s.GradePct:0.##},{s.TargetPowerW}\n"));
+                $"{s.TimeS:0.##},{s.PowerW},{s.CadenceRpm:0.#},{s.HeartRateBpm},{s.SpeedKmh:0.##},{s.DistanceM:0.#},{s.GradePct:0.##},{s.TargetPowerW},{s.TargetCadenceRpm}\n"));
         // Mesures d'abord : un en-tête présent garantit des mesures complètes.
         WriteAtomic(SamplesPath(ride.Info.Id), csv.ToString());
         WriteAtomic(InfoPath(ride.Info.Id), JsonSerializer.Serialize(ride.Info, RideJson.Default.RideInfo));
@@ -102,7 +102,8 @@ public sealed class RideStore
             return null; // en-tête ou ligne abîmée
         static double D(string s) => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0.0;
         static int I(string s) => int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : 0;
-        return new RideSample(t, I(f[1]), D(f[2]), I(f[3]), D(f[4]), D(f[5]), D(f[6]), I(f[7]));
+        // La cadence cible est arrivée après coup : les anciennes sorties ont 8 colonnes.
+        return new RideSample(t, I(f[1]), D(f[2]), I(f[3]), D(f[4]), D(f[5]), D(f[6]), I(f[7]), f.Length > 8 ? I(f[8]) : 0);
     }
 
     /// <summary>Écrit à côté puis remplace : une appli tuée en pleine écriture ne laisse pas de fichier tronqué.</summary>
@@ -118,4 +119,5 @@ public sealed class RideStore
 [JsonSourceGenerationOptions(WriteIndented = true, UseStringEnumConverter = true)]
 [JsonSerializable(typeof(RideInfo))]
 [JsonSerializable(typeof(RiderProfile))]
+[JsonSerializable(typeof(Workout))]
 internal partial class RideJson : JsonSerializerContext;

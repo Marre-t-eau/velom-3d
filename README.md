@@ -36,13 +36,28 @@ indisponible.
 ## Écrans
 
 ```
-Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînement structuré (grisé, à venir)
+Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements ─┬─ Modifier ──► Édition des blocs
+                                            │                └─ Démarrer ──► Séance ──Terminer──► Bilan
                                             ├─ Réglages (cycliste, vélo, vitesses virtuelles)
                                             ├─ Sortie libre ──Terminer──► Bilan
                                             ├─ Mes sorties ──► Bilan d'une sortie
                                             └─ Capteurs (retour à la connexion)
 ```
 
+- **Entraînements** (`Screens/Workouts/`) : la liste des séances structurées, avec leur profil
+  (couleur = zone de puissance), leur durée et le TSS prévu. Deux exemples sont créés au premier
+  lancement.
+- **Édition** (`Screens/WorkoutEditor/`) : nom, puissances en watts ou en % de FTP (la FTP des
+  Réglages, au moment de rouler ; changer d'unité convertit les valeurs), et les blocs. Chaque bloc
+  a une durée, une puissance *fixe*, *libre* ou en *rampe* (début → fin), et une cadence *libre* ou
+  *imposée*. Valeurs réglables avec − / + ou tapées (durée en `m:ss` ou en minutes). Blocs à
+  monter, descendre, dupliquer, supprimer. Enregistrement à chaque changement.
+- **Séance** (même écran que la sortie libre, `FreeRideScreen` avec un `Workout`) : bloc en cours
+  (temps restant, consigne, cadence demandée, profil avec la position), et la liste des blocs à
+  venir avec leur durée, leurs watts, leur cadence et dans combien de temps ils commencent ; les
+  blocs passés disparaissent. Bloc fixe ou rampe : consigne ERG (une mise à jour par seconde dans
+  une rampe). Bloc libre ou séance finie : le trainer passe en simulation sur le plat. Bouton
+  *Bloc suivant* pour sauter un bloc ; la cadence s'affiche en orange à plus de 5 tr/min de la cible.
 - **Sortie libre** (`Screens/FreeRide/`) : parcours plat, deux modes.
   *Puissance imposée* : le trainer impose les watts (ERG), réglables de ±5 ou ±10 W en roulant
   (départ à la dernière consigne utilisée).
@@ -61,12 +76,16 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînement str
 - **Bilan** (`Screens/RideSummary/`) : durée, distance, puissances moyenne / normalisée / max,
   TSS, facteur d'intensité, calories (travail en kJ ÷ 4,184 ÷ 24 % de rendement), cadence,
   vitesse, FC ; temps par zone de puissance (Coggan) ; courbes puissance, cadence, vitesse
-  (avec la pente quand elle varie) et fréquence cardiaque.
+  (avec la pente quand elle varie) et fréquence cardiaque. La cible (consigne ERG envoyée,
+  cadence demandée) est tracée en blanc sur les courbes de puissance et de cadence, en
+  entraînement comme en sortie libre à puissance imposée.
 - **Mes sorties** (`Screens/RideHistory/`) : toutes les sorties, la plus récente en haut.
 
 Les sorties sont enregistrées sur l'appareil, dans `user://rides/` : `{id}.json` (en-tête et
 résumé) et `{id}.csv` (une ligne par seconde, lisible dans un tableur), plus `profile.json`
-(FTP, poids, roue, vitesses virtuelles, dernier mode). Pendant une sortie, enregistrement toutes les 30 s et à la mise en
+(FTP, poids, roue, vitesses virtuelles, dernier mode). Le CSV garde à chaque seconde la consigne
+ERG et la cadence demandée (`target_power_w`, `target_cadence_rpm`, 0 sans cible). Les
+entraînements sont dans `user://workouts/{id}.json`. Pendant une sortie, enregistrement toutes les 30 s et à la mise en
 arrière-plan. Le calcul (`Rides/Core/`) ne dépend pas de Godot et est testé par `dotnet test`.
 
 ## Export Android avec le Bluetooth natif

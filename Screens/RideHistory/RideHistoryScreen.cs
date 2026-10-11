@@ -58,6 +58,7 @@ public partial class RideHistoryScreen : Screen
 
     public static string ModeName(RideInfo info) =>
         info.Mode == RideMode.TargetPower ? "Puissance imposée"
+        : info.Mode == RideMode.Workout ? $"Entraînement · {info.WorkoutName}"
         : info.VirtualGears.Length > 0 ? $"Simulation réaliste · {info.VirtualGears}"
         : "Simulation réaliste";
 

@@ -16,16 +16,18 @@ public sealed class RideRecorder
     public double DistanceM { get; private set; }
     public double SpeedKmh => Physics.SpeedMps * 3.6;
     public double AveragePowerW => ElapsedS > 0 ? _workJ / ElapsedS : 0.0;
-    /// <summary>Consigne ERG courante (0 en mode simulation).</summary>
+    /// <summary>Consigne ERG courante (0 sans consigne : simulation, bloc libre).</summary>
     public int TargetPowerW { get; set; }
+    /// <summary>Cadence demandée (0 si libre).</summary>
+    public int TargetCadenceRpm { get; set; }
 
     double _nextSampleAt = 1.0;
     double _workJ;
 
-    public RideRecorder(RideMode mode, RiderProfile profile, DateTimeOffset startedAt, int targetPowerW = 0)
+    public RideRecorder(RideMode mode, RiderProfile profile, DateTimeOffset startedAt, int targetPowerW = 0, string workoutName = "")
     {
         Physics = new BikePhysics { MassKg = profile.TotalMassKg };
-        TargetPowerW = mode == RideMode.TargetPower ? targetPowerW : 0;
+        TargetPowerW = mode == RideMode.Simulation ? 0 : targetPowerW;
         Ride = new Ride(new RideInfo
         {
             Id = Ride.NewId(startedAt),
@@ -35,6 +37,7 @@ public sealed class RideRecorder
             FtpW = profile.FtpW,
             MassKg = profile.TotalMassKg,
             VirtualGears = mode == RideMode.Simulation && profile.VirtualGears ? profile.CreateDrivetrain().Describe() : "",
+            WorkoutName = mode == RideMode.Workout ? workoutName : "",
         });
     }
 
@@ -51,7 +54,7 @@ public sealed class RideRecorder
         {
             Advance(_nextSampleAt - ElapsedS, powerW);
             Ride.Samples.Add(new RideSample(ElapsedS, Math.Max(0, powerW), cadenceRpm, heartRateBpm,
-                SpeedKmh, DistanceM, Physics.GradePct, TargetPowerW));
+                SpeedKmh, DistanceM, Physics.GradePct, TargetPowerW, TargetCadenceRpm));
             _nextSampleAt += 1.0;
         }
         Advance(end - ElapsedS, powerW);
