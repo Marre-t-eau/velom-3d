@@ -3,8 +3,9 @@ using Godot;
 
 namespace Velom3d.Sensors;
 
-/// <summary>Faux home trainer, fausses pédales et fausse ceinture cardio, pour les tests automatiques
-/// (Tests/GodotSmokeTest). L'écran de connexion ne s'en sert pas.</summary>
+/// <summary>Faux home trainer, fausses pédales et fausse ceinture cardio : mode debug
+/// (voir <see cref="SensorBackends"/>) et tests automatiques (Tests/GodotSmokeTest).
+/// Ils produisent les mêmes octets que de vrais appareils.</summary>
 public partial class SimulatedBackend : SensorBackend
 {
     public const string Trainer = "SIM:TRAINER";
@@ -17,6 +18,13 @@ public partial class SimulatedBackend : SensorBackend
     [Export] public double ConnectDelayS { get; set; } = 0.6;
 
     public SimulatedTrainer Model { get; } = new();
+
+    /// <summary>Effort variable du cycliste virtuel (mode debug), pour des courbes réalistes.</summary>
+    public bool VaryEffort
+    {
+        get => Model.VaryEffort;
+        set => Model.VaryEffort = value;
+    }
 
     readonly HashSet<string> _connected = new();
     double _accum;

@@ -6,8 +6,10 @@ namespace Velom3d.Sensors;
 /// Autoload "Sensors" : point d'entrée unique pour le reste du jeu.
 /// <code>
 /// SensorHub.Instance.PowerChanged += w => ...;   // ou SensorHub.Instance.Power
-/// SensorHub.Instance.SetGrade(4.5);               // mode simulation (pente)
-/// SensorHub.Instance.SetTargetPower(250);         // mode ERG
+/// SensorHub.Instance.EnterSimulation(0.0);        // passe en mode simulation (pente), quitte l'ERG
+/// SensorHub.Instance.SetGrade(4.5);               // change la pente en cours de simulation
+/// SensorHub.Instance.EnterErg(250);               // passe en mode ERG
+/// SensorHub.Instance.SetTargetPower(260);         // change la consigne ERG
 /// </code>
 /// </summary>
 public partial class SensorHub : Node
@@ -57,7 +59,8 @@ public partial class SensorHub : Node
         {
             EmitSignal(SignalName.ControlResult, r.RequestOpcode, r.Ok);
             if (!r.Ok)
-                EmitSignal(SignalName.StatusMessage, $"Le trainer a refusé la commande 0x{r.RequestOpcode:x2} (code {r.Result})");
+                EmitSignal(SignalName.StatusMessage,
+                    $"Le trainer a refusé : {FtmsCommands.Describe(r.RequestOpcode)} ({FtmsCommands.DescribeResult(r.Result)}).");
         };
         Devices.Changed += () => EmitSignal(SignalName.DevicesChanged);
     }
@@ -137,14 +140,22 @@ public partial class SensorHub : Node
 
     public void SetResistance(double level) => SendControl(FtmsCommands.SetTargetResistance(level));
 
-    void SendControl(byte[] frame)
+    /// <summary>Passe en mode ERG (prise de contrôle, démarrage, consigne).</summary>
+    public void EnterErg(int watts) => SendControl(FtmsCommands.EnterErg(watts));
+
+    /// <summary>Passe en mode simulation en effaçant d'abord toute consigne ERG.</summary>
+    public void EnterSimulation(double gradePct, double windMps = 0.0, double crr = 0.004, double cw = 0.51) =>
+        SendControl(FtmsCommands.EnterSimulation(gradePct, windMps, crr, cw));
+
+    void SendControl(params byte[][] frames)
     {
         if (Backend is null || TrainerAddress == "")
         {
             EmitSignal(SignalName.StatusMessage, "Aucun home trainer FTMS connecté");
             return;
         }
-        Backend.Write(TrainerAddress, BleUuids.FitnessMachineControlPoint, frame);
+        // Le transport les envoie dans l'ordre, une à la fois.
+        foreach (var frame in frames) Backend.Write(TrainerAddress, BleUuids.FitnessMachineControlPoint, frame);
     }
 
     void OnDeviceConnected(string address, string[] services)

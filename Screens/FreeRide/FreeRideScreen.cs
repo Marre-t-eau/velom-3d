@@ -14,7 +14,8 @@ namespace Velom3d.Screens;
 public partial class FreeRideScreen : Screen
 {
     const double AutosaveEveryS = 30.0;
-    const int PowerStep = 10;
+    /// <summary>Boutons de réglage de la consigne ERG pendant la sortie.</summary>
+    static readonly int[] PowerSteps = [10, 5];
 
     RiderProfile _profile = null!;
     RideMode _mode;
@@ -22,11 +23,10 @@ public partial class FreeRideScreen : Screen
 
     Control _setup = null!, _riding = null!;
     Button _ergChoice = null!, _simChoice = null!;
-    Control _targetRow = null!;
-    Label _targetValue = null!, _ftpValue = null!, _massValue = null!, _trainerHint = null!;
+    Label _ftpValue = null!, _massValue = null!, _trainerHint = null!;
 
     Label _clock = null!, _modeLabel = null!, _power = null!, _powerTitle = null!, _cadence = null!, _hr = null!;
-    Label _speed = null!, _distance = null!, _avgPower = null!, _rideTarget = null!;
+    Label _speed = null!, _distance = null!, _avgPower = null!, _rideTarget = null!, _trainerStatus = null!;
     Control _ergControls = null!;
     Button _pauseButton = null!, _finishButton = null!;
     double _finishArmedUntil = -1, _sinceAutosave;
@@ -47,9 +47,21 @@ public partial class FreeRideScreen : Screen
         _riding = BuildRiding(root);
         _riding.Visible = false;
         RefreshSetup();
+        Hub.StatusMessage += ShowTrainerStatus;
     }
 
-    public override void _ExitTree() => DisplayServer.ScreenSetKeepOn(false);
+    public override void _ExitTree()
+    {
+        Hub.StatusMessage -= ShowTrainerStatus;
+        DisplayServer.ScreenSetKeepOn(false);
+    }
+
+    /// <summary>Refus du trainer (mode non pris en charge…) : visible pendant la sortie.</summary>
+    void ShowTrainerStatus(string text)
+    {
+        _trainerStatus.Text = text;
+        _trainerStatus.Visible = text.Length > 0;
+    }
 
     // --- Réglages avant le départ ---
 
@@ -65,11 +77,9 @@ public partial class FreeRideScreen : Screen
         var modes = Ui.Row();
         content.AddChild(modes);
         _ergChoice = ModeChoice(modes, "Puissance imposée",
-            "Le trainer impose les watts choisis, quelle que soit la cadence (mode ERG).", RideMode.TargetPower);
+            "Le trainer impose les watts, quelle que soit la cadence (mode ERG). Réglables de 5 ou 10 W en roulant.", RideMode.TargetPower);
         _simChoice = ModeChoice(modes, "Simulation réaliste",
             "La résistance suit la vitesse : roulement des pneus et frottement de l'air, sur le plat.", RideMode.Simulation);
-
-        _targetRow = Stepper(content, "Puissance cible", out _targetValue, d => _target = Math.Clamp(_target + d * PowerStep, 50, 1000));
 
         content.AddChild(Ui.Label("Vos réglages (pour la vitesse, le TSS et l'IF)", 22, Ui.Muted));
         Stepper(content, "FTP", out _ftpValue, d => _profile.FtpW = Math.Clamp(_profile.FtpW + d * 5, 50, 600));
@@ -132,8 +142,6 @@ public partial class FreeRideScreen : Screen
     {
         _ergChoice.ButtonPressed = _mode == RideMode.TargetPower;
         _simChoice.ButtonPressed = _mode == RideMode.Simulation;
-        _targetRow.Visible = _mode == RideMode.TargetPower;
-        _targetValue.Text = $"{_target} W";
         _ftpValue.Text = $"{_profile.FtpW} W";
         _massValue.Text = $"{_profile.RiderMassKg:0} kg";
         _trainerHint.Text = Hub.TrainerAddress == ""
@@ -176,14 +184,22 @@ public partial class FreeRideScreen : Screen
         var erg = Ui.Row();
         erg.Alignment = BoxContainer.AlignmentMode.Center;
         content.AddChild(erg);
-        erg.AddChild(Ui.Button($"−{PowerStep} W", () => ChangeTarget(-PowerStep), 200, 96, 30));
+        foreach (var step in PowerSteps) erg.AddChild(Ui.Button($"−{step} W", () => ChangeTarget(-step), 150, 96, 28));
         _rideTarget = Ui.Label("", 34);
         _rideTarget.CustomMinimumSize = new Vector2(260, 0);
         _rideTarget.HorizontalAlignment = HorizontalAlignment.Center;
         _rideTarget.VerticalAlignment = VerticalAlignment.Center;
         erg.AddChild(_rideTarget);
-        erg.AddChild(Ui.Button($"+{PowerStep} W", () => ChangeTarget(+PowerStep), 200, 96, 30));
+        for (int i = PowerSteps.Length - 1; i >= 0; i--)
+        {
+            int step = PowerSteps[i];
+            erg.AddChild(Ui.Button($"+{step} W", () => ChangeTarget(+step), 150, 96, 28));
+        }
         _ergControls = erg;
+
+        _trainerStatus = Ui.Label("", 18, Ui.Warning);
+        _trainerStatus.Visible = false;
+        content.AddChild(_trainerStatus);
 
         var actions = Ui.Row();
         page.AddChild(actions);
@@ -207,7 +223,7 @@ public partial class FreeRideScreen : Screen
         Recorder = new RideRecorder(mode, _profile, DateTimeOffset.Now, targetW);
         if (Hub.TrainerAddress != "")
         {
-            if (mode == RideMode.TargetPower) Hub.SetTargetPower(targetW);
+            if (mode == RideMode.TargetPower) Hub.EnterErg(targetW);
             else ApplySimulation();
         }
         _modeLabel.Text = mode == RideMode.TargetPower ? "Puissance imposée · plat" : "Simulation réaliste · plat";
@@ -217,11 +233,12 @@ public partial class FreeRideScreen : Screen
         DisplayServer.ScreenSetKeepOn(true);
     }
 
-    /// <summary>Pente nulle ; le trainer applique les mêmes pneus et la même traînée que la vitesse affichée.</summary>
+    /// <summary>Pente nulle ; le trainer applique les mêmes pneus et la même traînée que la vitesse affichée.
+    /// L'ancienne consigne ERG éventuelle est effacée d'abord.</summary>
     void ApplySimulation()
     {
         var physics = Recorder!.Physics;
-        Hub.SetGrade(physics.GradePct, physics.WindMps, physics.Crr, physics.WindResistanceCoefficient);
+        Hub.EnterSimulation(physics.GradePct, physics.WindMps, physics.Crr, physics.WindResistanceCoefficient);
     }
 
     void ChangeTarget(int delta)
@@ -256,7 +273,7 @@ public partial class FreeRideScreen : Screen
         var ride = Recorder.Finish();
         Recorder = null;
         // On rend la main au cycliste : plus de consigne ERG après la sortie.
-        if (Hub.TrainerAddress != "") Hub.SetGrade(0.0);
+        if (Hub.TrainerAddress != "") Hub.EnterSimulation(0.0);
         DisplayServer.ScreenSetKeepOn(false);
         if (ride.Samples.Count == 0)
         {

@@ -9,7 +9,7 @@ namespace Velom3d.Screens;
 /// Premier écran : recherche et connexion du home trainer, du capteur de puissance et de la
 /// ceinture cardio, par le Bluetooth du téléphone. Pensé pour le tactile (grandes cibles,
 /// liste qui défile au doigt). Sans plugin Bluetooth natif (éditeur, ordinateur), l'écran
-/// l'indique et ne cherche rien. « Continuer » mène au menu principal.
+/// l'indique et ne cherche rien, sauf en mode debug (capteurs simulés, voir SensorBackends). « Continuer » mène au menu principal.
 /// </summary>
 public partial class DeviceConnectionScreen : Control
 {
@@ -43,18 +43,20 @@ public partial class DeviceConnectionScreen : Control
         Sensors.DevicesChanged += Refresh;
         Sensors.StatusMessage += ShowStatus;
         // Retour depuis le menu : on garde le transport, sinon les appareils seraient déconnectés.
-        if (NativeBleBackend.IsAvailable && Sensors.Backend is not NativeBleBackend) Sensors.UseBackend(new NativeBleBackend());
-        // Sans plugin natif, seul un transport déjà branché (tests automatiques) peut servir.
+        if (Sensors.Backend is null && SensorBackends.Create() is { } backend) Sensors.UseBackend(backend);
         if (Sensors.Backend is null)
         {
             _scanButton.Disabled = true;
             ShowStatus(OS.GetName() == "Android"
                 ? "Le plugin Bluetooth n'est pas dans cette version de l'appli. À l'export : fichiers velom3d_ble-*.aar "
                   + "dans addons/velom3d_ble/bin/, extension « Velom3d BLE » activée et « Use Gradle Build » coché."
-                : "Bluetooth indisponible ici : lancez le jeu sur un téléphone Android.");
+                : $"Bluetooth indisponible ici : lancez le jeu sur un téléphone Android, ou en mode debug "
+                  + $"({SensorBackends.DebugEnvVar}=1 ou {SensorBackends.DebugArg}) pour des capteurs simulés.");
             Refresh();
             return;
         }
+        if (Sensors.Backend is SimulatedBackend { VaryEffort: true })
+            ShowStatus("Mode debug : capteurs simulés, puissance, cadence et cardio générés automatiquement.");
         Sensors.StartScan();
     }
 

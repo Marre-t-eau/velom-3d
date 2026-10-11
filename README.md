@@ -10,7 +10,7 @@ et s'y connecte : home trainer (FTMS), capteur de puissance, ceinture cardio.
 ```
  capteurs BLE ──► backend ──(octets bruts)──► SensorHub (autoload "Sensors") ──► écrans du jeu
                   ├─ NativeBleBackend   (plugin Android « Velom3dBle »)
-                  └─ SimulatedBackend   (faux appareils, pour les tests automatiques)
+                  └─ SimulatedBackend   (faux appareils : mode debug et tests automatiques)
 ```
 
 - `Sensors/Core/` : C# pur, sans Godot (décodage BLE, commandes FTMS, fusion des mesures,
@@ -21,8 +21,17 @@ et s'y connecte : home trainer (FTMS), capteur de puissance, ceinture cardio.
 - `android-plugin/` : sources Kotlin du plugin Android (scan, connexion, notifications, écriture).
 - `addons/velom3d_ble/` : greffon d'éditeur qui ajoute le plugin aux exports Android.
 
-L'écran n'utilise que le vrai Bluetooth : sur ordinateur ou dans l'éditeur, il indique que le
-Bluetooth est indisponible. Pour l'essayer, exporter sur un téléphone Android (ci-dessous).
+Le transport est une classe `SensorBackend` à deux implémentations, choisie par `SensorBackends` :
+
+- `NativeBleBackend` : le vrai Bluetooth (Android). Utilisé par défaut.
+- `SimulatedBackend` : **mode debug**. Un faux home trainer, des pédales et une ceinture cardio
+  génèrent puissance, cadence et fréquence cardiaque (effort variable) et obéissent aux commandes
+  ERG et simulation. À activer sur ordinateur avec la variable d'environnement
+  `VELOM3D_DEBUG_SENSORS=1`, ou l'argument `--debug-sensors`
+  (`godot --path . -- --debug-sensors`, ou *Projet > Paramètres > Éditeur > Run > Main Run Args*).
+
+Sans mode debug et sans plugin natif (ordinateur, éditeur), l'écran indique que le Bluetooth est
+indisponible.
 
 ## Écrans
 
@@ -34,7 +43,8 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînement str
 ```
 
 - **Sortie libre** (`Screens/FreeRide/`) : parcours plat, deux modes.
-  *Puissance imposée* : le trainer impose les watts (ERG), réglables de 10 en 10 en roulant.
+  *Puissance imposée* : le trainer impose les watts (ERG), réglables de ±5 ou ±10 W en roulant
+  (départ à la dernière consigne utilisée).
   *Simulation réaliste* : le trainer reçoit pente 0 %, Crr 0,004 (pneus route) et
   ½·ρ·CdA = 0,25 kg/m (CdA 0,40 m², mains aux cocottes) ; il durcit avec la vitesse.
   Dans les deux cas, la vitesse et la distance viennent du même modèle physique

@@ -29,6 +29,11 @@ public partial class GodotSmokeTest : Node
         AddChild(screen);
         await Wait(0.5);
         Check(hub.Backend is null && hub.Devices.Sorted.Count == 0, "Sans plugin natif, aucun appareil inventé");
+        OS.SetEnvironment(SensorBackends.DebugEnvVar, "1");
+        var debug = SensorBackends.Create();
+        Check(debug is SimulatedBackend { VaryEffort: true }, "Mode debug : capteurs simulés via la variable d'environnement");
+        debug?.Free();
+        OS.UnsetEnvironment(SensorBackends.DebugEnvVar);
         screen.QueueFree();
         await Wait(0.1);
 
@@ -139,6 +144,7 @@ public partial class GodotSmokeTest : Node
         await Wait(0.1);
         ride.Start(RideMode.Simulation, 0);
         await Wait(1.5);
+        Check(sim.Model.TargetPowerW == 0, "Simulation après ERG : l'ancienne consigne est effacée");
         Check(!sim.Model.ErgMode && sim.Model.GradePct == 0 && Mathf.IsEqualApprox(sim.Model.Crr, 0.004)
               && Mathf.IsEqualApprox(sim.Model.Cw, 0.25), $"Simulation : plat, pneus et air envoyés (Crr {sim.Model.Crr}, Cw {sim.Model.Cw})");
         ride.Finish();

@@ -14,6 +14,9 @@ public sealed class SimulatedTrainer
     public double RiderPowerW { get; set; } = 180.0;
     public double RiderCadenceRpm { get; set; } = 88.0;
     public double MassKg { get; set; } = 75.0 + 9.0; // cycliste + vélo
+    /// <summary>Effort qui varie dans le temps (blocs, accélérations), comme un vrai cycliste.
+    /// Pour le mode debug ; les tests gardent un effort constant, plus facile à vérifier.</summary>
+    public bool VaryEffort { get; set; }
 
     public bool ErgMode { get; private set; }
     public int TargetPowerW { get; private set; }
@@ -32,18 +35,28 @@ public sealed class SimulatedTrainer
     public SimulatedTrainer(int seed = 1) => _rng = new Random(seed);
 
     public int HeartRate => (int)Math.Round(_hr);
-    public double Cadence => Math.Max(0.0, RiderCadenceRpm + Math.Sin(_time * 0.7) * 2.0);
+    public double Cadence => Math.Max(0.0, RiderCadenceRpm + Math.Sin(_time * 0.7) * 2.0
+                                           + (VaryEffort ? Math.Sin(_time / 45.0) * 6.0 : 0.0));
 
     public void Step(double dt)
     {
         _time += dt;
-        double goal = ErgMode ? TargetPowerW : RiderPowerW;
+        double goal = ErgMode ? TargetPowerW : RiderEffort();
         // Le trainer met ~1 s à atteindre une consigne ERG ; la FC suit en ~30 s.
         _power += (goal - _power) * Math.Clamp(dt * 2.0, 0.0, 1.0);
         _hr += (60.0 + _power * 0.45 - _hr) * Math.Clamp(dt / 30.0, 0.0, 1.0);
         double prev = _crankRevs;
         _crankRevs += Cadence / 60.0 * dt;
         if (Math.Floor(_crankRevs) > Math.Floor(prev)) _lastCrankEvent = _time;
+    }
+
+    /// <summary>Puissance que le cycliste virtuel cherche à produire en mode pente.</summary>
+    double RiderEffort()
+    {
+        if (!VaryEffort) return RiderPowerW;
+        // Vague lente (≈ 6 min) + relances plus courtes (≈ 40 s) + bruit de pédalage.
+        return Math.Max(0.0, RiderPowerW * (1.0 + 0.25 * Math.Sin(_time / 60.0) + 0.12 * Math.Sin(_time / 6.5))
+                             + (_rng.NextDouble() - 0.5) * 20.0);
     }
 
     /// <summary>Traite une écriture sur le Control Point et renvoie l'indication de réponse.</summary>
@@ -54,8 +67,12 @@ public sealed class SimulatedTrainer
         byte result = 0x01;
         switch (op)
         {
-            case FtmsCommands.OpRequestControl or FtmsCommands.OpReset
-                or FtmsCommands.OpStartOrResume or FtmsCommands.OpStopOrPause:
+            case FtmsCommands.OpRequestControl or FtmsCommands.OpStartOrResume or FtmsCommands.OpStopOrPause:
+                break;
+            case FtmsCommands.OpReset:
+                ErgMode = false;
+                TargetPowerW = 0;
+                GradePct = 0;
                 break;
             case FtmsCommands.OpSetTargetPower when d.Length >= 3:
                 ErgMode = true;

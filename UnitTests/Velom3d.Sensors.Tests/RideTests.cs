@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using Velom3d.Rides;
+using Velom3d.Sensors;
 using Xunit;
 
 namespace Velom3d.Sensors.Tests;
@@ -199,5 +200,56 @@ public class StoreTests : IDisposable
 
         File.WriteAllText(Path.Combine(_dir, "broken.json"), "{ pas du json");
         Assert.Empty(store.List());
+    }
+}
+
+public class TrainerModeTests
+{
+    static string Hex(byte[] b) => Convert.ToHexString(b).ToLowerInvariant();
+
+    [Fact]
+    public void Entering_simulation_resets_then_takes_control_again()
+    {
+        var frames = FtmsCommands.EnterSimulation(0.0, 0.0, 0.004, 0.25);
+        Assert.Equal(["01", "00", "07", "11000000002819"], frames.Select(Hex));
+    }
+
+    [Fact]
+    public void Entering_erg_takes_control_before_the_target() =>
+        Assert.Equal(["00", "07", "05dc00"], FtmsCommands.EnterErg(220).Select(Hex));
+
+    [Fact]
+    public void Simulation_after_erg_really_leaves_erg()
+    {
+        var t = new SimulatedTrainer();
+        foreach (var f in FtmsCommands.EnterErg(250)) t.HandleControlPoint(f);
+        Assert.True(t.ErgMode);
+        foreach (var f in FtmsCommands.EnterSimulation(0.0, 0.0, 0.004, 0.25))
+            Assert.Equal(0x01, t.HandleControlPoint(f)[2]);
+        Assert.False(t.ErgMode);
+        Assert.Equal(0, t.TargetPowerW);
+        Assert.Equal(0.25, t.Cw, 6);
+    }
+
+    [Fact]
+    public void Refusals_are_explained_in_plain_words() =>
+        Assert.Equal("mode simulation / non prise en charge par ce trainer",
+            FtmsCommands.Describe(0x11) + " / " + FtmsCommands.DescribeResult(0x02));
+
+    [Fact]
+    public void Debug_effort_varies_but_stays_realistic()
+    {
+        var t = new SimulatedTrainer { VaryEffort = true };
+        var f = new SensorFusion();
+        var powers = new System.Collections.Generic.List<int>();
+        for (int i = 0; i < 600 * 4; i++)
+        {
+            t.Step(0.25);
+            f.Feed("sim", BleUuids.IndoorBikeData, t.IndoorBikeFrame(true), i * 0.25);
+            if (i % 4 == 0) powers.Add(f.Power);
+        }
+        Assert.True(powers.Max() - powers.Min() > 60, $"{powers.Min()}..{powers.Max()}");
+        Assert.InRange(powers.Average(), 150, 210);
+        Assert.InRange(f.HeartRate, 100, 190);
     }
 }
