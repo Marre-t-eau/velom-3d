@@ -2,6 +2,7 @@ using System;
 using Godot;
 using Velom3d.Rides;
 using Velom3d.Sensors;
+using Velom3d.World;
 
 namespace Velom3d.Screens;
 
@@ -13,6 +14,7 @@ namespace Velom3d.Screens;
 /// les paramètres de simulation : l'appli calcule la puissance que demandent la vitesse engagée
 /// et la cadence, et la donne au trainer en consigne, mise à jour en continu.
 /// La sortie est enregistrée sur l'appareil, et toutes les 30 s au cas où l'appli serait coupée.
+/// Pendant la sortie, le cycliste roule en 3D sur un circuit en boucle (<see cref="RideWorld"/>), en fond d'écran.
 /// </summary>
 public partial class FreeRideScreen : Screen
 {
@@ -44,6 +46,9 @@ public partial class FreeRideScreen : Screen
     internal RideRecorder? Recorder { get; private set; }
     /// <summary>Vitesses virtuelles de la sortie en cours (null si désactivées ou en ERG).</summary>
     internal Drivetrain? Gears { get; private set; }
+    /// <summary>Vue 3D de la sortie en cours (null avant le départ).</summary>
+    internal RideWorld? Scene3D { get; private set; }
+    CanvasItem _backdrop = null!;
 
     SensorHub Hub => SensorHub.Instance;
 
@@ -53,6 +58,7 @@ public partial class FreeRideScreen : Screen
         _mode = _profile.LastMode;
         _target = Math.Clamp(_profile.LastTargetPowerW, 50, 1000);
         var root = Ui.BuildPage(this);
+        _backdrop = GetChild<CanvasItem>(0); // fond uni de la page, masqué pendant la sortie pour voir la 3D
         _setup = BuildSetup(root);
         _riding = BuildRiding(root);
         _riding.Visible = false;
@@ -152,31 +158,36 @@ public partial class FreeRideScreen : Screen
         page.AddChild(header);
         _clock = Ui.Label("0:00", 52);
         _clock.AutowrapMode = TextServer.AutowrapMode.Off;
+        Outline(_clock);
         header.AddChild(_clock);
         _modeLabel = Ui.Label("", 20, Ui.Muted);
         _modeLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _modeLabel.VerticalAlignment = VerticalAlignment.Center;
         _modeLabel.HorizontalAlignment = HorizontalAlignment.Right;
         header.AddChild(_modeLabel);
+        Outline(_modeLabel);
 
+        // Mesures sur une ligne en haut, commandes en bas : la route reste visible au milieu.
         var content = Ui.AddScroll(page, 14);
-        var row1 = Ui.Row(14);
+        content.SizeFlagsVertical = SizeFlags.ExpandFill;
+        var row1 = Ui.Row(12);
         content.AddChild(row1);
-        _power = Ui.Tile(row1, "Puissance", Ui.PowerColor, 52);
+        _power = Ui.Tile(row1, "Puissance", Ui.PowerColor, 40);
         _powerTitle = (Label)_power.GetParent().GetChild(0);
-        _cadence = Ui.Tile(row1, "Cadence", Ui.CadenceColor, 52);
-        _hr = Ui.Tile(row1, "Fréquence cardiaque", Ui.HeartRateColor, 52);
-        var row2 = Ui.Row(14);
-        content.AddChild(row2);
-        _speed = Ui.Tile(row2, "Vitesse", Ui.SpeedColor);
-        _distance = Ui.Tile(row2, "Distance", Ui.Muted);
-        _avgPower = Ui.Tile(row2, "Puissance moyenne", Ui.PowerColor);
+        _cadence = Ui.Tile(row1, "Cadence", Ui.CadenceColor, 40);
+        _hr = Ui.Tile(row1, "Cardio", Ui.HeartRateColor, 40);
+        _speed = Ui.Tile(row1, "Vitesse", Ui.SpeedColor, 40);
+        _distance = Ui.Tile(row1, "Distance", Ui.Muted, 40);
+        _avgPower = Ui.Tile(row1, "Puiss. moyenne", Ui.PowerColor, 40);
+        foreach (var tile in row1.GetChildren()) ((CanvasItem)tile).SelfModulate = new Color(1, 1, 1, 0.8f);
+        content.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass });
 
         var erg = Ui.Row();
         erg.Alignment = BoxContainer.AlignmentMode.Center;
         content.AddChild(erg);
         foreach (var step in PowerSteps) erg.AddChild(Ui.Button($"−{step} W", () => ChangeTarget(-step), 150, 96, 28));
         _rideTarget = Ui.Label("", 34);
+        Outline(_rideTarget);
         _rideTarget.CustomMinimumSize = new Vector2(260, 0);
         _rideTarget.HorizontalAlignment = HorizontalAlignment.Center;
         _rideTarget.VerticalAlignment = VerticalAlignment.Center;
@@ -196,6 +207,7 @@ public partial class FreeRideScreen : Screen
         gears.AddChild(_frontButton);
         gears.AddChild(Ui.Button("− Plus souple", ShiftEasier, 230, 96, 26));
         _gearLabel = Ui.Label("", 30);
+        Outline(_gearLabel);
         _gearLabel.CustomMinimumSize = new Vector2(220, 0);
         _gearLabel.HorizontalAlignment = HorizontalAlignment.Center;
         _gearLabel.VerticalAlignment = VerticalAlignment.Center;
@@ -204,6 +216,7 @@ public partial class FreeRideScreen : Screen
         _gearControls = gears;
 
         _trainerStatus = Ui.Label("", 18, Ui.Warning);
+        Outline(_trainerStatus);
         _trainerStatus.Visible = false;
         content.AddChild(_trainerStatus);
 
@@ -216,6 +229,13 @@ public partial class FreeRideScreen : Screen
         _finishButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         actions.AddChild(_finishButton);
         return page;
+    }
+
+    /// <summary>Contour sombre : texte lisible sur le ciel et la route.</summary>
+    static void Outline(Label label)
+    {
+        label.AddThemeConstantOverride("outline_size", 8);
+        label.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.6f));
     }
 
     internal void Start(RideMode mode, int targetW)
@@ -243,6 +263,9 @@ public partial class FreeRideScreen : Screen
         _gearControls.Visible = Gears is not null;
         _setup.Visible = false;
         _riding.Visible = true;
+        Scene3D = new RideWorld();
+        AddChild(Scene3D);
+        _backdrop.Visible = false;
         DisplayServer.ScreenSetKeepOn(true);
     }
 
@@ -342,6 +365,8 @@ public partial class FreeRideScreen : Screen
     {
         if (Recorder is null) return;
         Recorder.Tick(delta, Hub.Power, Hub.Cadence, Hub.HeartRate);
+        bool moving = !Recorder.IsPaused;
+        Scene3D?.Follow(Recorder.DistanceM, moving ? Recorder.Physics.SpeedMps : 0, moving ? Hub.Cadence : 0);
         if (Gears is not null) UpdateGearResistance(delta);
 
         _sinceAutosave += delta;

@@ -8,7 +8,7 @@ using Velom3d.Sensors;
 namespace Velom3d.Tests;
 
 /// <summary>
-/// Vérifie que tout fonctionne dans le moteur (autoload, signaux, écrans de connexion, menu, sortie libre,
+/// Vérifie que tout fonctionne dans le moteur (autoload, signaux, écrans de connexion, menu, sortie libre et sa vue 3D,
 /// bilan et historique) sur le simulateur :
 ///   godot --headless --path . res://Tests/GodotSmokeTest.tscn
 /// La logique pure est testée plus finement par dotnet test (dossier UnitTests/).
@@ -123,6 +123,10 @@ public partial class GodotSmokeTest : Node
         Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 220, $"Sortie ERG : consigne envoyée ({sim.Model.TargetPowerW} W)");
         Check(rec.Ride.Samples.Count >= 3, $"Une mesure par seconde ({rec.Ride.Samples.Count})");
         Check(rec.SpeedKmh > 5 && rec.DistanceM > 1, $"Le vélo virtuel avance ({rec.SpeedKmh:0.0} km/h, {rec.DistanceM:0} m)");
+        var world = ride.Scene3D;
+        Check(world is { PropCount: > 500 } && world.Camera.Current, $"Vue 3D : circuit, décor ({world?.PropCount} éléments) et caméra");
+        Check(world is not null && Mathf.Abs((float)(world.DistanceM - rec.DistanceM)) < 20 && world.Rider.CrankAngle > 0,
+            "Vue 3D : le cycliste avance et pédale");
         ride.OnFinishPressed();
         await Wait(0.1);
         Check(rec.IsPaused && ride.PauseButtonText == "Reprendre", "Terminer : la sortie se met en pause, Pause devient Reprendre");
