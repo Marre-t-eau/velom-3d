@@ -36,7 +36,9 @@ public partial class FreeRideScreen : Screen
     double _smoothCadence, _sinceGearCommand;
     int _gearTargetW = -1;
     Button _pauseButton = null!, _finishButton = null!;
-    double _finishArmedUntil = -1, _sinceAutosave;
+    double _sinceAutosave;
+    /// <summary>« Terminer » touché une fois : sortie en pause, en attente de confirmation.</summary>
+    bool _finishArmed;
 
     /// <summary>Enregistrement en cours (null avant le départ), exposé aux tests.</summary>
     internal RideRecorder? Recorder { get; private set; }
@@ -44,7 +46,6 @@ public partial class FreeRideScreen : Screen
     internal Drivetrain? Gears { get; private set; }
 
     SensorHub Hub => SensorHub.Instance;
-    static double Now => Time.GetTicksMsec() / 1000.0;
 
     public override void _Ready()
     {
@@ -290,23 +291,30 @@ public partial class FreeRideScreen : Screen
         if (Hub.TrainerAddress != "") Hub.SetTargetPower(Recorder.TargetPowerW);
     }
 
+    /// <summary>Pause / Reprendre. Reprendre annule aussi une fin demandée.</summary>
     void TogglePause()
     {
         if (Recorder is null) return;
         if (Recorder.IsPaused) Recorder.Resume(); else Recorder.Pause();
-        _pauseButton.Text = Recorder.IsPaused ? "Reprendre" : "Pause";
+        _finishArmed = false;
     }
 
-    /// <summary>Deux appuis pour terminer : un doigt qui glisse ne coupe pas une sortie.</summary>
-    void OnFinishPressed()
+    /// <summary>Premier appui : la sortie se met en pause et attend confirmation (Reprendre pour
+    /// continuer). Second appui : fin. Un doigt qui glisse ne coupe donc pas une sortie.</summary>
+    internal void OnFinishPressed()
     {
-        if (Now > _finishArmedUntil)
+        if (Recorder is null) return;
+        if (_finishArmed)
         {
-            _finishArmedUntil = Now + 3.0;
+            Finish();
             return;
         }
-        Finish();
+        _finishArmed = true;
+        Recorder.Pause();
     }
+
+    /// <summary>État affiché des boutons (pour les tests).</summary>
+    internal string PauseButtonText => _pauseButton.Text;
 
     internal void Finish()
     {
@@ -355,7 +363,7 @@ public partial class FreeRideScreen : Screen
         _distance.Text = Ui.Km(Recorder.DistanceM);
         _avgPower.Text = Recorder.ElapsedS > 0 ? $"{Recorder.AveragePowerW:0} W" : "--";
         _rideTarget.Text = $"Cible {Recorder.TargetPowerW} W";
-        _finishButton.Text = Now <= _finishArmedUntil ? "Confirmer la fin" : "Terminer";
+        _finishButton.Text = _finishArmed ? "Confirmer la fin" : "Terminer";
         _pauseButton.Text = Recorder.IsPaused ? "Reprendre" : "Pause";
     }
 

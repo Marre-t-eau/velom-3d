@@ -123,7 +123,10 @@ public partial class GodotSmokeTest : Node
         Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 220, $"Sortie ERG : consigne envoyée ({sim.Model.TargetPowerW} W)");
         Check(rec.Ride.Samples.Count >= 3, $"Une mesure par seconde ({rec.Ride.Samples.Count})");
         Check(rec.SpeedKmh > 5 && rec.DistanceM > 1, $"Le vélo virtuel avance ({rec.SpeedKmh:0.0} km/h, {rec.DistanceM:0} m)");
-        ride.Finish();
+        ride.OnFinishPressed();
+        await Wait(0.1);
+        Check(rec.IsPaused && ride.PauseButtonText == "Reprendre", "Terminer : la sortie se met en pause, Pause devient Reprendre");
+        ride.OnFinishPressed();
         await Wait(0.3);
         Check(!sim.Model.ErgMode, "Fin de sortie : le trainer n'impose plus de puissance");
         Check(next is RideSummaryScreen, "Fin de sortie : ouverture du bilan");
