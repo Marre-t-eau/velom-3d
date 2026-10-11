@@ -51,6 +51,39 @@ public static class FtmsCommands
         return b;
     }
 
+    /// <summary>Passage en mode ERG : on reprend le contrôle avant la consigne (certains trainers
+    /// le perdent après un moment d'inactivité).</summary>
+    public static byte[][] EnterErg(int watts) => [RequestControl(), Start(), SetTargetPower(watts)];
+
+    /// <summary>Passage en mode simulation. Reset d'abord : beaucoup de trainers gardent la consigne
+    /// ERG précédente et ignorent les paramètres de simulation tant qu'elle est active. Reset fait
+    /// perdre le contrôle, d'où la nouvelle demande avant de redémarrer.</summary>
+    public static byte[][] EnterSimulation(double gradePct, double windMps = 0.0, double crr = 0.004, double cw = 0.51) =>
+        [Reset(), RequestControl(), Start(), SetSimulation(gradePct, windMps, crr, cw)];
+
+    /// <summary>Nom lisible d'une commande, pour les messages d'erreur.</summary>
+    public static string Describe(int opcode) => opcode switch
+    {
+        OpRequestControl => "prise de contrôle",
+        OpReset => "remise à zéro",
+        OpSetTargetResistance => "niveau de résistance",
+        OpSetTargetPower => "puissance imposée (ERG)",
+        OpStartOrResume => "démarrage",
+        OpStopOrPause => "arrêt",
+        OpSetSimulation => "mode simulation",
+        _ => $"commande 0x{opcode:x2}",
+    };
+
+    /// <summary>Code de résultat FTMS (0x02 à 0x05) en clair.</summary>
+    public static string DescribeResult(int result) => result switch
+    {
+        0x02 => "non prise en charge par ce trainer",
+        0x03 => "paramètre refusé",
+        0x04 => "échec",
+        0x05 => "contrôle non accordé",
+        _ => $"code {result}",
+    };
+
     static short ClampS16(double v) => (short)Math.Clamp(v, short.MinValue, short.MaxValue);
     static byte ClampU8(double v) => (byte)Math.Clamp(v, 0, 255);
 }

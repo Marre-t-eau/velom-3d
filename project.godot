@@ -15,6 +15,7 @@ config/description="Simulateur de vélo d'intérieur open source"
 run/main_scene="res://Screens/DeviceConnection/DeviceConnectionScreen.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
+config/quit_on_go_back=false
 
 [autoload]
 
