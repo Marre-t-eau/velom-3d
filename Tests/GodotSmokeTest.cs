@@ -123,7 +123,10 @@ public partial class GodotSmokeTest : Node
         Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 220, $"Sortie ERG : consigne envoyée ({sim.Model.TargetPowerW} W)");
         Check(rec.Ride.Samples.Count >= 3, $"Une mesure par seconde ({rec.Ride.Samples.Count})");
         Check(rec.SpeedKmh > 5 && rec.DistanceM > 1, $"Le vélo virtuel avance ({rec.SpeedKmh:0.0} km/h, {rec.DistanceM:0} m)");
-        ride.Finish();
+        ride.OnFinishPressed();
+        await Wait(0.1);
+        Check(rec.IsPaused && ride.PauseButtonText == "Reprendre", "Terminer : la sortie se met en pause, Pause devient Reprendre");
+        ride.OnFinishPressed();
         await Wait(0.3);
         Check(!sim.Model.ErgMode, "Fin de sortie : le trainer n'impose plus de puissance");
         Check(next is RideSummaryScreen, "Fin de sortie : ouverture du bilan");
@@ -153,10 +156,46 @@ public partial class GodotSmokeTest : Node
         (next as Node)?.Free();
         next = null;
 
+        // Réglages : vitesses virtuelles 52/36 × 11-30 en 12 vitesses.
+        var settings = Navigator.Create<SettingsScreen>(Navigator.Settings);
+        AddChild(settings);
+        await Wait(0.1);
+        settings.Profile.VirtualGears = true;
+        settings.Profile.Chainrings = [52, 36];
+        settings.Profile.Cogs = [11, 12, 13, 14, 15, 16, 17, 19, 21, 24, 27, 30];
+        Screen.Store.SaveProfile(settings.Profile);
+        settings.QueueFree();
+
+        ride = Navigator.Create<FreeRideScreen>(Navigator.FreeRide);
+        AddChild(ride);
+        await Wait(0.1);
+        ride.Start(RideMode.Simulation, 0);
+        await Wait(3.0);
+        var gears = ride.Gears;
+        Check(gears is { Chainring: 52, Cog: 17 } && sim.Model.ErgMode,
+            $"Vitesses virtuelles : départ en {gears?.GearLabel}, résistance pilotée par le trainer");
+        int before = sim.Model.TargetPowerW;
+        double expected = gears?.RequiredPowerW(ride.Recorder!.Physics, sim.Model.RiderCadenceRpm) ?? 0;
+        Check(Mathf.Abs(before - expected) < 25, $"Consigne selon la vitesse et la cadence ({before} W, attendu ≈ {expected:0} W)");
+        ride.ShiftHarder();
+        ride.ShiftHarder();
+        await Wait(1.0);
+        Check(sim.Model.TargetPowerW > before + 20, $"Vitesse plus dure : plus de résistance ({before} -> {sim.Model.TargetPowerW} W)");
+        ride.ShiftFront();
+        await Wait(1.0);
+        Check(gears?.Chainring == 36 && sim.Model.TargetPowerW < before, $"Petit plateau : plus souple ({sim.Model.TargetPowerW} W)");
+        ride.Finish();
+        await Wait(0.2);
+        Check(!sim.Model.ErgMode, "Fin de sortie avec vitesses : le trainer n'impose plus de puissance");
+        ride.QueueFree();
+        (next as Node)?.Free();
+        next = null;
+
         var history = Navigator.Create<RideHistoryScreen>(Navigator.History);
         AddChild(history);
         await Wait(0.1);
-        Check(history.RideCount == 2, $"Historique : les deux sorties sont listées ({history.RideCount})");
+        Check(history.RideCount == 3, $"Historique : les trois sorties sont listées ({history.RideCount})");
+        Check(Screen.Store.List()[0].VirtualGears == "52/36 × 11-30 (12 v.)", "La sortie retient les vitesses utilisées");
         Check(Screen.Store.LoadProfile().LastMode == RideMode.Simulation, "Le dernier mode choisi est retenu");
         history.QueueFree();
 

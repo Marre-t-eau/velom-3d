@@ -253,3 +253,90 @@ public class TrainerModeTests
         Assert.InRange(f.HeartRate, 100, 190);
     }
 }
+
+public class GearingTests
+{
+    [Fact]
+    public void Every_preset_cassette_has_its_speed_count_and_increasing_teeth()
+    {
+        foreach (var (speeds, cassettes) in Gearing.Cassettes)
+            foreach (var c in cassettes)
+            {
+                Assert.Equal(speeds, c.Teeth.Length);
+                Assert.True(c.Teeth.Zip(c.Teeth.Skip(1)).All(p => p.Second > p.First), c.Label);
+                Assert.Equal(c.Label, $"{c.Teeth[0]}-{c.Teeth[^1]}");
+            }
+    }
+
+    [Fact]
+    public void Speed_and_development_follow_the_gear()
+    {
+        var d = new Drivetrain([34, 50], [11, 12, 13, 14, 15, 17, 19, 21, 24, 27, 30], 2.105);
+        Assert.Equal(50, d.Chainring); // grand plateau d'abord
+        Assert.Equal(17, d.Cog);       // pignon du milieu
+        Assert.Equal(50.0 / 17 * 2.105, d.Development, 6);
+        Assert.Equal(90.0 / 60 * d.Development * 3.6, d.SpeedMpsAt(90) * 3.6, 6); // ≈ 33,4 km/h
+        Assert.Equal(6, d.RearGearNumber);
+    }
+
+    [Fact]
+    public void Shifting_stops_at_both_ends_and_front_cycles()
+    {
+        var d = new Drivetrain([50, 34], [11, 13, 15, 17, 19]);
+        while (d.ShiftHarder()) { }
+        Assert.Equal(11, d.Cog);
+        Assert.False(d.ShiftHarder());
+        while (d.ShiftEasier()) { }
+        Assert.Equal(19, d.Cog);
+        Assert.Equal(1, d.RearGearNumber);
+        d.ShiftFront();
+        Assert.Equal(34, d.Chainring);
+        d.ShiftFront();
+        Assert.Equal(50, d.Chainring);
+    }
+
+    [Fact]
+    public void Harder_gear_or_faster_cadence_needs_more_power()
+    {
+        var physics = new BikePhysics { MassKg = 83 };
+        var d = new Drivetrain([50, 34], Gearing.DefaultCogs);
+        double p = d.RequiredPowerW(physics, 90);
+        // La puissance demandée est celle qui tient cette vitesse sur le plat.
+        Assert.Equal(d.SpeedMpsAt(90), physics.EquilibriumSpeed(p), 3);
+        Assert.True(d.RequiredPowerW(physics, 100) > p);
+        d.ShiftHarder();
+        Assert.True(d.RequiredPowerW(physics, 90) > p);
+        Assert.Equal(0.0, d.RequiredPowerW(physics, 0));
+    }
+
+    [Theory]
+    [InlineData("52/36", new[] { 52, 36 })]
+    [InlineData("50 34", new[] { 50, 34 })]
+    [InlineData("42", new[] { 42 })]
+    public void Custom_chainrings_are_parsed(string text, int[] expected) =>
+        Assert.Equal(expected, Gearing.ParseChainrings(text)!);
+
+    [Theory]
+    [InlineData("53/39/30/24")] // 4 plateaux
+    [InlineData("52/abc")]
+    [InlineData("52/52")]
+    [InlineData("70/50")]
+    public void Invalid_chainrings_are_refused(string text) => Assert.Null(Gearing.ParseChainrings(text));
+
+    [Fact]
+    public void Custom_cassette_is_parsed() =>
+        Assert.Equal([11, 12, 13, 14, 16, 18, 20, 22, 25, 28, 32], Gearing.ParseCassette("11,12,13,14,16,18,20,22,25,28,32")!);
+
+    [Fact]
+    public void Describe_reads_like_a_bike_shop() =>
+        Assert.Equal("52/36 × 11-30 (12 v.)", Gearing.Describe([36, 52], [11, 12, 13, 14, 15, 16, 17, 19, 21, 24, 27, 30]));
+
+    [Fact]
+    public void Profile_keeps_gears_and_ride_remembers_them()
+    {
+        var p = new RiderProfile { VirtualGears = true, Chainrings = [52, 36], Cogs = [11, 12, 13, 14, 15, 17, 19, 21, 24, 27, 30] };
+        var rec = new RideRecorder(RideMode.Simulation, p, DateTimeOffset.Now);
+        Assert.Equal("52/36 × 11-30 (11 v.)", rec.Ride.Info.VirtualGears);
+        Assert.Equal("", new RideRecorder(RideMode.TargetPower, p, DateTimeOffset.Now, 200).Ride.Info.VirtualGears);
+    }
+}

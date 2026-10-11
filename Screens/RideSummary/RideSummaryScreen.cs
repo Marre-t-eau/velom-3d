@@ -33,7 +33,7 @@ public partial class RideSummaryScreen : Screen
         root.AddChild(header);
         var titles = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         titles.AddChild(Ui.Label(JustFinished ? "Bravo, sortie enregistrée !" : "Bilan de la sortie", 36));
-        titles.AddChild(Ui.Label($"{Ui.Date(info.StartedAt)}  ·  {RideHistoryScreen.ModeName(info.Mode)}  ·  FTP {info.FtpW} W", 19, Ui.Muted));
+        titles.AddChild(Ui.Label($"{Ui.Date(info.StartedAt)}  ·  {RideHistoryScreen.ModeName(info)}  ·  FTP {info.FtpW} W", 19, Ui.Muted));
         header.AddChild(titles);
         header.AddChild(Ui.Button(JustFinished ? "Menu" : "Retour", OnBack, 200, 72));
 

@@ -14,7 +14,12 @@ public partial class MainMenuScreen : Screen
     public override void _Ready()
     {
         var root = Ui.BuildPage(this, 22);
-        root.AddChild(Ui.Label("Velom3d", 44));
+        var header = Ui.Row();
+        root.AddChild(header);
+        var title = Ui.Label("Velom3d", 44);
+        title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        header.AddChild(title);
+        header.AddChild(Ui.Button("Réglages", () => Navigator.GoTo(this, Navigator.Settings), 220, 72));
         _sensors = Ui.Label("", 20, Ui.Muted);
         root.AddChild(_sensors);
 

@@ -37,6 +37,7 @@ indisponible.
 
 ```
 Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînement structuré (grisé, à venir)
+                                            ├─ Réglages (cycliste, vélo, vitesses virtuelles)
                                             ├─ Sortie libre ──Terminer──► Bilan
                                             ├─ Mes sorties ──► Bilan d'une sortie
                                             └─ Capteurs (retour à la connexion)
@@ -49,6 +50,14 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînement str
   ½·ρ·CdA = 0,25 kg/m (CdA 0,40 m², mains aux cocottes) ; il durcit avec la vitesse.
   Dans les deux cas, la vitesse et la distance viennent du même modèle physique
   (`Rides/Core/BikePhysics.cs`), avec le poids du cycliste + 8 kg de vélo.
+- **Vitesses virtuelles** (*Réglages* depuis le menu, `Screens/Settings/`, calcul dans `Rides/Core/Gearing.cs`) :
+  en simulation, on change de plateau et de pignon dans l'appli (boutons, ou flèches haut/bas
+  au clavier). Préréglages : plateaux 53/39, 52/36, 50/34, 54/41, 50/37, 48/35, 46/33, 48/31,
+  1× 40/42/44 ; cassettes 11 v. (11-25 à 11-36), 12 v. (10-28 à 11-36), 13 v. (9-36 à 10-44,
+  denture régulière calculée) ; saisie libre des dentures. L'appli calcule la puissance que
+  demande la vitesse obtenue (cadence × développement) avec le même modèle que la vitesse
+  affichée, et la donne au trainer en consigne ERG, mise à jour en continu : la résistance suit
+  la vitesse engagée et la cadence, quel que soit le pignon réel du vélo.
 - **Bilan** (`Screens/RideSummary/`) : durée, distance, puissances moyenne / normalisée / max,
   TSS, facteur d'intensité, calories (travail en kJ ÷ 4,184 ÷ 24 % de rendement), cadence,
   vitesse, FC ; temps par zone de puissance (Coggan) ; courbes puissance, cadence, vitesse
@@ -57,7 +66,7 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînement str
 
 Les sorties sont enregistrées sur l'appareil, dans `user://rides/` : `{id}.json` (en-tête et
 résumé) et `{id}.csv` (une ligne par seconde, lisible dans un tableur), plus `profile.json`
-(FTP, poids, dernier mode). Pendant une sortie, enregistrement toutes les 30 s et à la mise en
+(FTP, poids, roue, vitesses virtuelles, dernier mode). Pendant une sortie, enregistrement toutes les 30 s et à la mise en
 arrière-plan. Le calcul (`Rides/Core/`) ne dépend pas de Godot et est testé par `dotnet test`.
 
 ## Export Android avec le Bluetooth natif

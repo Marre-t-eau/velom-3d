@@ -114,6 +114,46 @@ public static class Ui
         panel.AddThemeStyleboxOverride("panel", style);
     }
 
+    /// <summary>Ligne « libellé  [−]  valeur  [+] » ; <paramref name="after"/> rafraîchit l'écran.</summary>
+    public static Control Stepper(Container parent, string title, out Label value, Action<int> change, Action after)
+    {
+        var panel = Panel(Card);
+        var row = Row();
+        panel.AddChild(row);
+        var label = Label(title, 24);
+        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        label.VerticalAlignment = VerticalAlignment.Center;
+        row.AddChild(label);
+        row.AddChild(Button("−", () => { change(-1); after(); }, 96, 72, 32));
+        value = Label("", 30);
+        value.CustomMinimumSize = new Vector2(150, 0);
+        value.HorizontalAlignment = HorizontalAlignment.Center;
+        value.VerticalAlignment = VerticalAlignment.Center;
+        row.AddChild(value);
+        row.AddChild(Button("+", () => { change(+1); after(); }, 96, 72, 32));
+        parent.AddChild(panel);
+        return panel;
+    }
+
+    /// <summary>Petit bouton à bascule pour choisir parmi des préréglages.</summary>
+    public static Button Chip(Container parent, string text, Action onPressed)
+    {
+        var chip = Button(text, onPressed, 120, 64, 22);
+        MakeSelectable(chip);
+        parent.AddChild(chip);
+        return chip;
+    }
+
+    /// <summary>Rangée qui passe à la ligne quand elle est pleine.</summary>
+    public static HFlowContainer Flow(Container parent)
+    {
+        var flow = new HFlowContainer { MouseFilter = Control.MouseFilterEnum.Pass };
+        flow.AddThemeConstantOverride("h_separation", 12);
+        flow.AddThemeConstantOverride("v_separation", 12);
+        parent.AddChild(flow);
+        return flow;
+    }
+
     /// <summary>Tuile « titre / grande valeur » ; renvoie le label de valeur à mettre à jour.</summary>
     public static Label Tile(Container parent, string title, Color accent, int valueSize = 36)
     {
