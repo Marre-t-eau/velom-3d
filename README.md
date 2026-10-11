@@ -50,7 +50,7 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînement str
   ½·ρ·CdA = 0,25 kg/m (CdA 0,40 m², mains aux cocottes) ; il durcit avec la vitesse.
   Dans les deux cas, la vitesse et la distance viennent du même modèle physique
   (`Rides/Core/BikePhysics.cs`), avec le poids du cycliste + 8 kg de vélo.
-- **Vitesses virtuelles** (*Réglages*, `Screens/Settings/`, calcul dans `Rides/Core/Gearing.cs`) :
+- **Vitesses virtuelles** (*Réglages* depuis le menu, `Screens/Settings/`, calcul dans `Rides/Core/Gearing.cs`) :
   en simulation, on change de plateau et de pignon dans l'appli (boutons, ou flèches haut/bas
   au clavier). Préréglages : plateaux 53/39, 52/36, 50/34, 54/41, 50/37, 48/35, 46/33, 48/31,
   1× 40/42/44 ; cassettes 11 v. (11-25 à 11-36), 12 v. (10-28 à 11-36), 13 v. (9-36 à 10-44,

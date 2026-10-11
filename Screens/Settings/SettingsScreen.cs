@@ -13,9 +13,6 @@ namespace Velom3d.Screens;
 /// </summary>
 public partial class SettingsScreen : Screen
 {
-    /// <summary>Écran où revenir (menu par défaut, sortie libre si on vient de là).</summary>
-    public string ReturnTo { get; set; } = Navigator.Menu;
-
     RiderProfile _profile = null!;
     Label _ftp = null!, _riderMass = null!, _bikeMass = null!, _gearSummary = null!;
     CheckButton _gearsToggle = null!;
@@ -155,5 +152,5 @@ public partial class SettingsScreen : Screen
 
     static bool Same(int[] a, int[] b) => a.OrderBy(t => t).SequenceEqual(b.OrderBy(t => t));
 
-    protected override void OnBack() => Navigator.GoTo(this, ReturnTo);
+    protected override void OnBack() => Navigator.GoTo(this, Navigator.Menu);
 }

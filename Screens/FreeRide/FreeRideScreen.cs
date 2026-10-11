@@ -26,8 +26,7 @@ public partial class FreeRideScreen : Screen
 
     Control _setup = null!, _riding = null!;
     Button _ergChoice = null!, _simChoice = null!;
-    Label _ftpValue = null!, _massValue = null!, _trainerHint = null!, _gearsSetup = null!;
-    Control _gearsSetupRow = null!;
+    Label _settingsSummary = null!, _trainerHint = null!;
 
     Label _clock = null!, _modeLabel = null!, _power = null!, _powerTitle = null!, _cadence = null!, _hr = null!;
     Label _speed = null!, _distance = null!, _avgPower = null!, _rideTarget = null!, _trainerStatus = null!;
@@ -91,22 +90,9 @@ public partial class FreeRideScreen : Screen
         _simChoice = ModeChoice(modes, "Simulation réaliste",
             "La résistance suit la vitesse : roulement des pneus et frottement de l'air, sur le plat.", RideMode.Simulation);
 
-        var gearsPanel = Ui.Panel(Ui.Card);
-        var gearsRow = Ui.Row();
-        gearsPanel.AddChild(gearsRow);
-        _gearsSetup = Ui.Label("", 22);
-        _gearsSetup.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        _gearsSetup.VerticalAlignment = VerticalAlignment.Center;
-        gearsRow.AddChild(_gearsSetup);
-        gearsRow.AddChild(Ui.Button("Régler", OpenSettings, 180, 72));
-        content.AddChild(gearsPanel);
-        _gearsSetupRow = gearsPanel;
-
-        content.AddChild(Ui.Label("Vos réglages (pour la vitesse, le TSS et l'IF)", 22, Ui.Muted));
-        Ui.Stepper(content, "FTP", out _ftpValue, d => _profile.FtpW = Math.Clamp(_profile.FtpW + d * 5, 50, 600), RefreshSetup);
-        Ui.Stepper(content, "Poids du cycliste", out _massValue,
-            d => _profile.RiderMassKg = Math.Clamp(_profile.RiderMassKg + d, 30, 200), RefreshSetup);
-
+        // Rappel en lecture seule : tout se règle dans Réglages, depuis le menu.
+        _settingsSummary = Ui.Label("", 19, Ui.Muted);
+        content.AddChild(_settingsSummary);
 
         _trainerHint = Ui.Label("", 20, Ui.Warning);
         content.AddChild(_trainerHint);
@@ -144,23 +130,13 @@ public partial class FreeRideScreen : Screen
     {
         _ergChoice.ButtonPressed = _mode == RideMode.TargetPower;
         _simChoice.ButtonPressed = _mode == RideMode.Simulation;
-        _ftpValue.Text = $"{_profile.FtpW} W";
-        _massValue.Text = $"{_profile.RiderMassKg:0} kg";
-        _gearsSetupRow.Visible = _mode == RideMode.Simulation;
-        _gearsSetup.Text = _profile.VirtualGears
-            ? $"Vitesses virtuelles : {_profile.CreateDrivetrain().Describe()}"
-            : "Vitesses virtuelles : désactivées";
+        var gears = _mode != RideMode.Simulation ? ""
+            : _profile.VirtualGears ? $" · vitesses virtuelles {_profile.CreateDrivetrain().Describe()}"
+            : " · vitesses virtuelles désactivées";
+        _settingsSummary.Text = $"FTP {_profile.FtpW} W · {_profile.RiderMassKg:0} kg{gears}. À modifier dans Réglages, depuis le menu.";
         _trainerHint.Text = Hub.TrainerAddress == ""
             ? "Aucun home trainer pilotable connecté : la sortie enregistrera vos capteurs sans régler la résistance."
             : "";
-    }
-
-    void OpenSettings()
-    {
-        Store.SaveProfile(_profile);
-        var settings = Navigator.Create<SettingsScreen>(Navigator.Settings);
-        settings.ReturnTo = Navigator.FreeRide;
-        Navigator.GoTo(this, settings);
     }
 
     // --- Pendant la sortie ---
