@@ -52,7 +52,8 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînement str
   (`Rides/Core/BikePhysics.cs`), avec le poids du cycliste + 8 kg de vélo.
 - **Vue 3D** (`World/`) : pendant la sortie, un cycliste roule en fond d'écran sur un circuit
   plat de 5 km qui tourne en rond (arbustes, arbres, deux bois, quatre hameaux, arche de départ),
-  caméra derrière lui comme dans Zwift. Il avance de la distance calculée par l'appli, pédale à la
+  caméra derrière lui comme dans Zwift. Mesures compactes en haut (puissance, cadence, cardio,
+  vitesse, distance) ; toucher la puissance affiche la puissance moyenne pendant 5 s. Il avance de la distance calculée par l'appli, pédale à la
   cadence mesurée et s'arrête en pause. Tout est généré dans Godot en formes simples, sans fichier 3D.
   Tracé et placement du décor dans `World/Core/` (C# pur, testé par `dotnet test`) ; le monde
   (`RideWorld`) est un nœud à part, réutilisable par d'autres écrans de sortie : il suffit de

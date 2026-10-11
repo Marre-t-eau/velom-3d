@@ -127,6 +127,9 @@ public partial class GodotSmokeTest : Node
         Check(world is { PropCount: > 500 } && world.Camera.Current, $"Vue 3D : circuit, décor ({world?.PropCount} éléments) et caméra");
         Check(world is not null && Mathf.Abs((float)(world.DistanceM - rec.DistanceM)) < 20 && world.Rider.CrankAngle > 0,
             "Vue 3D : le cycliste avance et pédale");
+        ride.ShowAveragePower();
+        await Wait(0.1);
+        Check(ride.PowerTileTitle == "Puissance moyenne", "Toucher la puissance affiche la moyenne");
         ride.OnFinishPressed();
         await Wait(0.1);
         Check(rec.IsPaused && ride.PauseButtonText == "Reprendre", "Terminer : la sortie se met en pause, Pause devient Reprendre");

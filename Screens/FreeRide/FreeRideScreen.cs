@@ -31,7 +31,7 @@ public partial class FreeRideScreen : Screen
     Label _settingsSummary = null!, _trainerHint = null!;
 
     Label _clock = null!, _modeLabel = null!, _power = null!, _powerTitle = null!, _cadence = null!, _hr = null!;
-    Label _speed = null!, _distance = null!, _avgPower = null!, _rideTarget = null!, _trainerStatus = null!;
+    Label _speed = null!, _distance = null!, _rideTarget = null!, _trainerStatus = null!;
     Control _ergControls = null!, _gearControls = null!;
     Label _gearLabel = null!;
     Button _frontButton = null!;
@@ -39,6 +39,9 @@ public partial class FreeRideScreen : Screen
     int _gearTargetW = -1;
     Button _pauseButton = null!, _finishButton = null!;
     double _sinceAutosave;
+    /// <summary>Temps restant (s) pendant lequel la tuile puissance montre la moyenne (touchée par le cycliste).</summary>
+    double _showAverageS;
+    const double ShowAverageForS = 5.0;
     /// <summary>« Terminer » touché une fois : sortie en pause, en attente de confirmation.</summary>
     bool _finishArmed;
 
@@ -156,11 +159,11 @@ public partial class FreeRideScreen : Screen
 
         var header = Ui.Row();
         page.AddChild(header);
-        _clock = Ui.Label("0:00", 52);
+        _clock = Ui.Label("0:00", 40);
         _clock.AutowrapMode = TextServer.AutowrapMode.Off;
         Outline(_clock);
         header.AddChild(_clock);
-        _modeLabel = Ui.Label("", 20, Ui.Muted);
+        _modeLabel = Ui.Label("", 17, Ui.Muted);
         _modeLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _modeLabel.VerticalAlignment = VerticalAlignment.Center;
         _modeLabel.HorizontalAlignment = HorizontalAlignment.Right;
@@ -170,32 +173,49 @@ public partial class FreeRideScreen : Screen
         // Mesures sur une ligne en haut, commandes en bas : la route reste visible au milieu.
         var content = Ui.AddScroll(page, 14);
         content.SizeFlagsVertical = SizeFlags.ExpandFill;
-        var row1 = Ui.Row(12);
+        // Tuiles compactes et centrées. La puissance moyenne n'a pas sa tuile : toucher la puissance l'affiche quelques secondes.
+        var row1 = Ui.Row(10);
+        row1.Alignment = BoxContainer.AlignmentMode.Center;
         content.AddChild(row1);
-        _power = Ui.Tile(row1, "Puissance", Ui.PowerColor, 40);
+        _power = Ui.Tile(row1, "Puissance", Ui.PowerColor, 32);
         _powerTitle = (Label)_power.GetParent().GetChild(0);
-        _cadence = Ui.Tile(row1, "Cadence", Ui.CadenceColor, 40);
-        _hr = Ui.Tile(row1, "Cardio", Ui.HeartRateColor, 40);
-        _speed = Ui.Tile(row1, "Vitesse", Ui.SpeedColor, 40);
-        _distance = Ui.Tile(row1, "Distance", Ui.Muted, 40);
-        _avgPower = Ui.Tile(row1, "Puiss. moyenne", Ui.PowerColor, 40);
-        foreach (var tile in row1.GetChildren()) ((CanvasItem)tile).SelfModulate = new Color(1, 1, 1, 0.8f);
+        _cadence = Ui.Tile(row1, "Cadence", Ui.CadenceColor, 32);
+        _hr = Ui.Tile(row1, "Cardio", Ui.HeartRateColor, 32);
+        _speed = Ui.Tile(row1, "Vitesse", Ui.SpeedColor, 32);
+        _distance = Ui.Tile(row1, "Distance", Ui.Muted, 32);
+        foreach (var node in row1.GetChildren())
+        {
+            var tile = (PanelContainer)node;
+            tile.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
+            tile.CustomMinimumSize = new Vector2(190, 0);
+            tile.SelfModulate = new Color(1, 1, 1, 0.8f);
+            var style = (StyleBoxFlat)tile.GetThemeStylebox("panel");
+            style.ContentMarginTop = style.ContentMarginBottom = 8;
+            style.ContentMarginLeft = style.ContentMarginRight = 14;
+            ((Label)tile.GetChild(0).GetChild(0)).AddThemeFontSizeOverride("font_size", 15);
+        }
+        var powerTile = _power.GetParent().GetParent<Control>();
+        powerTile.CustomMinimumSize = new Vector2(240, 0);
+        powerTile.GuiInput += e =>
+        {
+            if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left }) ShowAveragePower();
+        };
         content.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass });
 
         var erg = Ui.Row();
         erg.Alignment = BoxContainer.AlignmentMode.Center;
         content.AddChild(erg);
-        foreach (var step in PowerSteps) erg.AddChild(Ui.Button($"−{step} W", () => ChangeTarget(-step), 150, 96, 28));
-        _rideTarget = Ui.Label("", 34);
+        foreach (var step in PowerSteps) erg.AddChild(Ui.Button($"−{step} W", () => ChangeTarget(-step), 120, 68, 24));
+        _rideTarget = Ui.Label("", 28);
         Outline(_rideTarget);
-        _rideTarget.CustomMinimumSize = new Vector2(260, 0);
+        _rideTarget.CustomMinimumSize = new Vector2(220, 0);
         _rideTarget.HorizontalAlignment = HorizontalAlignment.Center;
         _rideTarget.VerticalAlignment = VerticalAlignment.Center;
         erg.AddChild(_rideTarget);
         for (int i = PowerSteps.Length - 1; i >= 0; i--)
         {
             int step = PowerSteps[i];
-            erg.AddChild(Ui.Button($"+{step} W", () => ChangeTarget(+step), 150, 96, 28));
+            erg.AddChild(Ui.Button($"+{step} W", () => ChangeTarget(+step), 120, 68, 24));
         }
         _ergControls = erg;
 
@@ -203,16 +223,16 @@ public partial class FreeRideScreen : Screen
         var gears = Ui.Row();
         gears.Alignment = BoxContainer.AlignmentMode.Center;
         content.AddChild(gears);
-        _frontButton = Ui.Button("Plateau", ShiftFront, 190, 96, 24);
+        _frontButton = Ui.Button("Plateau", ShiftFront, 160, 68, 22);
         gears.AddChild(_frontButton);
-        gears.AddChild(Ui.Button("− Plus souple", ShiftEasier, 230, 96, 26));
-        _gearLabel = Ui.Label("", 30);
+        gears.AddChild(Ui.Button("− Plus souple", ShiftEasier, 190, 68, 22));
+        _gearLabel = Ui.Label("", 24);
         Outline(_gearLabel);
-        _gearLabel.CustomMinimumSize = new Vector2(220, 0);
+        _gearLabel.CustomMinimumSize = new Vector2(180, 0);
         _gearLabel.HorizontalAlignment = HorizontalAlignment.Center;
         _gearLabel.VerticalAlignment = VerticalAlignment.Center;
         gears.AddChild(_gearLabel);
-        gears.AddChild(Ui.Button("Plus dur +", ShiftHarder, 230, 96, 26));
+        gears.AddChild(Ui.Button("Plus dur +", ShiftHarder, 190, 68, 22));
         _gearControls = gears;
 
         _trainerStatus = Ui.Label("", 18, Ui.Warning);
@@ -222,14 +242,17 @@ public partial class FreeRideScreen : Screen
 
         var actions = Ui.Row();
         page.AddChild(actions);
-        _pauseButton = Ui.Button("Pause", TogglePause);
+        _pauseButton = Ui.Button("Pause", TogglePause, 260, 60, 22);
         _pauseButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         actions.AddChild(_pauseButton);
-        _finishButton = Ui.Button("Terminer", OnFinishPressed);
+        _finishButton = Ui.Button("Terminer", OnFinishPressed, 260, 60, 22);
         _finishButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         actions.AddChild(_finishButton);
         return page;
     }
+
+    /// <summary>La tuile puissance montre la moyenne de la sortie pendant quelques secondes.</summary>
+    internal void ShowAveragePower() => _showAverageS = ShowAverageForS;
 
     /// <summary>Contour sombre : texte lisible sur le ciel et la route.</summary>
     static void Outline(Label label)
@@ -338,6 +361,7 @@ public partial class FreeRideScreen : Screen
 
     /// <summary>État affiché des boutons (pour les tests).</summary>
     internal string PauseButtonText => _pauseButton.Text;
+    internal string PowerTileTitle => _powerTitle.Text;
 
     internal void Finish()
     {
@@ -373,9 +397,18 @@ public partial class FreeRideScreen : Screen
         if (_sinceAutosave >= AutosaveEveryS) Autosave();
 
         _clock.Text = Ui.Duration(Recorder.ElapsedS);
-        _power.Text = $"{Hub.Power} W";
-        _powerTitle.Text = Recorder.Ride.Info.Mode == RideMode.TargetPower ? $"Puissance · cible {Recorder.TargetPowerW} W"
-            : Gears is not null && _gearTargetW >= 0 ? $"Puissance · demandée {_gearTargetW} W" : "Puissance";
+        _showAverageS = Math.Max(0, _showAverageS - delta);
+        if (_showAverageS > 0)
+        {
+            _power.Text = Recorder.ElapsedS > 0 ? $"{Recorder.AveragePowerW:0} W" : "--";
+            _powerTitle.Text = "Puissance moyenne";
+        }
+        else
+        {
+            // En ERG, la cible est déjà affichée au-dessus des boutons ±.
+            _power.Text = $"{Hub.Power} W";
+            _powerTitle.Text = Gears is not null && _gearTargetW >= 0 ? $"Puissance · demandée {_gearTargetW} W" : "Puissance";
+        }
         if (Gears is not null)
         {
             _gearLabel.Text = $"{Gears.GearLabel}\n{Gears.RearGearNumber}/{Gears.Cogs.Length}";
@@ -386,7 +419,6 @@ public partial class FreeRideScreen : Screen
         _hr.Text = Hub.HeartRate > 0 ? $"{Hub.HeartRate} bpm" : "--";
         _speed.Text = $"{Recorder.SpeedKmh:0.0} km/h";
         _distance.Text = Ui.Km(Recorder.DistanceM);
-        _avgPower.Text = Recorder.ElapsedS > 0 ? $"{Recorder.AveragePowerW:0} W" : "--";
         _rideTarget.Text = $"Cible {Recorder.TargetPowerW} W";
         _finishButton.Text = _finishArmed ? "Confirmer la fin" : "Terminer";
         _pauseButton.Text = Recorder.IsPaused ? "Reprendre" : "Pause";
