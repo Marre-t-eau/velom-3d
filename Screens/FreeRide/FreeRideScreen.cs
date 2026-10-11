@@ -9,6 +9,9 @@ namespace Velom3d.Screens;
 /// Sortie libre sur le plat. Deux façons de faire résister le home trainer :
 /// puissance imposée (ERG, réglable en roulant) ou simulation réaliste (pente nulle, pneus et
 /// air : le trainer durcit avec la vitesse). La vitesse affichée vient du même modèle physique.
+/// En simulation, les vitesses virtuelles (si elles sont activées dans les réglages) remplacent
+/// les paramètres de simulation : l'appli calcule la puissance que demandent la vitesse engagée
+/// et la cadence, et la donne au trainer en consigne, mise à jour en continu.
 /// La sortie est enregistrée sur l'appareil, et toutes les 30 s au cas où l'appli serait coupée.
 /// </summary>
 public partial class FreeRideScreen : Screen
@@ -23,16 +26,23 @@ public partial class FreeRideScreen : Screen
 
     Control _setup = null!, _riding = null!;
     Button _ergChoice = null!, _simChoice = null!;
-    Label _ftpValue = null!, _massValue = null!, _trainerHint = null!;
+    Label _ftpValue = null!, _massValue = null!, _trainerHint = null!, _gearsSetup = null!;
+    Control _gearsSetupRow = null!;
 
     Label _clock = null!, _modeLabel = null!, _power = null!, _powerTitle = null!, _cadence = null!, _hr = null!;
     Label _speed = null!, _distance = null!, _avgPower = null!, _rideTarget = null!, _trainerStatus = null!;
-    Control _ergControls = null!;
+    Control _ergControls = null!, _gearControls = null!;
+    Label _gearLabel = null!;
+    Button _frontButton = null!;
+    double _smoothCadence, _sinceGearCommand;
+    int _gearTargetW = -1;
     Button _pauseButton = null!, _finishButton = null!;
     double _finishArmedUntil = -1, _sinceAutosave;
 
     /// <summary>Enregistrement en cours (null avant le départ), exposé aux tests.</summary>
     internal RideRecorder? Recorder { get; private set; }
+    /// <summary>Vitesses virtuelles de la sortie en cours (null si désactivées ou en ERG).</summary>
+    internal Drivetrain? Gears { get; private set; }
 
     SensorHub Hub => SensorHub.Instance;
     static double Now => Time.GetTicksMsec() / 1000.0;
@@ -81,9 +91,22 @@ public partial class FreeRideScreen : Screen
         _simChoice = ModeChoice(modes, "Simulation réaliste",
             "La résistance suit la vitesse : roulement des pneus et frottement de l'air, sur le plat.", RideMode.Simulation);
 
+        var gearsPanel = Ui.Panel(Ui.Card);
+        var gearsRow = Ui.Row();
+        gearsPanel.AddChild(gearsRow);
+        _gearsSetup = Ui.Label("", 22);
+        _gearsSetup.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        _gearsSetup.VerticalAlignment = VerticalAlignment.Center;
+        gearsRow.AddChild(_gearsSetup);
+        gearsRow.AddChild(Ui.Button("Régler", OpenSettings, 180, 72));
+        content.AddChild(gearsPanel);
+        _gearsSetupRow = gearsPanel;
+
         content.AddChild(Ui.Label("Vos réglages (pour la vitesse, le TSS et l'IF)", 22, Ui.Muted));
-        Stepper(content, "FTP", out _ftpValue, d => _profile.FtpW = Math.Clamp(_profile.FtpW + d * 5, 50, 600));
-        Stepper(content, "Poids du cycliste", out _massValue, d => _profile.RiderMassKg = Math.Clamp(_profile.RiderMassKg + d, 30, 200));
+        Ui.Stepper(content, "FTP", out _ftpValue, d => _profile.FtpW = Math.Clamp(_profile.FtpW + d * 5, 50, 600), RefreshSetup);
+        Ui.Stepper(content, "Poids du cycliste", out _massValue,
+            d => _profile.RiderMassKg = Math.Clamp(_profile.RiderMassKg + d, 30, 200), RefreshSetup);
+
 
         _trainerHint = Ui.Label("", 20, Ui.Warning);
         content.AddChild(_trainerHint);
@@ -117,36 +140,27 @@ public partial class FreeRideScreen : Screen
         return button;
     }
 
-    /// <summary>Ligne « libellé  [−]  valeur  [+] ».</summary>
-    Control Stepper(Container parent, string title, out Label value, Action<int> change)
-    {
-        var panel = Ui.Panel(Ui.Card);
-        var row = Ui.Row();
-        panel.AddChild(row);
-        var label = Ui.Label(title, 24);
-        label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        label.VerticalAlignment = VerticalAlignment.Center;
-        row.AddChild(label);
-        row.AddChild(Ui.Button("−", () => { change(-1); RefreshSetup(); }, 96, 72, 32));
-        value = Ui.Label("", 30);
-        value.CustomMinimumSize = new Vector2(150, 0);
-        value.HorizontalAlignment = HorizontalAlignment.Center;
-        value.VerticalAlignment = VerticalAlignment.Center;
-        row.AddChild(value);
-        row.AddChild(Ui.Button("+", () => { change(+1); RefreshSetup(); }, 96, 72, 32));
-        parent.AddChild(panel);
-        return panel;
-    }
-
     void RefreshSetup()
     {
         _ergChoice.ButtonPressed = _mode == RideMode.TargetPower;
         _simChoice.ButtonPressed = _mode == RideMode.Simulation;
         _ftpValue.Text = $"{_profile.FtpW} W";
         _massValue.Text = $"{_profile.RiderMassKg:0} kg";
+        _gearsSetupRow.Visible = _mode == RideMode.Simulation;
+        _gearsSetup.Text = _profile.VirtualGears
+            ? $"Vitesses virtuelles : {_profile.CreateDrivetrain().Describe()}"
+            : "Vitesses virtuelles : désactivées";
         _trainerHint.Text = Hub.TrainerAddress == ""
             ? "Aucun home trainer pilotable connecté : la sortie enregistrera vos capteurs sans régler la résistance."
             : "";
+    }
+
+    void OpenSettings()
+    {
+        Store.SaveProfile(_profile);
+        var settings = Navigator.Create<SettingsScreen>(Navigator.Settings);
+        settings.ReturnTo = Navigator.FreeRide;
+        Navigator.GoTo(this, settings);
     }
 
     // --- Pendant la sortie ---
@@ -197,6 +211,21 @@ public partial class FreeRideScreen : Screen
         }
         _ergControls = erg;
 
+        // Vitesses virtuelles : plateau, puis pignon plus souple / plus dur.
+        var gears = Ui.Row();
+        gears.Alignment = BoxContainer.AlignmentMode.Center;
+        content.AddChild(gears);
+        _frontButton = Ui.Button("Plateau", ShiftFront, 190, 96, 24);
+        gears.AddChild(_frontButton);
+        gears.AddChild(Ui.Button("− Plus souple", ShiftEasier, 230, 96, 26));
+        _gearLabel = Ui.Label("", 30);
+        _gearLabel.CustomMinimumSize = new Vector2(220, 0);
+        _gearLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        _gearLabel.VerticalAlignment = VerticalAlignment.Center;
+        gears.AddChild(_gearLabel);
+        gears.AddChild(Ui.Button("Plus dur +", ShiftHarder, 230, 96, 26));
+        _gearControls = gears;
+
         _trainerStatus = Ui.Label("", 18, Ui.Warning);
         _trainerStatus.Visible = false;
         content.AddChild(_trainerStatus);
@@ -221,13 +250,20 @@ public partial class FreeRideScreen : Screen
         Store.SaveProfile(_profile);
 
         Recorder = new RideRecorder(mode, _profile, DateTimeOffset.Now, targetW);
+        Gears = mode == RideMode.Simulation && _profile.VirtualGears ? _profile.CreateDrivetrain() : null;
+        _smoothCadence = Hub.Cadence;
         if (Hub.TrainerAddress != "")
         {
             if (mode == RideMode.TargetPower) Hub.EnterErg(targetW);
+            else if (Gears is not null) Hub.EnterErg(GearTargetW());
             else ApplySimulation();
+            _gearTargetW = Gears is null ? -1 : GearTargetW();
         }
-        _modeLabel.Text = mode == RideMode.TargetPower ? "Puissance imposée · plat" : "Simulation réaliste · plat";
+        _modeLabel.Text = mode == RideMode.TargetPower ? "Puissance imposée · plat"
+            : Gears is not null ? $"Simulation réaliste · plat · {Gears.Describe()}"
+            : "Simulation réaliste · plat";
         _ergControls.Visible = mode == RideMode.TargetPower;
+        _gearControls.Visible = Gears is not null;
         _setup.Visible = false;
         _riding.Visible = true;
         DisplayServer.ScreenSetKeepOn(true);
@@ -240,6 +276,35 @@ public partial class FreeRideScreen : Screen
         var physics = Recorder!.Physics;
         Hub.EnterSimulation(physics.GradePct, physics.WindMps, physics.Crr, physics.WindResistanceCoefficient);
     }
+
+    int GearTargetW() => (int)Math.Round(Gears!.RequiredPowerW(Recorder!.Physics, _smoothCadence));
+
+    /// <summary>La consigne suit la cadence lissée : deux mises à jour par seconde au plus, et une
+    /// toutes les 2 s même sans changement (au cas où une écriture se serait perdue).</summary>
+    void UpdateGearResistance(double delta)
+    {
+        _smoothCadence += (Hub.Cadence - _smoothCadence) * Math.Clamp(delta, 0.0, 1.0);
+        _sinceGearCommand += delta;
+        if (Hub.TrainerAddress == "" || _sinceGearCommand < 0.5) return;
+        int target = GearTargetW();
+        if (Math.Abs(target - _gearTargetW) < 3 && _sinceGearCommand < 2.0) return;
+        _gearTargetW = target;
+        _sinceGearCommand = 0;
+        Hub.SetTargetPower(target);
+    }
+
+    internal void ShiftHarder() { if (Gears?.ShiftHarder() == true) GearChanged(); }
+    internal void ShiftEasier() { if (Gears?.ShiftEasier() == true) GearChanged(); }
+
+    internal void ShiftFront()
+    {
+        if (Gears is not { Chainrings.Length: > 1 }) return;
+        Gears.ShiftFront();
+        GearChanged();
+    }
+
+    /// <summary>Nouvelle vitesse : la consigne part tout de suite, sans attendre le prochain envoi.</summary>
+    void GearChanged() => _sinceGearCommand = 2.0;
 
     void ChangeTarget(int delta)
     {
@@ -272,6 +337,7 @@ public partial class FreeRideScreen : Screen
         if (Recorder is null) return;
         var ride = Recorder.Finish();
         Recorder = null;
+        Gears = null;
         // On rend la main au cycliste : plus de consigne ERG après la sortie.
         if (Hub.TrainerAddress != "") Hub.EnterSimulation(0.0);
         DisplayServer.ScreenSetKeepOn(false);
@@ -292,13 +358,21 @@ public partial class FreeRideScreen : Screen
     {
         if (Recorder is null) return;
         Recorder.Tick(delta, Hub.Power, Hub.Cadence, Hub.HeartRate);
+        if (Gears is not null) UpdateGearResistance(delta);
 
         _sinceAutosave += delta;
         if (_sinceAutosave >= AutosaveEveryS) Autosave();
 
         _clock.Text = Ui.Duration(Recorder.ElapsedS);
         _power.Text = $"{Hub.Power} W";
-        _powerTitle.Text = Recorder.Ride.Info.Mode == RideMode.TargetPower ? $"Puissance · cible {Recorder.TargetPowerW} W" : "Puissance";
+        _powerTitle.Text = Recorder.Ride.Info.Mode == RideMode.TargetPower ? $"Puissance · cible {Recorder.TargetPowerW} W"
+            : Gears is not null && _gearTargetW >= 0 ? $"Puissance · demandée {_gearTargetW} W" : "Puissance";
+        if (Gears is not null)
+        {
+            _gearLabel.Text = $"{Gears.GearLabel}\n{Gears.RearGearNumber}/{Gears.Cogs.Length}";
+            _frontButton.Text = $"Plateau {Gears.Chainring}";
+            _frontButton.Disabled = Gears.Chainrings.Length < 2;
+        }
         _cadence.Text = $"{Hub.Cadence:0} tr/min";
         _hr.Text = Hub.HeartRate > 0 ? $"{Hub.HeartRate} bpm" : "--";
         _speed.Text = $"{Recorder.SpeedKmh:0.0} km/h";
@@ -322,6 +396,14 @@ public partial class FreeRideScreen : Screen
         base._Notification(what);
         // L'appli passe en arrière-plan : Android peut la tuer, on enregistre.
         if (what == NotificationApplicationPaused) Autosave();
+    }
+
+    /// <summary>Au clavier (ordinateur, mode debug) : flèches haut/bas pour changer de pignon.</summary>
+    public override void _UnhandledInput(InputEvent e)
+    {
+        if (Gears is not null && e.IsActionPressed("ui_up")) { ShiftHarder(); GetViewport().SetInputAsHandled(); return; }
+        if (Gears is not null && e.IsActionPressed("ui_down")) { ShiftEasier(); GetViewport().SetInputAsHandled(); return; }
+        base._UnhandledInput(e);
     }
 
     protected override void OnBack()

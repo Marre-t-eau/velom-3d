@@ -34,6 +34,7 @@ public sealed class RideRecorder
             TargetPowerW = TargetPowerW,
             FtpW = profile.FtpW,
             MassKg = profile.TotalMassKg,
+            VirtualGears = mode == RideMode.Simulation && profile.VirtualGears ? profile.CreateDrivetrain().Describe() : "",
         });
     }
 

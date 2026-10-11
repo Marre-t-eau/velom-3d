@@ -45,7 +45,7 @@ public partial class RideHistoryScreen : Screen
         box.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         box.OffsetLeft = 24;
         box.OffsetRight = -24;
-        var date = Ui.Label($"{Ui.Date(info.StartedAt)}  ·  {ModeName(info.Mode)}", 24);
+        var date = Ui.Label($"{Ui.Date(info.StartedAt)}  ·  {ModeName(info)}", 24);
         date.MouseFilter = MouseFilterEnum.Ignore;
         var stats = Ui.Label($"{Ui.Duration(s.DurationS)}   {Ui.Km(s.DistanceM)}   {s.AvgPowerW:0} W moy.   "
                              + $"{s.Tss:0} TSS   IF {s.IntensityFactor:0.00}   {s.Kcal:0} kcal", 19, Ui.Muted);
@@ -56,7 +56,10 @@ public partial class RideHistoryScreen : Screen
         return button;
     }
 
-    public static string ModeName(RideMode mode) => mode == RideMode.TargetPower ? "Puissance imposée" : "Simulation réaliste";
+    public static string ModeName(RideInfo info) =>
+        info.Mode == RideMode.TargetPower ? "Puissance imposée"
+        : info.VirtualGears.Length > 0 ? $"Simulation réaliste · {info.VirtualGears}"
+        : "Simulation réaliste";
 
     void Open(string id)
     {

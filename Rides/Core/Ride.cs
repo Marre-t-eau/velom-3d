@@ -26,6 +26,21 @@ public sealed class RiderProfile
     public RideMode LastMode { get; set; } = RideMode.Simulation;
     public int LastTargetPowerW { get; set; } = 150;
 
+    /// <summary>Vitesses virtuelles en mode simulation : on change de plateau et de pignon dans
+    /// l'appli, la résistance du trainer suit.</summary>
+    public bool VirtualGears { get; set; }
+    public int[] Chainrings { get; set; } = Gearing.DefaultChainrings;
+    public int[] Cogs { get; set; } = Gearing.DefaultCogs;
+    public int WheelCircumferenceMm { get; set; } = 2105;
+
+    /// <summary>Transmission réglée, ou celle par défaut si le fichier contient des dentures invalides.</summary>
+    public Drivetrain CreateDrivetrain()
+    {
+        bool ok = Chainrings is { Length: >= 1 and <= 3 } && Cogs is { Length: >= 5 and <= 14 };
+        return new Drivetrain(ok ? Chainrings : Gearing.DefaultChainrings, ok ? Cogs : Gearing.DefaultCogs,
+            Math.Clamp(WheelCircumferenceMm, 1500, 2500) / 1000.0);
+    }
+
     [JsonIgnore] public double TotalMassKg => RiderMassKg + BikeMassKg;
 }
 
@@ -39,6 +54,8 @@ public sealed class RideInfo
     /// <summary>FTP au moment de la sortie : le TSS d'hier ne change pas si la FTP évolue.</summary>
     public int FtpW { get; set; }
     public double MassKg { get; set; }
+    /// <summary>Transmission virtuelle utilisée (« 52/36 × 11-30 (12 v.) »), vide sinon.</summary>
+    public string VirtualGears { get; set; } = "";
     public RideSummary Summary { get; set; } = new();
 }
 
