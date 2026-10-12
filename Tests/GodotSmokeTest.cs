@@ -100,14 +100,15 @@ public partial class GodotSmokeTest : Node
     {
         var dir = ProjectSettings.GlobalizePath("user://test-rides-" + Time.GetTicksMsec());
         Screen.Store = new RideStore(dir);
+        Screen.Workouts = new WorkoutStore(Path.Combine(dir, "workouts"));
         Node? next = null;
         Navigator.Override = n => next = n;
 
         var menu = Navigator.Create<MainMenuScreen>(Navigator.Menu);
         AddChild(menu);
         await Wait(0.1);
-        Check(menu.StructuredButton.Disabled && !menu.FreeRideButton.Disabled,
-            "Menu : entraînement structuré grisé, sortie libre disponible");
+        Check(!menu.StructuredButton.Disabled && !menu.FreeRideButton.Disabled,
+            "Menu : entraînement structuré et sortie libre disponibles");
         menu.FreeRideButton.EmitSignal(BaseButton.SignalName.Pressed);
         await Wait(0.1);
         Check(next is FreeRideScreen, "Le menu ouvre la sortie libre");
@@ -206,8 +207,127 @@ public partial class GodotSmokeTest : Node
         Check(Screen.Store.LoadProfile().LastMode == RideMode.Simulation, "Le dernier mode choisi est retenu");
         history.QueueFree();
 
+        await Workouts(sim, () => next, n => next = n);
+
         Navigator.Override = null;
         if (Directory.Exists(dir)) Directory.Delete(dir, true);
+    }
+
+    /// <summary>5. Entraînements : liste (exemples), édition, puis un entraînement déroulé bloc par bloc.</summary>
+    async System.Threading.Tasks.Task Workouts(SimulatedBackend sim, System.Func<Node?> next, System.Action<Node?> setNext)
+    {
+        var menu = Navigator.Create<MainMenuScreen>(Navigator.Menu);
+        AddChild(menu);
+        await Wait(0.1);
+        menu.StructuredButton.EmitSignal(BaseButton.SignalName.Pressed);
+        await Wait(0.1);
+        Check(next() is WorkoutListScreen, "Le menu ouvre la liste des entraînements");
+        menu.QueueFree();
+        (next() as Node)?.Free();
+        setNext(null);
+
+        var list = Navigator.Create<WorkoutListScreen>(Navigator.Workouts);
+        AddChild(list);
+        await Wait(0.1);
+        Check(list.WorkoutCount == 2, $"Liste : deux exemples au premier lancement ({list.WorkoutCount})");
+        list.NewButton.EmitSignal(BaseButton.SignalName.Pressed);
+        await Wait(0.1);
+        var editor = next() as WorkoutEditorScreen;
+        Check(editor is not null, "Nouvel entraînement : ouverture de l'éditeur");
+        list.QueueFree();
+        setNext(null);
+        if (editor is not null)
+        {
+            AddChild(editor);
+            await Wait(0.1);
+            int blocks = editor.Workout.Blocks.Count;
+            editor.AddBlock();
+            editor.SetUnit(Velom3d.Rides.PowerUnit.Watts);
+            await Wait(0.1);
+            var saved = Screen.Workouts.Load(editor.Workout.Id);
+            Check(saved is { Unit: Velom3d.Rides.PowerUnit.Watts } && saved.Blocks.Count == blocks + 1,
+                "Éditeur : bloc ajouté et passage en watts enregistrés");
+            Check(WorkoutEditorScreen.ParseDuration("2:30") == 150 && WorkoutEditorScreen.ParseDuration("5") == 300,
+                "Éditeur : durées saisies en m:ss ou en minutes");
+            int workouts = Screen.Workouts.List().Count;
+            editor.OnDeletePressed();
+            editor.Popup?.YesButton.EmitSignal(BaseButton.SignalName.Pressed);
+            await Wait(0.1);
+            Check(Screen.Workouts.List().Count == workouts - 1, "Supprimer un entraînement après confirmation");
+            (next() as Node)?.Free();
+            setNext(null);
+            editor.QueueFree();
+        }
+
+        var workout = new Workout
+        {
+            Id = "test-workout", Name = "Test blocs", Unit = Velom3d.Rides.PowerUnit.Watts,
+            Blocks =
+            [
+                new() { DurationS = 3, Power = 210, CadenceRpm = 90 },
+                new() { DurationS = 60, Kind = BlockPower.Ramp, Power = 150, PowerEnd = 250 },
+                new() { DurationS = 60, Kind = BlockPower.Free },
+                new() { DurationS = 60, Power = 180 },
+            ],
+        };
+        Screen.Workouts.Save(workout);
+        list = Navigator.Create<WorkoutListScreen>(Navigator.Workouts);
+        AddChild(list);
+        await Wait(0.1);
+        list.StartWorkout(workout);
+        await Wait(0.1);
+        var ride = next() as FreeRideScreen;
+        list.QueueFree();
+        setNext(null);
+        Check(ride is { Workout: not null }, "Démarrer : l'écran de sortie reçoit l'entraînement");
+        if (ride is null) return;
+        AddChild(ride);
+        await Wait(1.5);
+        Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 210, $"Bloc 1 : consigne ERG 210 W ({sim.Model.TargetPowerW} W)");
+        Check(ride.UpcomingCount == 3, $"Les trois blocs suivants sont affichés ({ride.UpcomingCount})");
+        Check(ride.Scene3D is { PropCount: > 500 }, "Entraînement : le cycliste roule aussi en 3D");
+        await Wait(2.5);
+        Check(ride.Progress?.BlockIndex == 1, "Passage automatique au bloc 2 à la fin du bloc 1");
+        Check(ride.UpcomingCount == 2, $"Le bloc passé n'est plus affiché ({ride.UpcomingCount})");
+        await Wait(1.5);
+        Check(sim.Model.ErgMode && sim.Model.TargetPowerW is > 150 and < 175, $"Rampe : la consigne monte ({sim.Model.TargetPowerW} W)");
+        ride.SkipBlock();
+        await Wait(1.0);
+        Check(!sim.Model.ErgMode && sim.Model.TargetPowerW == 0, "Bloc libre : le trainer n'impose plus de puissance");
+        ride.SkipBlock();
+        await Wait(1.0);
+        Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 180, $"Dernier bloc : retour en ERG à 180 W ({sim.Model.TargetPowerW} W)");
+        ride.SkipBlock();
+        await Wait(1.0);
+        Check(ride.Progress?.IsFinished == true && !sim.Model.ErgMode, "Fin de l'entraînement : puissance libre");
+        var samples = ride.Recorder!.Ride.Samples;
+        Check(samples.Any(x => x.TargetPowerW == 210 && x.TargetCadenceRpm == 90) && samples.Any(x => x.TargetPowerW == 0),
+            "Les cibles sont enregistrées à chaque seconde");
+        ride.Finish();
+        await Wait(0.2);
+        ride.QueueFree();
+        if (next() is RideSummaryScreen summary)
+        {
+            setNext(null);
+            AddChild(summary);
+            await Wait(0.2);
+            Check(summary.TargetCount == 2, $"Bilan : cibles de puissance et de cadence tracées ({summary.TargetCount})");
+            Check(summary.Ride.Info.WorkoutName == "Test blocs", "La sortie retient le nom de l'entraînement");
+            int rides = Screen.Store.List().Count;
+            summary.OnDeletePressed();
+            Check(summary.Popup is not null, "Supprimer une sortie : fenêtre de confirmation");
+            summary.Popup?.NoButton.EmitSignal(BaseButton.SignalName.Pressed);
+            await Wait(0.1);
+            Check(summary.Popup is null && Screen.Store.List().Count == rides, "Non : la fenêtre se ferme, rien n'est supprimé");
+            summary.OnDeletePressed();
+            summary.Popup?.YesButton.EmitSignal(BaseButton.SignalName.Pressed);
+            await Wait(0.1);
+            Check(Screen.Store.List().Count == rides - 1 && next() is RideHistoryScreen, "Oui : sortie supprimée, retour à l'historique");
+            (next() as Node)?.Free();
+            setNext(null);
+            summary.QueueFree();
+        }
+        else Check(false, "Fin de l'entraînement : ouverture du bilan");
     }
 
     SignalAwaiter Wait(double s) => ToSignal(GetTree().CreateTimer(s), SceneTreeTimer.SignalName.Timeout);
