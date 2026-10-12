@@ -22,8 +22,6 @@ public partial class WorkoutEditorScreen : Screen
     Button _wattsChip = null!, _percentChip = null!, _deleteButton = null!;
     VBoxContainer _blocks = null!;
     ScrollContainer _scroll = null!;
-    double _deleteArmedUntil = -1;
-    static double Now => Time.GetTicksMsec() / 1000.0;
 
     /// <summary>Entraînement en cours de modification (pour les tests).</summary>
     internal Workout Workout => _w;
@@ -84,12 +82,6 @@ public partial class WorkoutEditorScreen : Screen
         actions.AddChild(_deleteButton);
 
         RebuildBlocks();
-    }
-
-    public override void _Process(double delta)
-    {
-        if (_deleteButton is not null)
-            _deleteButton.Text = Now <= _deleteArmedUntil ? "Toucher encore pour supprimer" : "Supprimer l'entraînement";
     }
 
     // --- Blocs ---
@@ -293,16 +285,11 @@ public partial class WorkoutEditorScreen : Screen
         _chart.QueueRedraw();
     }
 
-    void OnDeletePressed()
+    internal void OnDeletePressed() => Confirm("Supprimer cet entraînement ?", "Les sorties déjà faites avec lui restent dans l'historique.", "Oui, supprimer", () =>
     {
-        if (Now > _deleteArmedUntil)
-        {
-            _deleteArmedUntil = Now + 3.0;
-            return;
-        }
         Workouts.Delete(_w.Id);
         Navigator.GoTo(this, Navigator.Workouts);
-    }
+    });
 
     protected override void OnBack() => Navigator.GoTo(this, Navigator.Workouts);
 }

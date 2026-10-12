@@ -22,8 +22,6 @@ public partial class RideSummaryScreen : Screen
     internal int TargetCount { get; private set; }
 
     Button _deleteButton = null!;
-    double _deleteArmedUntil = -1;
-    static double Now => Time.GetTicksMsec() / 1000.0;
 
     public override void _Ready()
     {
@@ -94,9 +92,6 @@ public partial class RideSummaryScreen : Screen
         actions.AddChild(_deleteButton);
     }
 
-    public override void _Process(double delta) =>
-        _deleteButton.Text = Now <= _deleteArmedUntil ? "Toucher encore pour supprimer" : "Supprimer cette sortie";
-
     static void Stat(GridContainer grid, string title, string value, Color accent)
     {
         var label = Ui.Tile(grid, title, accent, 30);
@@ -153,16 +148,11 @@ public partial class RideSummaryScreen : Screen
         return panel;
     }
 
-    void OnDeletePressed()
+    internal void OnDeletePressed() => Confirm("Supprimer cette sortie ?", "Ses mesures et son bilan seront effacés de l'appareil.", "Oui, supprimer", () =>
     {
-        if (Now > _deleteArmedUntil)
-        {
-            _deleteArmedUntil = Now + 3.0;
-            return;
-        }
         Store.Delete(Ride.Info.Id);
         Navigator.GoTo(this, Navigator.History);
-    }
+    });
 
     protected override void OnBack() => Navigator.GoTo(this, JustFinished ? Navigator.Menu : Navigator.History);
 }

@@ -242,6 +242,13 @@ public partial class GodotSmokeTest : Node
                 "Éditeur : bloc ajouté et passage en watts enregistrés");
             Check(WorkoutEditorScreen.ParseDuration("2:30") == 150 && WorkoutEditorScreen.ParseDuration("5") == 300,
                 "Éditeur : durées saisies en m:ss ou en minutes");
+            int workouts = Screen.Workouts.List().Count;
+            editor.OnDeletePressed();
+            editor.Popup?.YesButton.EmitSignal(BaseButton.SignalName.Pressed);
+            await Wait(0.1);
+            Check(Screen.Workouts.List().Count == workouts - 1, "Supprimer un entraînement après confirmation");
+            (next() as Node)?.Free();
+            setNext(null);
             editor.QueueFree();
         }
 
@@ -298,6 +305,18 @@ public partial class GodotSmokeTest : Node
             await Wait(0.2);
             Check(summary.TargetCount == 2, $"Bilan : cibles de puissance et de cadence tracées ({summary.TargetCount})");
             Check(summary.Ride.Info.WorkoutName == "Test blocs", "La sortie retient le nom de l'entraînement");
+            int rides = Screen.Store.List().Count;
+            summary.OnDeletePressed();
+            Check(summary.Popup is not null, "Supprimer une sortie : fenêtre de confirmation");
+            summary.Popup?.NoButton.EmitSignal(BaseButton.SignalName.Pressed);
+            await Wait(0.1);
+            Check(summary.Popup is null && Screen.Store.List().Count == rides, "Non : la fenêtre se ferme, rien n'est supprimé");
+            summary.OnDeletePressed();
+            summary.Popup?.YesButton.EmitSignal(BaseButton.SignalName.Pressed);
+            await Wait(0.1);
+            Check(Screen.Store.List().Count == rides - 1 && next() is RideHistoryScreen, "Oui : sortie supprimée, retour à l'historique");
+            (next() as Node)?.Free();
+            setNext(null);
             summary.QueueFree();
         }
         else Check(false, "Fin de l'entraînement : ouverture du bilan");
