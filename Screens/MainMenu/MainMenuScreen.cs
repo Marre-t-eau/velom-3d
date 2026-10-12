@@ -6,7 +6,7 @@ namespace Velom3d.Screens;
 /// <summary>Menu principal, après la connexion des capteurs.</summary>
 public partial class MainMenuScreen : Screen
 {
-    /// <summary>Bouton de l'entraînement structuré (grisé pour l'instant), exposé aux tests.</summary>
+    /// <summary>Boutons exposés aux tests.</summary>
     internal Button StructuredButton { get; private set; } = null!;
     internal Button FreeRideButton { get; private set; } = null!;
     Label _sensors = null!;
@@ -28,8 +28,8 @@ public partial class MainMenuScreen : Screen
         content.AddThemeConstantOverride("h_separation", 18);
         content.AddThemeConstantOverride("v_separation", 18);
         root.AddChild(content);
-        StructuredButton = Choice(content, "Entraînement structuré", "Bientôt : séances par intervalles en mode ERG.", () => { });
-        StructuredButton.Disabled = true;
+        StructuredButton = Choice(content, "Entraînement structuré", "Vos séances par blocs : puissance fixe, libre ou en rampe, cadence imposée.",
+            () => Navigator.GoTo(this, Navigator.Workouts));
         FreeRideButton = Choice(content, "Sortie libre", "Roulez sur le plat, à puissance imposée ou en simulation réaliste.",
             () => Navigator.GoTo(this, Navigator.FreeRide));
         Choice(content, "Mes sorties", "Historique, graphiques, TSS, IF et calories de chaque sortie.",

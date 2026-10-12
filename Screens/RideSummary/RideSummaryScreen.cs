@@ -18,10 +18,10 @@ public partial class RideSummaryScreen : Screen
 
     /// <summary>Graphiques affichés (pour les tests).</summary>
     internal int ChartCount { get; private set; }
+    /// <summary>Graphiques avec une cible tracée (pour les tests).</summary>
+    internal int TargetCount { get; private set; }
 
     Button _deleteButton = null!;
-    double _deleteArmedUntil = -1;
-    static double Now => Time.GetTicksMsec() / 1000.0;
 
     public override void _Ready()
     {
@@ -60,8 +60,18 @@ public partial class RideSummaryScreen : Screen
         if (s.DurationS > 0) content.AddChild(Zones(s, info.FtpW));
 
         var t = Ride.Samples.Select(x => x.TimeS).ToArray();
-        AddChart(content, "Puissance", "W", Ui.PowerColor, t, Ride.Samples.Select(x => (double)x.PowerW).ToArray(), s.AvgPowerW);
-        AddChart(content, "Cadence", "tr/min", Ui.CadenceColor, t, Ride.Samples.Select(x => x.CadenceRpm).ToArray(), s.AvgCadenceRpm);
+        // Cible enregistrée (consigne ERG, cadence demandée) : tracée par-dessus la mesure.
+        var power = AddChart(content, "Puissance", "W", Ui.PowerColor, t, Ride.Samples.Select(x => (double)x.PowerW).ToArray(), s.AvgPowerW);
+        if (power is not null && Ride.Samples.Any(x => x.TargetPowerW > 0)) {
+            power.Target = Ride.Samples.Select(x => (double)x.TargetPowerW).ToArray();
+            power.Title += " · cible en blanc";
+        }
+        var cadence = AddChart(content, "Cadence", "tr/min", Ui.CadenceColor, t, Ride.Samples.Select(x => x.CadenceRpm).ToArray(), s.AvgCadenceRpm);
+        if (cadence is not null && Ride.Samples.Any(x => x.TargetCadenceRpm > 0)) {
+            cadence.Target = Ride.Samples.Select(x => (double)x.TargetCadenceRpm).ToArray();
+            cadence.Title += " · cible en blanc";
+        }
+        TargetCount = (power?.Target is null ? 0 : 1) + (cadence?.Target is null ? 0 : 1);
         // La pente n'est tracée que si elle varie ; sur le plat, le titre le dit.
         var grades = Ride.Samples.Select(x => x.GradePct).ToArray();
         bool flat = grades.All(g => Math.Abs(g - grades.FirstOrDefault()) < 0.05);
@@ -81,9 +91,6 @@ public partial class RideSummaryScreen : Screen
         _deleteButton.Modulate = Ui.Danger;
         actions.AddChild(_deleteButton);
     }
-
-    public override void _Process(double delta) =>
-        _deleteButton.Text = Now <= _deleteArmedUntil ? "Toucher encore pour supprimer" : "Supprimer cette sortie";
 
     static void Stat(GridContainer grid, string title, string value, Color accent)
     {
@@ -124,7 +131,7 @@ public partial class RideSummaryScreen : Screen
                 SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter,
                 CustomMinimumSize = new Vector2(0, 18), MouseFilter = MouseFilterEnum.Pass,
             };
-            var fill = new StyleBoxFlat { BgColor = ZoneColor(z) };
+            var fill = new StyleBoxFlat { BgColor = Ui.ZoneColor(z) };
             fill.SetCornerRadiusAll(6);
             var back = new StyleBoxFlat { BgColor = new Color(1, 1, 1, 0.06f) };
             back.SetCornerRadiusAll(6);
@@ -141,27 +148,11 @@ public partial class RideSummaryScreen : Screen
         return panel;
     }
 
-    static Color ZoneColor(int zone) => zone switch
+    internal void OnDeletePressed() => Confirm("Supprimer cette sortie ?", "Ses mesures et son bilan seront effacés de l'appareil.", "Oui, supprimer", () =>
     {
-        0 => new Color(0.55f, 0.58f, 0.62f),
-        1 => new Color(0.30f, 0.62f, 0.95f),
-        2 => new Color(0.30f, 0.80f, 0.50f),
-        3 => new Color(0.98f, 0.80f, 0.25f),
-        4 => new Color(0.98f, 0.55f, 0.20f),
-        5 => new Color(0.95f, 0.35f, 0.30f),
-        _ => new Color(0.75f, 0.35f, 0.85f),
-    };
-
-    void OnDeletePressed()
-    {
-        if (Now > _deleteArmedUntil)
-        {
-            _deleteArmedUntil = Now + 3.0;
-            return;
-        }
         Store.Delete(Ride.Info.Id);
         Navigator.GoTo(this, Navigator.History);
-    }
+    });
 
     protected override void OnBack() => Navigator.GoTo(this, JustFinished ? Navigator.Menu : Navigator.History);
 }

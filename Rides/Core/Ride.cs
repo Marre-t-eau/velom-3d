@@ -10,12 +10,15 @@ public enum RideMode
     TargetPower,
     /// <summary>Mode simulation : la résistance vient de la pente, des pneus et de l'air.</summary>
     Simulation,
+    /// <summary>Entraînement structuré : une suite de blocs (ERG, libre ou rampe).</summary>
+    Workout,
 }
 
-/// <summary>Une mesure par seconde de sortie (pauses exclues).</summary>
+/// <summary>Une mesure par seconde de sortie (pauses exclues). Les cibles valent 0 quand il n'y en a pas :
+/// <paramref name="TargetPowerW"/> est la consigne ERG envoyée au trainer à cet instant.</summary>
 public readonly record struct RideSample(
     double TimeS, int PowerW, double CadenceRpm, int HeartRateBpm,
-    double SpeedKmh, double DistanceM, double GradePct, int TargetPowerW);
+    double SpeedKmh, double DistanceM, double GradePct, int TargetPowerW, int TargetCadenceRpm = 0);
 
 /// <summary>Réglages du cycliste qui servent au calcul de la vitesse, du TSS et de l'IF.</summary>
 public sealed class RiderProfile
@@ -56,6 +59,8 @@ public sealed class RideInfo
     public double MassKg { get; set; }
     /// <summary>Transmission virtuelle utilisée (« 52/36 × 11-30 (12 v.) »), vide sinon.</summary>
     public string VirtualGears { get; set; } = "";
+    /// <summary>Nom de l'entraînement structuré suivi, vide sinon.</summary>
+    public string WorkoutName { get; set; } = "";
     public RideSummary Summary { get; set; } = new();
 }
 

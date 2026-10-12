@@ -21,6 +21,18 @@ public static class Ui
     public static readonly Color HeartRateColor = new(0.95f, 0.36f, 0.45f);
     public static readonly Color GradeColor = new(0.70f, 0.62f, 0.95f);
 
+    /// <summary>Couleur d'une zone de puissance (Z1 gris … Z7 violet).</summary>
+    public static Color ZoneColor(int zone) => zone switch
+    {
+        0 => new Color(0.55f, 0.58f, 0.62f),
+        1 => new Color(0.30f, 0.62f, 0.95f),
+        2 => new Color(0.30f, 0.80f, 0.50f),
+        3 => new Color(0.98f, 0.80f, 0.25f),
+        4 => new Color(0.98f, 0.55f, 0.20f),
+        5 => new Color(0.95f, 0.35f, 0.30f),
+        _ => new Color(0.75f, 0.35f, 0.85f),
+    };
+
     /// <summary>Fond plein écran et colonne principale avec marges.</summary>
     public static VBoxContainer BuildPage(Control screen, int separation = 18)
     {

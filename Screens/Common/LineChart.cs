@@ -21,6 +21,8 @@ public partial class LineChart : Control
     public double[]? Secondary { get; set; }
     public string SecondaryLabel { get; set; } = "";
     public Color SecondaryColor { get; set; } = Ui.GradeColor;
+    /// <summary>Cible (consigne ERG, cadence demandée), même échelle que la mesure ; 0 = pas de cible à cet instant.</summary>
+    public double[]? Target { get; set; }
 
     const float Left = 64, Right = 64, Top = 44, Bottom = 34;
 
@@ -48,7 +50,8 @@ public partial class LineChart : Control
         if (plot.Size.X < 20 || plot.Size.Y < 20 || Values.Length < 2 || Times.Length != Values.Length) return;
 
         double tMax = Math.Max(1.0, Times[^1]);
-        var (lo, hi) = Range(Values, true);
+        bool hasTarget = Target is { Length: > 1 } tgt && tgt.Length == Values.Length;
+        var (lo, hi) = Range(hasTarget ? [.. Values, .. Target!] : Values, true);
         DrawAxis(font, plot, lo, hi, tMax);
 
         if (Secondary is { Length: > 1 } sec && sec.Length == Values.Length)
@@ -66,6 +69,27 @@ public partial class LineChart : Control
             DrawDashedLine(new Vector2(plot.Position.X, y), new Vector2(plot.End.X, y), Ui.Muted, 1.5f, 8f);
         }
         DrawSeries(plot, Values, lo, hi, tMax, LineColor, 3f);
+        if (hasTarget)
+        {
+            DrawTarget(plot, Target!, lo, hi, tMax);
+        }
+    }
+
+    /// <summary>La cible en traits blancs, en marches (pas de moyenne : un changement de bloc reste net) ;
+    /// interrompue là où il n'y a pas de cible.</summary>
+    void DrawTarget(Rect2 plot, double[] target, double lo, double hi, double tMax)
+    {
+        int step = Math.Max(1, target.Length / Math.Max(1, (int)plot.Size.X));
+        var color = new Color(1, 1, 1, 0.85f);
+        for (int i = 0; i + step < target.Length; i += step)
+        {
+            if (target[i] <= 0) continue;
+            float x0 = plot.Position.X + (float)(Times[i] / tMax) * plot.Size.X;
+            float x1 = plot.Position.X + (float)(Times[i + step] / tMax) * plot.Size.X;
+            float y = Y(plot, target[i], lo, hi);
+            DrawLine(new Vector2(x0, y), new Vector2(x1, y), color, 2f);
+            if (target[i + step] > 0) DrawLine(new Vector2(x1, y), new Vector2(x1, Y(plot, target[i + step], lo, hi)), color, 2f);
+        }
     }
 
     void DrawAxis(Font font, Rect2 plot, double lo, double hi, double tMax)

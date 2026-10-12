@@ -12,6 +12,8 @@ public static class Navigator
     public const string History = "res://Screens/RideHistory/RideHistoryScreen.tscn";
     public const string Summary = "res://Screens/RideSummary/RideSummaryScreen.tscn";
     public const string Settings = "res://Screens/Settings/SettingsScreen.tscn";
+    public const string Workouts = "res://Screens/Workouts/WorkoutListScreen.tscn";
+    public const string WorkoutEditor = "res://Screens/WorkoutEditor/WorkoutEditorScreen.tscn";
 
     /// <summary>Remplace le changement de scène (tests : l'écran de test reste en place).</summary>
     public static Action<Node>? Override { get; set; }
