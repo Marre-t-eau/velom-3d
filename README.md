@@ -87,7 +87,12 @@ résumé) et `{id}.csv` (une ligne par seconde, lisible dans un tableur), plus `
 ERG et la cadence demandée (`target_power_w`, `target_cadence_rpm`, 0 sans cible) et l'heure réelle
 (`clock`, pauses déduites). Le JSON garde le poids du cycliste et du vélo (W/kg dans le bilan), la résistance des
 pneus (Crr), le CdA et la roue,
-l'heure de fin et chaque pause (début, reprise, temps de sortie écoulé). Les
+l'heure de fin et chaque pause (début, reprise, temps de sortie écoulé).
+`{id}.raw.csv` est le journal brut : chaque trame BLE reçue des capteurs (`rx`) ou envoyée au
+trainer (`tx`), en hexadécimal, sans décodage, à la milliseconde, pauses comprises, plus les
+événements de l'appli (`app` : départ, capteurs connectés, vitesse, pause, reprise, fin). Il
+permet de tout retraiter plus tard (intervalles RR, équilibre gauche/droite…). Compter environ
+6 Mo par heure. Les
 entraînements sont dans `user://workouts/{id}.json`. Pendant une sortie, enregistrement toutes les 30 s et à la mise en
 arrière-plan. Le calcul (`Rides/Core/`) ne dépend pas de Godot et est testé par `dotnet test`.
 

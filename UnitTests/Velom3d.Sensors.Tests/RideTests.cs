@@ -231,6 +231,33 @@ public class StoreTests : IDisposable
     }
 
     [Fact]
+    public void Raw_log_is_appended_untouched_and_kept_by_reloaded_rides()
+    {
+        var store = new RideStore(_dir);
+        var start = new DateTimeOffset(2026, 10, 13, 18, 0, 0, TimeSpan.FromHours(2));
+        var rec = new RideRecorder(RideMode.TargetPower, new RiderProfile(), start, 200);
+        rec.LogRaw(start.AddMilliseconds(250), RawDirection.Received, "KICKR, CORE", "AA:BB", "2ad2", RawEntry.Hex([0x44, 0x02, 0xC8, 0x00]));
+        rec.Tick(1.0, 200, 90, 0);
+        store.Save(rec.Ride); // sauvegarde automatique en cours de sortie
+        rec.LogRaw(start.AddSeconds(1.5), RawDirection.Sent, "KICKR", "AA:BB", "2ad9", RawEntry.Hex([0x05, 0xD2, 0x00]));
+        rec.Pause(start.AddSeconds(2));
+        store.Save(rec.Finish(start.AddSeconds(3)));
+
+        var path = store.RawFile(rec.Ride.Info.Id);
+        var lines = File.ReadAllLines(path);
+        Assert.Equal("clock,ride_s,dir,device,address,channel,data", lines[0]);
+        Assert.Equal("2026-10-13T18:00:00.250+02:00,0,rx,KICKR  CORE,AA:BB,2ad2,4402C800", lines[1]);
+        Assert.Equal("2026-10-13T18:00:01.500+02:00,1,tx,KICKR,AA:BB,2ad9,05D200", lines[2]);
+        Assert.EndsWith(",app,,,pause,", lines[3]);
+        Assert.EndsWith(",app,,,finish,", lines[4]);
+        Assert.Equal(5, lines.Length);
+
+        // Relue depuis l'historique puis réenregistrée : le journal brut reste intact.
+        store.Save(store.Load(rec.Ride.Info.Id)!);
+        Assert.Equal(lines, File.ReadAllLines(path));
+    }
+
+    [Fact]
     public void Delete_removes_both_files()
     {
         var store = new RideStore(_dir);

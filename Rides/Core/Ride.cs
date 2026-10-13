@@ -94,6 +94,8 @@ public sealed class Ride
 {
     public RideInfo Info { get; }
     public List<RideSample> Samples { get; }
+    /// <summary>Tout ce qui a été reçu des capteurs et envoyé au trainer pendant la sortie (vide pour une sortie relue).</summary>
+    public RawLog Raw { get; } = new();
 
     public Ride(RideInfo info, List<RideSample>? samples = null)
     {

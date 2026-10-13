@@ -143,6 +143,10 @@ public partial class GodotSmokeTest : Node
             var info = summary.Ride.Info;
             Check(info.RiderMassKg > 0 && info.EndedAt is not null && info.Pauses.Count == 1 && RideSummaryScreen.PausesText.StartsWith("Pause 1"),
                 $"Bilan : poids, heure de fin et pause enregistrés ({info.Pauses.Count} pause)");
+            var raw = summary.Ride.Raw.Entries;
+            Check(raw.Any(e => e.Direction == RawDirection.Received && e.Channel == "2ad2")
+                  && raw.Any(e => e.Direction == RawDirection.Sent) && System.IO.File.Exists(Screen.Store.RawFile(info.Id)),
+                $"Journal brut : trames reçues et envoyées enregistrées ({raw.Count} lignes)");
             summary.QueueFree();
         }
 

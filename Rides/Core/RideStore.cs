@@ -11,10 +11,12 @@ namespace Velom3d.Rides;
 /// <summary>
 /// Sorties enregistrées sur l'appareil, deux fichiers par sortie :
 /// <c>{id}.json</c> (en-tête et résumé, lu pour la liste) et <c>{id}.csv</c> (une ligne par seconde,
-/// lu seulement à l'ouverture d'une sortie ; s'ouvre aussi dans un tableur).
+/// lu seulement à l'ouverture d'une sortie ; s'ouvre aussi dans un tableur), plus <c>{id}.raw.csv</c> :
+/// le journal brut, chaque trame BLE reçue ou envoyée, horodatée, sans aucun traitement.
 /// </summary>
 public sealed class RideStore
 {
+    const string RawHeader = "clock,ride_s,dir,device,address,channel,data";
     const string CsvHeader = "time_s,power_w,cadence_rpm,heart_rate_bpm,speed_kmh,distance_m,grade_pct,target_power_w,target_cadence_rpm,clock";
 
     public string Directory { get; }
@@ -23,6 +25,7 @@ public sealed class RideStore
 
     string InfoPath(string id) => Path.Combine(Directory, id + ".json");
     string SamplesPath(string id) => Path.Combine(Directory, id + ".csv");
+    string RawPath(string id) => Path.Combine(Directory, id + ".raw.csv");
     string ProfilePath => Path.Combine(Directory, "profile.json");
 
     public void Save(Ride ride)
@@ -34,6 +37,7 @@ public sealed class RideStore
                 $"{s.TimeS:0.##},{s.PowerW},{s.CadenceRpm:0.#},{s.HeartRateBpm},{s.SpeedKmh:0.##},{s.DistanceM:0.#},{s.GradePct:0.##},{s.TargetPowerW},{s.TargetCadenceRpm},{ride.ClockAt(s.TimeS):yyyy-MM-ddTHH:mm:sszzz}\n"));
         // Mesures d'abord : un en-tête présent garantit des mesures complètes.
         WriteAtomic(SamplesPath(ride.Info.Id), csv.ToString());
+        AppendRaw(ride);
         WriteAtomic(InfoPath(ride.Info.Id), JsonSerializer.Serialize(ride.Info, RideJson.Default.RideInfo));
     }
 
@@ -71,8 +75,34 @@ public sealed class RideStore
         catch (Exception e) when (e is JsonException or IOException) { return null; }
     }
 
+    /// <summary>Ajoute au journal brut les lignes pas encore écrites (le fichier peut devenir gros :
+    /// on ne le réécrit pas à chaque enregistrement). Une sortie relue, sans journal en mémoire, n'y touche pas.</summary>
+    void AppendRaw(Ride ride)
+    {
+        var raw = ride.Raw;
+        if (raw.Entries.Count <= raw.Saved) return;
+        var text = new StringBuilder();
+        if (raw.Saved == 0) text.Append(RawHeader).Append('\n');
+        for (int i = raw.Saved; i < raw.Entries.Count; i++)
+        {
+            var e = raw.Entries[i];
+            text.Append(string.Create(CultureInfo.InvariantCulture,
+                $"{e.At:yyyy-MM-ddTHH:mm:ss.fffzzz},{e.RideS:0.###},{DirName(e.Direction)},{Clean(e.Device)},{Clean(e.Address)},{Clean(e.Channel)},{Clean(e.Data)}\n"));
+        }
+        if (raw.Saved == 0) File.WriteAllText(RawPath(ride.Info.Id), text.ToString());
+        else File.AppendAllText(RawPath(ride.Info.Id), text.ToString());
+        raw.Saved = raw.Entries.Count;
+    }
+
+    static string DirName(RawDirection d) => d switch { RawDirection.Received => "rx", RawDirection.Sent => "tx", _ => "app" };
+    static string Clean(string s) => s.Replace(',', ' ').Replace('\n', ' ').Replace('\r', ' ');
+
+    /// <summary>Chemin du journal brut d'une sortie (pour l'exporter).</summary>
+    public string RawFile(string id) => RawPath(id);
+
     public void Delete(string id)
     {
+        File.Delete(RawPath(id));
         File.Delete(InfoPath(id));
         File.Delete(SamplesPath(id));
     }

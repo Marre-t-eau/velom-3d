@@ -46,19 +46,30 @@ public sealed class RideRecorder
         });
     }
 
+    /// <summary>Ajoute une ligne au journal brut, datée du temps de sortie courant.</summary>
+    public void LogRaw(DateTimeOffset at, RawDirection direction, string device, string address, string channel, string data) =>
+        Ride.Raw.Add(new RawEntry(at, ElapsedS, direction, device, address, channel, data));
+
+    /// <summary>Événement de l'appli dans le journal brut.</summary>
+    public void LogEvent(string name, string value = "", DateTimeOffset? now = null) =>
+        LogRaw(now ?? DateTimeOffset.Now, RawDirection.App, "", "", name, value);
+
     /// <summary>Met en pause et note l'heure (une seule entrée si déjà en pause).</summary>
     public void Pause(DateTimeOffset? now = null)
     {
         if (IsPaused) return;
         IsPaused = true;
         Ride.Info.Pauses.Add(new RidePause { PausedAt = now ?? DateTimeOffset.Now, AtElapsedS = ElapsedS });
+        LogEvent("pause", now: Ride.Info.Pauses[^1].PausedAt);
     }
 
     public void Resume(DateTimeOffset? now = null)
     {
         if (!IsPaused) return;
         IsPaused = false;
-        if (Ride.Info.Pauses.Count > 0) Ride.Info.Pauses[^1].ResumedAt = now ?? DateTimeOffset.Now;
+        var at = now ?? DateTimeOffset.Now;
+        if (Ride.Info.Pauses.Count > 0) Ride.Info.Pauses[^1].ResumedAt = at;
+        LogEvent("resume", now: at);
     }
 
     /// <summary>Avance de dt secondes avec les mesures du moment.</summary>
@@ -91,6 +102,7 @@ public sealed class RideRecorder
     public Ride Finish(DateTimeOffset? now = null)
     {
         Ride.Info.EndedAt = now ?? DateTimeOffset.Now;
+        LogEvent("finish", now: Ride.Info.EndedAt);
         Ride.Summarize();
         return Ride;
     }

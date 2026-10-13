@@ -27,6 +27,10 @@ public partial class SensorHub : Node
     [Signal] public delegate void ControlResultEventHandler(int requestOpcode, bool ok);
     [Signal] public delegate void StatusMessageEventHandler(string text);
 
+    /// <summary>Chaque trame BLE telle quelle : adresse, UUID court, octets, true si envoyée au trainer.
+    /// Sert au journal brut des sorties.</summary>
+    public event System.Action<string, string, byte[], bool>? RawFrame;
+
     public SensorFusion Fusion { get; } = new();
     /// <summary>Appareils vus au scan et état de leur connexion.</summary>
     public DeviceList Devices { get; } = new();
@@ -80,7 +84,11 @@ public partial class SensorHub : Node
         TrainerAddress = "";
         IsScanning = false;
         AddChild(backend);
-        backend.Notified += (address, charUuid, data) => Fusion.Feed(address, charUuid, data, Now);
+        backend.Notified += (address, charUuid, data) =>
+        {
+            RawFrame?.Invoke(address, charUuid, data, false);
+            Fusion.Feed(address, charUuid, data, Now);
+        };
         backend.DeviceFound += (a, n, s, rssi) => Devices.Found(a, n, s, rssi, Now);
         backend.ScanFinished += () =>
         {
@@ -155,7 +163,13 @@ public partial class SensorHub : Node
             return;
         }
         // Le transport les envoie dans l'ordre, une à la fois.
-        foreach (var frame in frames) Backend.Write(TrainerAddress, BleUuids.FitnessMachineControlPoint, frame);
+        foreach (var frame in frames) Write(TrainerAddress, frame);
+    }
+
+    void Write(string address, byte[] frame)
+    {
+        RawFrame?.Invoke(address, BleUuids.ToShort(BleUuids.FitnessMachineControlPoint), frame, true);
+        Backend!.Write(address, BleUuids.FitnessMachineControlPoint, frame);
     }
 
     void OnDeviceConnected(string address, string[] services)
@@ -171,8 +185,8 @@ public partial class SensorHub : Node
         {
             TrainerAddress = address;
             // FTMS exige de demander le contrôle avant toute commande.
-            Backend!.Write(address, BleUuids.FitnessMachineControlPoint, FtmsCommands.RequestControl());
-            Backend.Write(address, BleUuids.FitnessMachineControlPoint, FtmsCommands.Start());
+            Write(address, FtmsCommands.RequestControl());
+            Write(address, FtmsCommands.Start());
         }
         EmitSignal(SignalName.DeviceConnected, address, services);
     }
