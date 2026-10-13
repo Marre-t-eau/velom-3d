@@ -430,9 +430,10 @@ public partial class FreeRideScreen : Screen
 
         if (progress.Current is { } b)
         {
-            _blockTitle.Text = $"Bloc {index + 1} / {w.Blocks.Count} · reste";
+            _blockTitle.Text = b.FtpTest ? "Test FTP : à fond, régulier · reste" : $"Bloc {index + 1} / {w.Blocks.Count} · reste";
             _blockRemaining.Text = Ui.Duration(Math.Ceiling(progress.BlockRemainingS));
-            _blockPower.Text = b.Kind == BlockPower.Ramp && progress.TargetW is { } now ? $"{now} W, vers {w.ToWatts(b.PowerEnd, progress.FtpW)} W"
+            _blockPower.Text = b.FtpTest ? $"Moyenne {progress.FtpTestAveragePowerW:0} W"
+                : b.Kind == BlockPower.Ramp && progress.TargetW is { } now ? $"{now} W, vers {w.ToWatts(b.PowerEnd, progress.FtpW)} W"
                 : b.Kind == BlockPower.Free ? "Puissance libre" : BlockPowerText(b);
             _blockCadence.Text = b.FreeCadence ? "Cadence libre" : $"Cadence {b.CadenceRpm} tr/min";
             _blockBar.Value = 1.0 - progress.BlockRemainingS / Math.Max(1, b.DurationS);
@@ -443,7 +444,8 @@ public partial class FreeRideScreen : Screen
             _blockTitle.Text = "Entraînement terminé";
             _blockRemaining.Text = "Bravo !";
             _blockPower.Text = "Puissance libre";
-            _blockCadence.Text = "Touchez Terminer pour enregistrer.";
+            _blockCadence.Text = progress.FtpTestResultW is { } ftp ? $"Nouvelle FTP : {ftp} W. Touchez Terminer pour enregistrer."
+                : "Touchez Terminer pour enregistrer.";
             _blockBar.Value = 1;
             _skipButton.Disabled = true;
         }
@@ -551,6 +553,15 @@ public partial class FreeRideScreen : Screen
     {
         if (Recorder is null) return;
         var ride = Recorder.Finish();
+        // Test FTP réussi : la nouvelle FTP est enregistrée tout de suite dans les réglages.
+        int? newFtp = Progress?.FtpTestResultW;
+        int oldFtp = _profile.FtpW;
+        if (newFtp is { } ftp)
+        {
+            ride.Info.FtpTestW = ftp;
+            _profile.FtpW = ftp;
+            _profile.FtpTestedAt = DateTimeOffset.Now;
+        }
         Recorder = null;
         Gears = null;
         Progress = null;
@@ -567,6 +578,7 @@ public partial class FreeRideScreen : Screen
         var summary = Navigator.Create<RideSummaryScreen>(Navigator.Summary);
         summary.Ride = ride;
         summary.JustFinished = true;
+        summary.PreviousFtpW = oldFtp;
         Navigator.GoTo(this, summary);
     }
 
@@ -576,7 +588,7 @@ public partial class FreeRideScreen : Screen
         if (Progress is not null) UpdateWorkoutControl(delta);
         double before = Recorder.ElapsedS;
         Recorder.Tick(delta, Hub.Power, Hub.Cadence, Hub.HeartRate);
-        Progress?.Advance(Recorder.ElapsedS - before);
+        Progress?.Advance(Recorder.ElapsedS - before, Hub.Power);
         if (Gears is not null) UpdateGearResistance(delta);
 
         _sinceAutosave += delta;

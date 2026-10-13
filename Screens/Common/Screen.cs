@@ -37,6 +37,14 @@ public abstract partial class Screen : Control
         AddChild(Popup);
     }
 
+    /// <summary>Fenêtre d'information avec un seul bouton.</summary>
+    protected void Inform(string title, string detail, string ok = "OK")
+    {
+        Popup?.QueueFree();
+        Popup = new ConfirmPopup(title, detail, ok, ClosePopup, null);
+        AddChild(Popup);
+    }
+
     void ClosePopup()
     {
         Popup?.QueueFree();

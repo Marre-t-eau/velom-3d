@@ -10,12 +10,14 @@ public partial class WorkoutListScreen : Screen
     /// <summary>Nombre d'entraînements affichés (pour les tests).</summary>
     internal int WorkoutCount { get; private set; }
     internal Button NewButton { get; private set; } = null!;
+    internal Label FtpLabel { get; private set; } = null!;
 
     int _ftpW;
 
     public override void _Ready()
     {
-        _ftpW = Store.LoadProfile().FtpW;
+        var profile = Store.LoadProfile();
+        _ftpW = profile.FtpW;
         var root = Ui.BuildPage(this);
         var header = Ui.Row();
         root.AddChild(header);
@@ -25,9 +27,21 @@ public partial class WorkoutListScreen : Screen
         NewButton = Ui.Button("Nouvel entraînement", CreateWorkout, 300, 72);
         header.AddChild(NewButton);
         header.AddChild(Ui.Button("Retour", OnBack, 200, 72));
-        root.AddChild(Ui.Label($"Les pourcentages se calculent sur votre FTP ({_ftpW} W, à changer dans Réglages).", 19, Ui.Muted));
+
+        var ftp = Ui.Row(12);
+        root.AddChild(ftp);
+        FtpLabel = Ui.Label($"FTP {_ftpW} W", 30, Ui.Accent);
+        FtpLabel.AutowrapMode = TextServer.AutowrapMode.Off;
+        ftp.AddChild(FtpLabel);
+        var ftpDetail = Ui.Label((profile.FtpTestedAt is { } at ? $"testée le {Ui.Date(at)}" : "pas encore testée")
+                                 + " · les pourcentages se calculent dessus · modifiable dans Réglages", 19, Ui.Muted);
+        ftpDetail.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        ftpDetail.VerticalAlignment = VerticalAlignment.Center;
+        ftp.AddChild(ftpDetail);
 
         var list = Ui.AddScroll(root, 12);
+        list.AddChild(Card(Workout.FtpTestWorkout(), "Test FTP : 20 min à fond en puissance libre, la FTP vaut 95 % de la moyenne. "
+                                                     + "Elle est enregistrée automatiquement à la fin."));
         var workouts = Workouts.List();
         WorkoutCount = workouts.Count;
         if (workouts.Count == 0)
@@ -35,7 +49,8 @@ public partial class WorkoutListScreen : Screen
         foreach (var w in workouts) list.AddChild(Card(w));
     }
 
-    Control Card(Workout w)
+    /// <summary>Carte d'un entraînement ; avec <paramref name="fixedNote"/>, entraînement intégré (pas de bouton Modifier).</summary>
+    Control Card(Workout w, string fixedNote = "")
     {
         var panel = Ui.Panel(Ui.Card);
         var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
@@ -49,7 +64,8 @@ public partial class WorkoutListScreen : Screen
         titles.AddChild(Ui.Label(w.Name.Length > 0 ? w.Name : "Sans nom", 26));
         titles.AddChild(Ui.Label($"{Ui.Duration(w.TotalDurationS)} · {w.Blocks.Count} bloc(s) · ≈ {w.EstimatedTss(_ftpW):0} TSS · "
                                  + (w.Unit == PowerUnit.PercentFtp ? "en % de FTP" : "en watts"), 18, Ui.Muted));
-        top.AddChild(Ui.Button("Modifier", () => Edit(w), 180, 72, 22));
+        if (fixedNote.Length > 0) titles.AddChild(Ui.Label(fixedNote, 18, Ui.Accent));
+        else top.AddChild(Ui.Button("Modifier", () => Edit(w), 180, 72, 22));
         var start = Ui.Button("Démarrer", () => StartWorkout(w), 200, 72, 22);
         start.Disabled = w.Blocks.Count == 0;
         top.AddChild(start);
