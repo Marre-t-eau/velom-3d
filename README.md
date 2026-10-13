@@ -85,7 +85,8 @@ Les sorties sont enregistrées sur l'appareil, dans `user://rides/` : `{id}.json
 résumé) et `{id}.csv` (une ligne par seconde, lisible dans un tableur), plus `profile.json`
 (FTP, poids, roue, vitesses virtuelles, dernier mode). Le CSV garde à chaque seconde la consigne
 ERG et la cadence demandée (`target_power_w`, `target_cadence_rpm`, 0 sans cible) et l'heure réelle
-(`clock`, pauses déduites). Le JSON garde le poids du cycliste et du vélo (W/kg dans le bilan),
+(`clock`, pauses déduites). Le JSON garde le poids du cycliste et du vélo (W/kg dans le bilan), la résistance des
+pneus (Crr), le CdA et la roue,
 l'heure de fin et chaque pause (début, reprise, temps de sortie écoulé). Les
 entraînements sont dans `user://workouts/{id}.json`. Pendant une sortie, enregistrement toutes les 30 s et à la mise en
 arrière-plan. Le calcul (`Rides/Core/`) ne dépend pas de Godot et est testé par `dotnet test`.

@@ -38,6 +38,9 @@ public sealed class RideRecorder
             MassKg = profile.TotalMassKg,
             RiderMassKg = profile.RiderMassKg,
             BikeMassKg = profile.BikeMassKg,
+            Crr = Physics.Crr,
+            CdA = Physics.CdA,
+            WheelCircumferenceMm = profile.WheelCircumferenceMm,
             VirtualGears = mode == RideMode.Simulation && profile.VirtualGears ? profile.CreateDrivetrain().Describe() : "",
             WorkoutName = mode == RideMode.Workout ? workoutName : "",
         });

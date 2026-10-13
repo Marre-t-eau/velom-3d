@@ -131,6 +131,9 @@ public partial class RideSummaryScreen : Screen
                 ? $"Pause {i + 1} : {Clock(p.PausedAt)} → {Clock(r)} ({Ui.Duration(p.DurationS)}), après {Ui.Duration(p.AtElapsedS)} de sortie"
                 : $"Pause {i + 1} : {Clock(p.PausedAt)}, après {Ui.Duration(p.AtElapsedS)} de sortie, jusqu'à la fin"));
         box.AddChild(Ui.Label(PausesText, 17, Ui.Muted));
+        if (info.Crr > 0)
+            box.AddChild(Ui.Label(string.Create(System.Globalization.CultureInfo.GetCultureInfo("fr-FR"),
+                $"Résistance des pneus Crr {info.Crr:0.0000}  ·  aéro CdA {info.CdA:0.00} m²  ·  roue {info.WheelCircumferenceMm} mm"), 17, Ui.Muted));
         return panel;
     }
 

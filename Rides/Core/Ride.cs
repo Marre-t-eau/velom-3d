@@ -62,6 +62,12 @@ public sealed class RideInfo
     public double RiderMassKg { get; set; }
     /// <summary>Poids du vélo réglé au moment de la sortie. 0 pour les sorties plus anciennes.</summary>
     public double BikeMassKg { get; set; }
+    /// <summary>Résistance au roulement des pneus (Crr) utilisée par la simulation. 0 pour les sorties plus anciennes.</summary>
+    public double Crr { get; set; }
+    /// <summary>Surface aérodynamique (CdA, m²) utilisée par la simulation. 0 pour les sorties plus anciennes.</summary>
+    public double CdA { get; set; }
+    /// <summary>Circonférence de roue réglée (mm), qui donne la taille des pneus.</summary>
+    public int WheelCircumferenceMm { get; set; }
     /// <summary>Heure de fin (appui sur Terminer), absente tant que la sortie est en cours.</summary>
     public DateTimeOffset? EndedAt { get; set; }
     /// <summary>Pauses dans l'ordre, avec leurs heures.</summary>

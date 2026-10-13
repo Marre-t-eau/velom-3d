@@ -219,6 +219,9 @@ public class StoreTests : IDisposable
         var info = store.List()[0];
         Assert.Equal(68, info.RiderMassKg);
         Assert.Equal(9, info.BikeMassKg);
+        Assert.Equal(BikePhysics.DefaultCrr, info.Crr);
+        Assert.Equal(BikePhysics.DefaultCdA, info.CdA);
+        Assert.Equal(2105, info.WheelCircumferenceMm);
         Assert.Equal(start.AddSeconds(40), info.EndedAt);
         Assert.Equal(start.AddSeconds(35), Assert.Single(info.Pauses).ResumedAt);
         var csv = File.ReadAllLines(Path.Combine(_dir, ride.Info.Id + ".csv"));
