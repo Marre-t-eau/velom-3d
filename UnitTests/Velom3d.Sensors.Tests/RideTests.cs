@@ -128,6 +128,33 @@ public class RecorderTests
     }
 
     [Fact]
+    public void Pauses_are_logged_with_times_and_sample_clock_skips_them()
+    {
+        var start = new DateTimeOffset(2026, 10, 13, 18, 0, 0, TimeSpan.FromHours(2));
+        var rec = new RideRecorder(RideMode.Simulation, new RiderProfile { RiderMassKg = 70, BikeMassKg = 7.5 }, start);
+        for (int i = 0; i < 10; i++) rec.Tick(1.0, 200, 90, 140);
+        rec.Pause(start.AddSeconds(10));
+        rec.Pause(start.AddSeconds(20)); // déjà en pause : rien de plus
+        rec.Resume(start.AddSeconds(70));
+        for (int i = 0; i < 5; i++) rec.Tick(1.0, 200, 90, 140);
+        rec.Pause(start.AddSeconds(75));
+        var ride = rec.Finish(start.AddSeconds(80));
+
+        var info = ride.Info;
+        Assert.Equal(70, info.RiderMassKg);
+        Assert.Equal(7.5, info.BikeMassKg);
+        Assert.Equal(77.5, info.MassKg);
+        Assert.Equal(start.AddSeconds(80), info.EndedAt);
+        Assert.Equal(2, info.Pauses.Count);
+        Assert.Equal(10, info.Pauses[0].AtElapsedS, 6);
+        Assert.Equal(60, info.Pauses[0].DurationS, 6);
+        Assert.Null(info.Pauses[1].ResumedAt); // terminée pendant la pause
+        Assert.Equal(start.AddSeconds(10), ride.ClockAt(ride.Samples[9].TimeS));
+        Assert.Equal(start.AddSeconds(71), ride.ClockAt(ride.Samples[10].TimeS));
+        Assert.Equal(200 / 70.0, Ride.PerKg(200, info), 6);
+    }
+
+    [Fact]
     public void Distance_matches_speed_and_summary_uses_ride_FTP()
     {
         var rec = NewRecorder(RideMode.TargetPower);
@@ -174,6 +201,60 @@ public class StoreTests : IDisposable
         Assert.Equal(88.5, loaded.Samples[42].CadenceRpm, 6);
         Assert.Equal(newer.Samples[42].DistanceM, loaded.Samples[42].DistanceM, 0);
         Assert.Equal(newer.Info.StartedAt, loaded.Info.StartedAt);
+    }
+
+    [Fact]
+    public void Weights_pauses_and_clock_are_saved()
+    {
+        var store = new RideStore(_dir);
+        var start = new DateTimeOffset(2026, 10, 13, 18, 0, 0, TimeSpan.FromHours(2));
+        var rec = new RideRecorder(RideMode.TargetPower, new RiderProfile { RiderMassKg = 68, BikeMassKg = 9 }, start, 200);
+        for (int i = 0; i < 5; i++) rec.Tick(1.0, 200, 90, 0);
+        rec.Pause(start.AddSeconds(5));
+        rec.Resume(start.AddSeconds(35));
+        for (int i = 0; i < 5; i++) rec.Tick(1.0, 200, 90, 0);
+        var ride = rec.Finish(start.AddSeconds(40));
+        store.Save(ride);
+
+        var info = store.List()[0];
+        Assert.Equal(68, info.RiderMassKg);
+        Assert.Equal(9, info.BikeMassKg);
+        Assert.Equal(BikePhysics.DefaultCrr, info.Crr);
+        Assert.Equal(BikePhysics.DefaultCdA, info.CdA);
+        Assert.Equal(2105, info.WheelCircumferenceMm);
+        Assert.Equal(start.AddSeconds(40), info.EndedAt);
+        Assert.Equal(start.AddSeconds(35), Assert.Single(info.Pauses).ResumedAt);
+        var csv = File.ReadAllLines(Path.Combine(_dir, ride.Info.Id + ".csv"));
+        Assert.EndsWith(",clock", csv[0]);
+        Assert.EndsWith(",2026-10-13T18:00:36+02:00", csv[6]);
+        Assert.Equal(10, store.Load(ride.Info.Id)!.Samples.Count);
+    }
+
+    [Fact]
+    public void Raw_log_is_appended_untouched_and_kept_by_reloaded_rides()
+    {
+        var store = new RideStore(_dir);
+        var start = new DateTimeOffset(2026, 10, 13, 18, 0, 0, TimeSpan.FromHours(2));
+        var rec = new RideRecorder(RideMode.TargetPower, new RiderProfile(), start, 200);
+        rec.LogRaw(start.AddMilliseconds(250), RawDirection.Received, "KICKR, CORE", "AA:BB", "2ad2", RawEntry.Hex([0x44, 0x02, 0xC8, 0x00]));
+        rec.Tick(1.0, 200, 90, 0);
+        store.Save(rec.Ride); // sauvegarde automatique en cours de sortie
+        rec.LogRaw(start.AddSeconds(1.5), RawDirection.Sent, "KICKR", "AA:BB", "2ad9", RawEntry.Hex([0x05, 0xD2, 0x00]));
+        rec.Pause(start.AddSeconds(2));
+        store.Save(rec.Finish(start.AddSeconds(3)));
+
+        var path = store.RawFile(rec.Ride.Info.Id);
+        var lines = File.ReadAllLines(path);
+        Assert.Equal("clock,ride_s,dir,device,address,channel,data", lines[0]);
+        Assert.Equal("2026-10-13T18:00:00.250+02:00,0,rx,KICKR  CORE,AA:BB,2ad2,4402C800", lines[1]);
+        Assert.Equal("2026-10-13T18:00:01.500+02:00,1,tx,KICKR,AA:BB,2ad9,05D200", lines[2]);
+        Assert.EndsWith(",app,,,pause,", lines[3]);
+        Assert.EndsWith(",app,,,finish,", lines[4]);
+        Assert.Equal(5, lines.Length);
+
+        // Relue depuis l'historique puis réenregistrée : le journal brut reste intact.
+        store.Save(store.Load(rec.Ride.Info.Id)!);
+        Assert.Equal(lines, File.ReadAllLines(path));
     }
 
     [Fact]

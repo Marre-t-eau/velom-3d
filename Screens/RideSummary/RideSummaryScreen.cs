@@ -55,8 +55,17 @@ public partial class RideSummaryScreen : Screen
         Stat(grid, "Vitesse moyenne", $"{s.AvgSpeedKmh:0.0} km/h", Ui.SpeedColor);
         Stat(grid, "FC moyenne", s.AvgHeartRateBpm > 0 ? $"{s.AvgHeartRateBpm:0} bpm" : "--", Ui.HeartRateColor);
         Stat(grid, "FC max", s.MaxHeartRateBpm > 0 ? $"{s.MaxHeartRateBpm} bpm" : "--", Ui.HeartRateColor);
+        if (info.RiderMassKg > 0)
+        {
+            // Rapport poids/puissance avec le poids du cycliste ce jour-là.
+            Stat(grid, "W/kg moyen", $"{Ride.PerKg(s.AvgPowerW, info):0.00}", Ui.PowerColor);
+            Stat(grid, "W/kg normalisé", $"{Ride.PerKg(s.NormalizedPowerW, info):0.00}", Ui.PowerColor);
+            Stat(grid, "W/kg max", $"{Ride.PerKg(s.MaxPowerW, info):0.00}", Ui.PowerColor);
+            Stat(grid, "Poids", $"{info.RiderMassKg:0.#} + {info.BikeMassKg:0.#} kg", Ui.Muted);
+        }
         content.AddChild(Ui.Label($"Travail : {s.WorkKj:0} kJ. Calories estimées avec un rendement musculaire de 24 %.", 16, Ui.Muted));
 
+        content.AddChild(Timeline(info));
         if (s.DurationS > 0) content.AddChild(Zones(s, info.FtpW));
 
         var t = Ride.Samples.Select(x => x.TimeS).ToArray();
@@ -107,6 +116,31 @@ public partial class RideSummaryScreen : Screen
         ChartCount++;
         return chart;
     }
+
+    /// <summary>Heures de départ et de fin, et chaque pause avec sa durée.</summary>
+    static Control Timeline(RideInfo info)
+    {
+        var panel = Ui.Panel(Ui.Card);
+        var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
+        box.AddThemeConstantOverride("separation", 4);
+        panel.AddChild(box);
+        string end = info.EndedAt is { } e ? $"  ·  fin {Clock(e)}" : "";
+        box.AddChild(Ui.Label($"Départ {Clock(info.StartedAt)}{end}", 20));
+        PausesText = info.Pauses.Count == 0 ? "Aucune pause."
+            : string.Join("\n", info.Pauses.Select((p, i) => p.ResumedAt is { } r
+                ? $"Pause {i + 1} : {Clock(p.PausedAt)} → {Clock(r)} ({Ui.Duration(p.DurationS)}), après {Ui.Duration(p.AtElapsedS)} de sortie"
+                : $"Pause {i + 1} : {Clock(p.PausedAt)}, après {Ui.Duration(p.AtElapsedS)} de sortie, jusqu'à la fin"));
+        box.AddChild(Ui.Label(PausesText, 17, Ui.Muted));
+        if (info.Crr > 0)
+            box.AddChild(Ui.Label(string.Create(System.Globalization.CultureInfo.GetCultureInfo("fr-FR"),
+                $"Résistance des pneus Crr {info.Crr:0.0000}  ·  aéro CdA {info.CdA:0.00} m²  ·  roue {info.WheelCircumferenceMm} mm"), 17, Ui.Muted));
+        return panel;
+    }
+
+    /// <summary>Texte des pauses affiché (pour les tests).</summary>
+    internal static string PausesText { get; private set; } = "";
+
+    static string Clock(DateTimeOffset at) => at.ToLocalTime().ToString("HH:mm:ss");
 
     /// <summary>Barres horizontales : part du temps dans chaque zone de puissance.</summary>
     static Control Zones(RideSummary s, int ftpW)

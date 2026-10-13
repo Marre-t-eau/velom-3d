@@ -84,6 +84,7 @@ public partial class FreeRideScreen : Screen
     public override void _ExitTree()
     {
         Hub.StatusMessage -= ShowTrainerStatus;
+        Hub.RawFrame -= OnRawFrame;
         DisplayServer.ScreenSetKeepOn(false);
     }
 
@@ -314,6 +315,7 @@ public partial class FreeRideScreen : Screen
         _target = 0;
         Progress = new WorkoutProgress(workout, _profile.FtpW);
         Recorder = new RideRecorder(RideMode.Workout, _profile, DateTimeOffset.Now, Progress.TargetW ?? 0, workout.Name);
+        StartRawLog($"workout {workout.Name}");
         Gears = null;
         _workoutChart.Workout = workout;
         _workoutChart.FtpW = _profile.FtpW;
@@ -459,6 +461,7 @@ public partial class FreeRideScreen : Screen
 
         Recorder = new RideRecorder(mode, _profile, DateTimeOffset.Now, targetW);
         Gears = mode == RideMode.Simulation && _profile.VirtualGears ? _profile.CreateDrivetrain() : null;
+        StartRawLog(Gears is null ? mode.ToString() : $"{mode} {Gears.Describe()} {Gears.GearLabel}");
         _smoothCadence = Hub.Cadence;
         if (Hub.TrainerAddress != "")
         {
@@ -512,7 +515,25 @@ public partial class FreeRideScreen : Screen
     }
 
     /// <summary>Nouvelle vitesse : la consigne part tout de suite, sans attendre le prochain envoi.</summary>
-    void GearChanged() => _sinceGearCommand = 2.0;
+    void GearChanged()
+    {
+        _sinceGearCommand = 2.0;
+        Recorder?.LogEvent("gear", Gears!.GearLabel);
+    }
+
+    /// <summary>Journal brut : toutes les trames BLE à partir d'ici, jusqu'à la fin de la sortie.</summary>
+    void StartRawLog(string mode)
+    {
+        Hub.RawFrame -= OnRawFrame;
+        Hub.RawFrame += OnRawFrame;
+        foreach (var d in Hub.Devices.Sorted)
+            if (d.State == LinkState.Connected) Recorder!.LogEvent("device", $"{d.DisplayName} {d.Address}");
+        Recorder!.LogEvent("start", mode);
+    }
+
+    void OnRawFrame(string address, string channel, byte[] data, bool sent) =>
+        Recorder?.LogRaw(DateTimeOffset.Now, sent ? RawDirection.Sent : RawDirection.Received,
+            Hub.Devices.Get(address)?.DisplayName ?? "", address, channel, RawEntry.Hex(data));
 
     void ChangeTarget(int delta)
     {
@@ -552,6 +573,7 @@ public partial class FreeRideScreen : Screen
         if (Recorder is null) return;
         var ride = Recorder.Finish();
         Recorder = null;
+        Hub.RawFrame -= OnRawFrame;
         Gears = null;
         Progress = null;
         // On rend la main au cycliste : plus de consigne ERG après la sortie.

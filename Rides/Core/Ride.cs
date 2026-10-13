@@ -56,7 +56,22 @@ public sealed class RideInfo
     public int TargetPowerW { get; set; }
     /// <summary>FTP au moment de la sortie : le TSS d'hier ne change pas si la FTP évolue.</summary>
     public int FtpW { get; set; }
+    /// <summary>Masse totale cycliste + vélo, celle de la simulation.</summary>
     public double MassKg { get; set; }
+    /// <summary>Poids du cycliste au moment de la sortie (W/kg). 0 pour les sorties plus anciennes.</summary>
+    public double RiderMassKg { get; set; }
+    /// <summary>Poids du vélo réglé au moment de la sortie. 0 pour les sorties plus anciennes.</summary>
+    public double BikeMassKg { get; set; }
+    /// <summary>Résistance au roulement des pneus (Crr) utilisée par la simulation. 0 pour les sorties plus anciennes.</summary>
+    public double Crr { get; set; }
+    /// <summary>Surface aérodynamique (CdA, m²) utilisée par la simulation. 0 pour les sorties plus anciennes.</summary>
+    public double CdA { get; set; }
+    /// <summary>Circonférence de roue réglée (mm), qui donne la taille des pneus.</summary>
+    public int WheelCircumferenceMm { get; set; }
+    /// <summary>Heure de fin (appui sur Terminer), absente tant que la sortie est en cours.</summary>
+    public DateTimeOffset? EndedAt { get; set; }
+    /// <summary>Pauses dans l'ordre, avec leurs heures.</summary>
+    public List<RidePause> Pauses { get; set; } = new();
     /// <summary>Transmission virtuelle utilisée (« 52/36 × 11-30 (12 v.) »), vide sinon.</summary>
     public string VirtualGears { get; set; } = "";
     /// <summary>Nom de l'entraînement structuré suivi, vide sinon.</summary>
@@ -64,10 +79,23 @@ public sealed class RideInfo
     public RideSummary Summary { get; set; } = new();
 }
 
+/// <summary>Une pause : heure de début et de reprise, et temps de sortie écoulé à ce moment.
+/// <see cref="ResumedAt"/> reste vide pour une sortie terminée pendant la pause.</summary>
+public sealed class RidePause
+{
+    public DateTimeOffset PausedAt { get; set; }
+    public DateTimeOffset? ResumedAt { get; set; }
+    public double AtElapsedS { get; set; }
+
+    [JsonIgnore] public double DurationS => ResumedAt is { } r ? Math.Max(0, (r - PausedAt).TotalSeconds) : 0;
+}
+
 public sealed class Ride
 {
     public RideInfo Info { get; }
     public List<RideSample> Samples { get; }
+    /// <summary>Tout ce qui a été reçu des capteurs et envoyé au trainer pendant la sortie (vide pour une sortie relue).</summary>
+    public RawLog Raw { get; } = new();
 
     public Ride(RideInfo info, List<RideSample>? samples = null)
     {
@@ -76,6 +104,18 @@ public sealed class Ride
     }
 
     public static string NewId(DateTimeOffset startedAt) => startedAt.ToUniversalTime().ToString("yyyyMMdd-HHmmss");
+
+    /// <summary>Heure réelle d'une mesure : départ + temps de sortie + pauses terminées avant elle.</summary>
+    public DateTimeOffset ClockAt(double timeS)
+    {
+        double paused = 0;
+        foreach (var p in Info.Pauses)
+            if (p.AtElapsedS < timeS) paused += p.DurationS;
+        return Info.StartedAt.AddSeconds(timeS + paused);
+    }
+
+    /// <summary>W/kg avec le poids du cycliste enregistré, 0 si inconnu.</summary>
+    public static double PerKg(double powerW, RideInfo info) => info.RiderMassKg > 0 ? powerW / info.RiderMassKg : 0;
 
     /// <summary>Recalcule le résumé à partir des mesures.</summary>
     public RideSummary Summarize() => Info.Summary = RideMetrics.Compute(Samples, Info.FtpW);
