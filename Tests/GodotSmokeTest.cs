@@ -287,6 +287,14 @@ public partial class GodotSmokeTest : Node
         ride.SkipBlock();
         await Wait(1.0);
         Check(!sim.Model.ErgMode && sim.Model.TargetPowerW == 0, "Bloc libre : le trainer n'impose plus de puissance");
+        ride.ToggleFreeErg();
+        ride.ChangeFreeErg(+10);
+        await Wait(1.0);
+        Check(sim.Model.ErgMode && sim.Model.TargetPowerW == ride.FreeErgW && ride.Recorder!.TargetPowerW == ride.FreeErgW,
+            $"Bloc libre avec ERG choisi : consigne {ride.FreeErgW} W envoyée et enregistrée ({sim.Model.TargetPowerW} W)");
+        ride.ToggleFreeErg();
+        await Wait(1.0);
+        Check(!sim.Model.ErgMode, "ERG retiré : le bloc redevient libre");
         ride.SkipBlock();
         await Wait(1.0);
         Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 180, $"Dernier bloc : retour en ERG à 180 W ({sim.Model.TargetPowerW} W)");

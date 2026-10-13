@@ -59,7 +59,8 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
   (temps restant, consigne, cadence demandée, profil avec la position), et la liste des blocs à
   venir avec leur durée, leurs watts, leur cadence et dans combien de temps ils commencent ; les
   blocs passés disparaissent. Bloc fixe ou rampe : consigne ERG (une mise à jour par seconde dans
-  une rampe). Bloc libre ou séance finie : le trainer passe en simulation sur le plat. Bouton
+  une rampe). Bloc libre ou séance finie : le trainer passe en simulation sur le plat, sauf si le
+  cycliste active « ERG » (watts réglables de ±5 ou ±10 W, enregistrés comme cible). Bouton
   *Bloc suivant* pour sauter un bloc ; la cadence s'affiche en orange à plus de 5 tr/min de la cible.
 - **Sortie libre** (`Screens/FreeRide/`) : parcours plat, deux modes.
   *Puissance imposée* : le trainer impose les watts (ERG), réglables de ±5 ou ±10 W en roulant

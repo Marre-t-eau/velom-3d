@@ -40,8 +40,7 @@ public partial class WorkoutListScreen : Screen
         ftp.AddChild(ftpDetail);
 
         var list = Ui.AddScroll(root, 12);
-        list.AddChild(Card(Workout.FtpTestWorkout(), "Test FTP : 20 min à fond en puissance libre, la FTP vaut 95 % de la moyenne. "
-                                                     + "Elle est enregistrée automatiquement à la fin."));
+        list.AddChild(Card(Workout.FtpTestWorkout(), "Test FTP : 20 min à fond, la FTP vaut 95 % de la moyenne."));
         var workouts = Workouts.List();
         WorkoutCount = workouts.Count;
         if (workouts.Count == 0)
