@@ -47,7 +47,7 @@ public partial class RideHistoryScreen : Screen
         box.OffsetRight = -24;
         var date = Ui.Label($"{Ui.Date(info.StartedAt)}  ·  {ModeName(info)}", 24);
         date.MouseFilter = MouseFilterEnum.Ignore;
-        var stats = Ui.Label($"{Ui.Duration(s.DurationS)}   {Ui.Km(s.DistanceM)}   {s.AvgPowerW:0} W moy.   "
+        var stats = Ui.Label($"{Ui.Duration(s.DurationS)}   {Ui.Km(s.DistanceM)}   {s.AvgPowerW:0} W moy.{PerKg(s.AvgPowerW, info)}   "
                              + $"{s.Tss:0} TSS   IF {s.IntensityFactor:0.00}   {s.Kcal:0} kcal", 19, Ui.Muted);
         stats.MouseFilter = MouseFilterEnum.Ignore;
         box.AddChild(date);
@@ -55,6 +55,8 @@ public partial class RideHistoryScreen : Screen
         button.AddChild(box);
         return button;
     }
+
+    static string PerKg(double powerW, RideInfo info) => info.RiderMassKg > 0 ? $" ({Ride.PerKg(powerW, info):0.0} W/kg)" : "";
 
     public static string ModeName(RideInfo info) =>
         info.Mode == RideMode.TargetPower ? "Puissance imposée"

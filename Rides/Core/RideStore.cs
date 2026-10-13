@@ -15,7 +15,7 @@ namespace Velom3d.Rides;
 /// </summary>
 public sealed class RideStore
 {
-    const string CsvHeader = "time_s,power_w,cadence_rpm,heart_rate_bpm,speed_kmh,distance_m,grade_pct,target_power_w,target_cadence_rpm";
+    const string CsvHeader = "time_s,power_w,cadence_rpm,heart_rate_bpm,speed_kmh,distance_m,grade_pct,target_power_w,target_cadence_rpm,clock";
 
     public string Directory { get; }
 
@@ -31,7 +31,7 @@ public sealed class RideStore
         var csv = new StringBuilder(CsvHeader).Append('\n');
         foreach (var s in ride.Samples)
             csv.Append(string.Create(CultureInfo.InvariantCulture,
-                $"{s.TimeS:0.##},{s.PowerW},{s.CadenceRpm:0.#},{s.HeartRateBpm},{s.SpeedKmh:0.##},{s.DistanceM:0.#},{s.GradePct:0.##},{s.TargetPowerW},{s.TargetCadenceRpm}\n"));
+                $"{s.TimeS:0.##},{s.PowerW},{s.CadenceRpm:0.#},{s.HeartRateBpm},{s.SpeedKmh:0.##},{s.DistanceM:0.#},{s.GradePct:0.##},{s.TargetPowerW},{s.TargetCadenceRpm},{ride.ClockAt(s.TimeS):yyyy-MM-ddTHH:mm:sszzz}\n"));
         // Mesures d'abord : un en-tête présent garantit des mesures complètes.
         WriteAtomic(SamplesPath(ride.Info.Id), csv.ToString());
         WriteAtomic(InfoPath(ride.Info.Id), JsonSerializer.Serialize(ride.Info, RideJson.Default.RideInfo));
