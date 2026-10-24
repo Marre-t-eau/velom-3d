@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using Godot;
@@ -140,6 +141,22 @@ public partial class GodotSmokeTest : Node
             await Wait(0.2);
             Check(summary.ChartCount == 4, $"Bilan : courbes puissance, cadence, vitesse, cardio ({summary.ChartCount})");
             Check(summary.Ride.Info.Summary.Tss > 0 && summary.Ride.Info.Summary.Kcal > 0, "Bilan : TSS et calories calculés");
+            var info = summary.Ride.Info;
+            var r = summary.Ride;
+            Check(info.RiderMassKg > 0 && info.EndedAt is not null && r.Pauses.Count == 1 && RideSummaryScreen.PausesText.StartsWith("Pause 1"),
+                $"Bilan : poids, heure de fin et pause ({r.Pauses.Count} pause)");
+            var trainer = info.Sensors.FirstOrDefault(x => x.Kind == DeviceKind.Trainer);
+            Check(trainer is { Specs.PowerMaxW: 2000, Specs.Model: "Home trainer démo" } && info.Sensors.Count == 3
+                  && RideSummaryScreen.SensorsText.Contains("0 à 2000 W"),
+                $"En-tête : capteurs et leur fiche ({info.Sensors.Count} capteurs, {RideSummaryScreen.SensorsText.Replace('\n','|')})");
+            Check(r.Events.Any(e => e.Sensor == trainer!.Index && e.Type == "power")
+                  && r.Events.Any(e => e.Type == "set_power" && e.Value == "220")
+                  && r.Events.Any(e => e.Type == "rr") && r.Events.Any(e => e.Type == "pause"),
+                $"Fichier de données : valeurs des capteurs, consignes et pause ({r.Events.Count} lignes : {string.Join(" ", r.Events.Select(e => e.Type + e.Sensor).Distinct())})");
+            var reloaded = Screen.Store.Load(info.Id)!;
+            Check(reloaded.Samples.Count == r.Samples.Count && reloaded.Samples.Count >= 3
+                  && Math.Abs(reloaded.Samples[^1].DistanceM - r.Samples[^1].DistanceM) < 0.5,
+                $"Réouverture : mesures reconstruites à l'identique ({reloaded.Samples.Count} s)");
             summary.QueueFree();
         }
 

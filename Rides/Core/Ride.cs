@@ -58,7 +58,23 @@ public sealed class RideInfo
     public int TargetPowerW { get; set; }
     /// <summary>FTP au moment de la sortie : le TSS d'hier ne change pas si la FTP évolue.</summary>
     public int FtpW { get; set; }
+    /// <summary>Masse totale cycliste + vélo, celle de la simulation.</summary>
     public double MassKg { get; set; }
+    /// <summary>Poids du cycliste au moment de la sortie (W/kg). 0 pour les sorties plus anciennes.</summary>
+    public double RiderMassKg { get; set; }
+    /// <summary>Poids du vélo réglé au moment de la sortie. 0 pour les sorties plus anciennes.</summary>
+    public double BikeMassKg { get; set; }
+    /// <summary>Résistance au roulement des pneus (Crr) utilisée par la simulation. 0 pour les sorties plus anciennes.</summary>
+    public double Crr { get; set; }
+    /// <summary>Surface aérodynamique (CdA, m²) utilisée par la simulation. 0 pour les sorties plus anciennes.</summary>
+    public double CdA { get; set; }
+    /// <summary>Circonférence de roue réglée (mm), qui donne la taille des pneus.</summary>
+    public int WheelCircumferenceMm { get; set; }
+    /// <summary>Heure de fin (appui sur Terminer), absente tant que la sortie est en cours.</summary>
+    public DateTimeOffset? EndedAt { get; set; }
+    /// <summary>Capteurs utilisés, avec leur fiche. Leur numéro (1, 2, 3…) est celui de la colonne
+    /// <c>sensor</c> du fichier de données ; 0 désigne l'appli.</summary>
+    public List<RideSensor> Sensors { get; set; } = new();
     /// <summary>Transmission virtuelle utilisée (« 52/36 × 11-30 (12 v.) »), vide sinon.</summary>
     public string VirtualGears { get; set; } = "";
     /// <summary>Nom de l'entraînement structuré suivi, vide sinon.</summary>
@@ -71,7 +87,14 @@ public sealed class RideInfo
 public sealed class Ride
 {
     public RideInfo Info { get; }
-    public List<RideSample> Samples { get; }
+    /// <summary>Mesures seconde par seconde, reconstruites depuis <see cref="Events"/> (pour les graphiques et le bilan).</summary>
+    public List<RideSample> Samples { get; private set; }
+    /// <summary>Pauses, déduites de <see cref="Events"/>.</summary>
+    public List<RidePause> Pauses { get; private set; } = new();
+    /// <summary>Le fichier de données : chaque valeur reçue, chaque consigne et chaque événement, dans l'ordre.</summary>
+    public List<RideEvent> Events { get; } = new();
+    /// <summary>Lignes de <see cref="Events"/> déjà écrites sur l'appareil.</summary>
+    public int SavedEvents { get; set; }
 
     public Ride(RideInfo info, List<RideSample>? samples = null)
     {
@@ -80,6 +103,15 @@ public sealed class Ride
     }
 
     public static string NewId(DateTimeOffset startedAt) => startedAt.ToUniversalTime().ToString("yyyyMMdd-HHmmss");
+
+    /// <summary>Recalcule les mesures et les pauses à partir du fichier de données.</summary>
+    public void Rebuild()
+    {
+        (Samples, Pauses) = RideReplay.Run(Info, Events);
+    }
+
+    /// <summary>W/kg avec le poids du cycliste enregistré, 0 si inconnu.</summary>
+    public static double PerKg(double powerW, RideInfo info) => info.RiderMassKg > 0 ? powerW / info.RiderMassKg : 0;
 
     /// <summary>Recalcule le résumé à partir des mesures.</summary>
     public RideSummary Summarize() => Info.Summary = RideMetrics.Compute(Samples, Info.FtpW);

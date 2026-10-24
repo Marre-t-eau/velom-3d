@@ -10,12 +10,15 @@ namespace Velom3d.Rides;
 
 /// <summary>
 /// Sorties enregistrées sur l'appareil, deux fichiers par sortie :
-/// <c>{id}.json</c> (en-tête et résumé, lu pour la liste) et <c>{id}.csv</c> (une ligne par seconde,
-/// lu seulement à l'ouverture d'une sortie ; s'ouvre aussi dans un tableur).
+/// <c>{id}.json</c>, l'en-tête (réglages, capteurs et leur fiche, bilan ; lu pour la liste), et
+/// <c>{id}.csv</c>, le fichier de données : une ligne par valeur reçue ou événement,
+/// <c>t,type,sensor,value</c>, sans aucun traitement. Les mesures seconde par seconde des graphiques
+/// en sont reconstruites à l'ouverture (<see cref="RideReplay"/>). Les sorties enregistrées avant ce
+/// format (une ligne par seconde, colonne <c>time_s</c>) restent lisibles.
 /// </summary>
 public sealed class RideStore
 {
-    const string CsvHeader = "time_s,power_w,cadence_rpm,heart_rate_bpm,speed_kmh,distance_m,grade_pct,target_power_w,target_cadence_rpm";
+    public const string EventsHeader = "t,type,sensor,value";
 
     public string Directory { get; }
 
@@ -28,14 +31,29 @@ public sealed class RideStore
     public void Save(Ride ride)
     {
         System.IO.Directory.CreateDirectory(Directory);
-        var csv = new StringBuilder(CsvHeader).Append('\n');
-        foreach (var s in ride.Samples)
-            csv.Append(string.Create(CultureInfo.InvariantCulture,
-                $"{s.TimeS:0.##},{s.PowerW},{s.CadenceRpm:0.#},{s.HeartRateBpm},{s.SpeedKmh:0.##},{s.DistanceM:0.#},{s.GradePct:0.##},{s.TargetPowerW},{s.TargetCadenceRpm}\n"));
-        // Mesures d'abord : un en-tête présent garantit des mesures complètes.
-        WriteAtomic(SamplesPath(ride.Info.Id), csv.ToString());
+        // Données d'abord : un en-tête présent garantit des données complètes.
+        AppendEvents(ride);
         WriteAtomic(InfoPath(ride.Info.Id), JsonSerializer.Serialize(ride.Info, RideJson.Default.RideInfo));
     }
+
+    /// <summary>Ajoute les lignes pas encore écrites : le fichier grossit pendant la sortie sans être
+    /// réécrit à chaque sauvegarde. Une sortie relue sans nouvelles lignes n'y touche pas.</summary>
+    void AppendEvents(Ride ride)
+    {
+        if (ride.Events.Count <= ride.SavedEvents) return;
+        var text = new StringBuilder();
+        if (ride.SavedEvents == 0) text.Append(EventsHeader).Append('\n');
+        for (int i = ride.SavedEvents; i < ride.Events.Count; i++)
+        {
+            var e = ride.Events[i];
+            text.Append(string.Create(CultureInfo.InvariantCulture, $"{e.T:0.###},{Clean(e.Type)},{e.Sensor},{Clean(e.Value)}\n"));
+        }
+        if (ride.SavedEvents == 0) File.WriteAllText(SamplesPath(ride.Info.Id), text.ToString());
+        else File.AppendAllText(SamplesPath(ride.Info.Id), text.ToString());
+        ride.SavedEvents = ride.Events.Count;
+    }
+
+    static string Clean(string s) => s.Replace(',', ' ').Replace('\n', ' ').Replace('\r', ' ');
 
     /// <summary>En-têtes de toutes les sorties, la plus récente d'abord. Les fichiers illisibles sont ignorés.</summary>
     public List<RideInfo> List()
@@ -62,17 +80,30 @@ public sealed class RideStore
         {
             var info = JsonSerializer.Deserialize(File.ReadAllText(InfoPath(id)), RideJson.Default.RideInfo);
             if (info is null) return null;
-            var samples = new List<RideSample>();
-            if (File.Exists(SamplesPath(id)))
-                foreach (var line in File.ReadLines(SamplesPath(id)))
-                    if (ParseSample(line) is { } s) samples.Add(s);
-            return new Ride(info, samples);
+            if (!File.Exists(SamplesPath(id))) return new Ride(info);
+            using var lines = File.ReadLines(SamplesPath(id)).GetEnumerator();
+            if (!lines.MoveNext()) return new Ride(info);
+            if (lines.Current.StartsWith("time_s"))
+            {
+                // Ancien format : déjà une ligne par seconde.
+                var samples = new List<RideSample>();
+                while (lines.MoveNext())
+                    if (ParseSample(lines.Current) is { } s) samples.Add(s);
+                return new Ride(info, samples);
+            }
+            var ride = new Ride(info);
+            while (lines.MoveNext())
+                if (ParseEvent(lines.Current) is { } e) ride.Events.Add(e);
+            ride.SavedEvents = ride.Events.Count;
+            ride.Rebuild();
+            return ride;
         }
         catch (Exception e) when (e is JsonException or IOException) { return null; }
     }
 
     public void Delete(string id)
     {
+        File.Delete(Path.Combine(Directory, id + ".raw.csv")); // journal brut d'une version de test
         File.Delete(InfoPath(id));
         File.Delete(SamplesPath(id));
     }
@@ -93,6 +124,15 @@ public sealed class RideStore
     {
         System.IO.Directory.CreateDirectory(Directory);
         WriteAtomic(ProfilePath, JsonSerializer.Serialize(profile, RideJson.Default.RiderProfile));
+    }
+
+    static RideEvent? ParseEvent(string line)
+    {
+        var f = line.Split(',', 4);
+        if (f.Length < 4 || !double.TryParse(f[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var t)
+            || !int.TryParse(f[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var sensor))
+            return null; // ligne abîmée (appli coupée en pleine écriture)
+        return new RideEvent(t, f[1], sensor, f[3]);
     }
 
     static RideSample? ParseSample(string line)
@@ -118,6 +158,7 @@ public sealed class RideStore
 /// <summary>Sérialisation générée à la compilation : pas de réflexion, sûr sur Android.</summary>
 [JsonSourceGenerationOptions(WriteIndented = true, UseStringEnumConverter = true)]
 [JsonSerializable(typeof(RideInfo))]
+[JsonSerializable(typeof(RideSensor))]
 [JsonSerializable(typeof(RiderProfile))]
 [JsonSerializable(typeof(Workout))]
 internal partial class RideJson : JsonSerializerContext;
