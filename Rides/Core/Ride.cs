@@ -28,6 +28,8 @@ public sealed class RiderProfile
     public double BikeMassKg { get; set; } = 8.0;
     public RideMode LastMode { get; set; } = RideMode.Simulation;
     public int LastTargetPowerW { get; set; } = 150;
+    /// <summary>Date du dernier test FTP réussi (null si la FTP a été saisie à la main).</summary>
+    public DateTimeOffset? FtpTestedAt { get; set; }
 
     /// <summary>Vitesses virtuelles en mode simulation : on change de plateau et de pignon dans
     /// l'appli, la résistance du trainer suit.</summary>
@@ -61,6 +63,8 @@ public sealed class RideInfo
     public string VirtualGears { get; set; } = "";
     /// <summary>Nom de l'entraînement structuré suivi, vide sinon.</summary>
     public string WorkoutName { get; set; } = "";
+    /// <summary>FTP mesurée par cette sortie (test FTP), 0 sinon.</summary>
+    public int FtpTestW { get; set; }
     public RideSummary Summary { get; set; } = new();
 }
 
