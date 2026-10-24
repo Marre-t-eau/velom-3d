@@ -15,6 +15,8 @@ public partial class RideSummaryScreen : Screen
     public Ride Ride { get; set; } = null!;
     /// <summary>Ouvert à la fin d'une sortie : Retour mène au menu plutôt qu'à l'historique.</summary>
     public bool JustFinished { get; set; }
+    /// <summary>FTP avant la sortie, pour annoncer celle mesurée par un test FTP.</summary>
+    public int PreviousFtpW { get; set; }
 
     /// <summary>Graphiques affichés (pour les tests).</summary>
     internal int ChartCount { get; private set; }
@@ -33,7 +35,8 @@ public partial class RideSummaryScreen : Screen
         root.AddChild(header);
         var titles = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         titles.AddChild(Ui.Label(JustFinished ? "Bravo, sortie enregistrée !" : "Bilan de la sortie", 36));
-        titles.AddChild(Ui.Label($"{Ui.Date(info.StartedAt)}  ·  {RideHistoryScreen.ModeName(info)}  ·  FTP {info.FtpW} W", 19, Ui.Muted));
+        titles.AddChild(Ui.Label($"{Ui.Date(info.StartedAt)}  ·  {RideHistoryScreen.ModeName(info)}  ·  FTP {info.FtpW} W"
+                                 + (info.FtpTestW > 0 ? $"  ·  nouvelle FTP {info.FtpTestW} W" : ""), 19, Ui.Muted));
         header.AddChild(titles);
         header.AddChild(Ui.Button(JustFinished ? "Menu" : "Retour", OnBack, 200, 72));
 
@@ -99,6 +102,14 @@ public partial class RideSummaryScreen : Screen
         _deleteButton = Ui.Button("Supprimer cette sortie", OnDeletePressed, 320, 72, 20);
         _deleteButton.Modulate = Ui.Danger;
         actions.AddChild(_deleteButton);
+
+        if (JustFinished && info.FtpTestW > 0)
+        {
+            int diff = info.FtpTestW - PreviousFtpW;
+            string change = PreviousFtpW <= 0 ? "" : diff == 0 ? $" C'est la même qu'avant." : $" Avant : {PreviousFtpW} W ({diff:+0;-0} W).";
+            Inform($"Nouvelle FTP : {info.FtpTestW} W", $"95 % de votre moyenne sur les 20 minutes d'effort.{change} "
+                   + "Elle est enregistrée dans les Réglages : vos entraînements en % de FTP s'y adaptent.");
+        }
     }
 
     static void Stat(GridContainer grid, string title, string value, Color accent)

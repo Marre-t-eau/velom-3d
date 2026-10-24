@@ -37,6 +37,8 @@ public sealed class WorkoutBlock
     public int PowerEnd { get; set; } = 200;
     /// <summary>Cadence demandée ; 0 = libre.</summary>
     public int CadenceRpm { get; set; }
+    /// <summary>Bloc d'effort du test FTP : sa puissance moyenne donne la nouvelle FTP.</summary>
+    public bool FtpTest { get; set; }
 
     [JsonIgnore] public bool FreeCadence => CadenceRpm <= 0;
 
@@ -177,6 +179,31 @@ public sealed class Workout
         ],
     };
 
+    public const string FtpTestId = "ftp-test";
+    /// <summary>Durée de l'effort du test FTP ; la FTP vaut 95 % de la puissance moyenne tenue.</summary>
+    public const int FtpTestEffortS = 20 * 60;
+    public const double FtpTestFactor = 0.95;
+
+    /// <summary>Test FTP de 20 minutes (protocole classique) : échauffement, trois accélérations,
+    /// récupération, 20 min à fond en puissance libre, retour au calme. Toujours proposé, non modifiable.</summary>
+    public static Workout FtpTestWorkout()
+    {
+        var w = new Workout
+        {
+            Id = FtpTestId, Name = "Test FTP (20 min)", Unit = PowerUnit.PercentFtp,
+            Blocks = [new() { DurationS = 600, Kind = BlockPower.Ramp, Power = 50, PowerEnd = 75 }],
+        };
+        for (int i = 0; i < 3; i++)
+        {
+            w.Blocks.Add(new() { DurationS = 60, Power = 100, CadenceRpm = 105 });
+            w.Blocks.Add(new() { DurationS = 60, Power = 55 });
+        }
+        w.Blocks.Add(new() { DurationS = 300, Power = 60 });
+        w.Blocks.Add(new() { DurationS = FtpTestEffortS, Kind = BlockPower.Free, FtpTest = true });
+        w.Blocks.Add(new() { DurationS = 600, Kind = BlockPower.Ramp, Power = 60, PowerEnd = 40 });
+        return w;
+    }
+
     /// <summary>Exemples proposés au premier lancement.</summary>
     public static List<Workout> Examples(DateTimeOffset at)
     {
@@ -241,9 +268,33 @@ public sealed class WorkoutProgress
     /// <summary>Cadence demandée ; 0 si libre ou fini.</summary>
     public int TargetCadenceRpm => Current is { FreeCadence: false } b ? b.CadenceRpm : 0;
 
-    public void Advance(double dt)
+    double _testWorkJ;
+    /// <summary>Temps roulé dans le bloc de test FTP (s).</summary>
+    public double FtpTestTimeS { get; private set; }
+    public double FtpTestAveragePowerW => FtpTestTimeS > 0 ? _testWorkJ / FtpTestTimeS : 0;
+
+    /// <summary>Nouvelle FTP (95 % de la moyenne de l'effort) si le bloc de test a été roulé
+    /// au moins à 90 % ; null sinon (pas de test, bloc sauté, sortie arrêtée trop tôt).</summary>
+    public int? FtpTestResultW
     {
-        if (dt > 0) PositionS += dt;
+        get
+        {
+            var test = Workout.Blocks.Find(b => b.FtpTest);
+            if (test is null || FtpTestTimeS < test.DurationS * 0.9 || FtpTestAveragePowerW <= 0) return null;
+            return Math.Clamp((int)Math.Round(FtpTestAveragePowerW * Workout.FtpTestFactor), 50, 600);
+        }
+    }
+
+    /// <summary>Avance de <paramref name="dt"/> secondes roulées à <paramref name="powerW"/>.</summary>
+    public void Advance(double dt, int powerW = 0)
+    {
+        if (dt <= 0) return;
+        if (Current is { FtpTest: true })
+        {
+            _testWorkJ += Math.Max(0, powerW) * dt;
+            FtpTestTimeS += dt;
+        }
+        PositionS += dt;
     }
 
     /// <summary>Passe directement au début du bloc suivant.</summary>

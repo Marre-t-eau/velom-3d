@@ -46,7 +46,10 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
 
 - **Entraînements** (`Screens/Workouts/`) : la liste des séances structurées, avec leur profil
   (couleur = zone de puissance), leur durée et le TSS prévu. Deux exemples sont créés au premier
-  lancement.
+  lancement. La FTP est rappelée en haut (avec la date du dernier test), et un **test FTP**
+  intégré est toujours proposé en premier : échauffement, trois accélérations, 20 min à fond en
+  puissance libre, retour au calme. Si l'effort a été roulé au moins à 90 %, la nouvelle FTP
+  (95 % de la moyenne) est enregistrée dans les Réglages à la fin et annoncée dans une fenêtre.
 - **Édition** (`Screens/WorkoutEditor/`) : nom, puissances en watts ou en % de FTP (la FTP des
   Réglages, au moment de rouler ; changer d'unité convertit les valeurs), et les blocs. Chaque bloc
   a une durée, une puissance *fixe*, *libre* ou en *rampe* (début → fin), et une cadence *libre* ou
@@ -56,7 +59,8 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
   (temps restant, consigne, cadence demandée, profil avec la position), et la liste des blocs à
   venir avec leur durée, leurs watts, leur cadence et dans combien de temps ils commencent ; les
   blocs passés disparaissent. Bloc fixe ou rampe : consigne ERG (une mise à jour par seconde dans
-  une rampe). Bloc libre ou séance finie : le trainer passe en simulation sur le plat. Bouton
+  une rampe). Bloc libre ou séance finie : le trainer passe en simulation sur le plat, sauf si le
+  cycliste active « ERG » (watts réglables de ±5 ou ±10 W, enregistrés comme cible). Bouton
   *Bloc suivant* pour sauter un bloc ; la cadence s'affiche en orange à plus de 5 tr/min de la cible.
 - **Sortie libre** (`Screens/FreeRide/`) : parcours plat, deux modes.
   *Puissance imposée* : le trainer impose les watts (ERG), réglables de ±5 ou ±10 W en roulant

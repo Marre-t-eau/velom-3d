@@ -6,6 +6,7 @@ namespace Velom3d.Screens;
 /// <summary>
 /// Fenêtre de confirmation plein écran : fond assombri qui bloque l'écran derrière, question,
 /// précision, et deux grands boutons Non / Oui. Toucher le fond revient à Non.
+/// Sans <c>onNo</c>, c'est une simple information avec un seul bouton.
 /// </summary>
 public partial class ConfirmPopup : Control
 {
@@ -14,8 +15,10 @@ public partial class ConfirmPopup : Control
 
     public ConfirmPopup() { }
 
-    public ConfirmPopup(string question, string detail, string yes, Action onYes, Action onNo)
+    public ConfirmPopup(string question, string detail, string yes, Action onYes, Action? onNo)
     {
+        bool info = onNo is null;
+        onNo ??= onYes;
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         MouseFilter = MouseFilterEnum.Stop;
         var shade = new ColorRect { Color = new Color(0, 0, 0, 0.6f), MouseFilter = MouseFilterEnum.Stop };
@@ -26,7 +29,7 @@ public partial class ConfirmPopup : Control
         var center = new CenterContainer { MouseFilter = MouseFilterEnum.Ignore };
         center.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(center);
-        var panel = Ui.Panel(Ui.Card, Ui.Danger);
+        var panel = Ui.Panel(Ui.Card, info ? Ui.Accent : Ui.Danger);
         panel.MouseFilter = MouseFilterEnum.Stop;
         panel.CustomMinimumSize = new Vector2(620, 0);
         center.AddChild(panel);
@@ -39,12 +42,14 @@ public partial class ConfirmPopup : Control
         box.AddChild(buttons);
         NoButton = Ui.Button("Non", onNo, 0, 88, 26);
         NoButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        NoButton.Visible = !info;
         buttons.AddChild(NoButton);
         YesButton = Ui.Button(yes, onYes, 0, 88, 26);
         YesButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        YesButton.AddThemeColorOverride("font_color", Ui.Danger);
-        YesButton.AddThemeColorOverride("font_hover_color", Ui.Danger);
-        YesButton.AddThemeColorOverride("font_pressed_color", Ui.Danger);
+        var color = info ? Ui.Accent : Ui.Danger;
+        YesButton.AddThemeColorOverride("font_color", color);
+        YesButton.AddThemeColorOverride("font_hover_color", color);
+        YesButton.AddThemeColorOverride("font_pressed_color", color);
         buttons.AddChild(YesButton);
     }
 }

@@ -199,3 +199,45 @@ public class TargetHistoryTests : IDisposable
         Assert.All(back.Samples, s => Assert.Equal((200, 0), (s.TargetPowerW, s.TargetCadenceRpm)));
     }
 }
+
+public class FtpTestTests
+{
+    [Fact]
+    public void Test_workout_has_one_20_minute_free_effort()
+    {
+        var w = Workout.FtpTestWorkout();
+        var effort = Assert.Single(w.Blocks, b => b.FtpTest);
+        Assert.Equal(BlockPower.Free, effort.Kind);
+        Assert.Equal(Workout.FtpTestEffortS, effort.DurationS);
+    }
+
+    [Fact]
+    public void Ftp_is_95_percent_of_the_effort_average()
+    {
+        var w = Workout.FtpTestWorkout();
+        var p = new WorkoutProgress(w, 200);
+        int start = w.StartOf(w.Blocks.FindIndex(b => b.FtpTest));
+        p.Advance(start, 150); // échauffement : ne compte pas
+        Assert.Null(p.FtpTestResultW);
+        for (int t = 0; t < Workout.FtpTestEffortS; t++) p.Advance(1, t % 2 == 0 ? 240 : 260);
+        Assert.Equal(250, p.FtpTestAveragePowerW, 3);
+        Assert.Equal(238, p.FtpTestResultW);
+        p.Advance(60, 100); // retour au calme : ne change rien
+        Assert.Equal(238, p.FtpTestResultW);
+    }
+
+    [Fact]
+    public void Skipped_or_cut_short_test_gives_no_ftp()
+    {
+        var w = Workout.FtpTestWorkout();
+        int index = w.Blocks.FindIndex(b => b.FtpTest);
+        var p = new WorkoutProgress(w, 200);
+        p.Advance(w.StartOf(index), 150);
+        p.Advance(600, 300); // 10 min sur 20
+        p.SkipBlock();
+        Assert.Null(p.FtpTestResultW);
+        Assert.Null(new WorkoutProgress(Examples()[0], 200).FtpTestResultW);
+    }
+
+    static System.Collections.Generic.List<Workout> Examples() => Workout.Examples(System.DateTimeOffset.Now);
+}
