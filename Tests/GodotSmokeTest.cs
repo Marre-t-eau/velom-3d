@@ -127,6 +127,8 @@ public partial class GodotSmokeTest : Node
         Check(rec.SpeedKmh > 5 && rec.DistanceM > 1, $"Le vélo virtuel avance ({rec.SpeedKmh:0.0} km/h, {rec.DistanceM:0} m)");
         var world = ride.Scene3D;
         Check(world is { PropCount: > 500 } && world.Camera.Current, $"Vue 3D : circuit, décor ({world?.PropCount} éléments) et caméra");
+        Check(Godot.FileAccess.GetFileAsString(Velom3d.World.RideWorld.DefaultMapPath) is { Length: > 1000 } json
+              && Velom3d.World.CourseMap.FromJson(json).Id == world?.Map.Id, "Vue 3D : la map vient du fichier Maps/boucle-5km.json");
         Check(world is not null && Mathf.Abs((float)(world.DistanceM - rec.DistanceM)) < 20 && world.Rider.CrankAngle > 0,
             "Vue 3D : le cycliste avance et pédale");
         ride.ShowAveragePower();

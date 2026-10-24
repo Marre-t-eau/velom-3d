@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Velom3d.World;
 
@@ -10,7 +11,7 @@ public enum PropKind { Bush, LeafyTree, Conifer, House, Farmhouse }
 public readonly record struct Prop(PropKind Kind, double X, double Z, double RotationY, double Scale, double CourseDistanceM);
 
 /// <summary>
-/// Place le décor le long du circuit : haies d'arbustes, arbres isolés, deux bois et quatre
+/// Place le décor le long d'une route : haies d'arbustes, arbres isolés, deux bois et quatre
 /// hameaux. Toujours le même décor pour une graine donnée, rien sur la route.
 /// </summary>
 public static class Scenery
@@ -18,15 +19,18 @@ public static class Scenery
     /// <summary>Demi-largeur de la route (m).</summary>
     public const double RoadHalfWidthM = 3.5;
 
-    static readonly (double From, double To)[] Hamlets = [(550, 800), (1750, 1950), (3050, 3300), (4250, 4450)];
-    static readonly (double From, double To)[] Woods = [(2250, 2700), (3600, 3950)];
+    // Hameaux et bois, en fraction de la longueur de la route (placés pour une boucle de 5 km).
+    static readonly (double From, double To)[] HamletShare = [(0.11, 0.16), (0.35, 0.39), (0.61, 0.66), (0.85, 0.89)];
+    static readonly (double From, double To)[] WoodShare = [(0.45, 0.54), (0.72, 0.79)];
 
-    public static List<Prop> Generate(LoopCourse course, int seed = 7)
+    public static List<Prop> Generate(Course course, int seed = 7, double roadHalfWidthM = RoadHalfWidthM)
     {
         var rng = new Random(seed);
         var props = new List<Prop>();
         var houses = new List<Prop>();
         double L = course.LengthM;
+        var hamlets = HamletShare.Select(r => (r.From * L, r.To * L)).ToArray();
+        var woods = WoodShare.Select(r => (r.From * L, r.To * L)).ToArray();
         double Rand(double a, double b) => a + rng.NextDouble() * (b - a);
 
         bool Clear(PropKind kind, double x, double z)
@@ -37,7 +41,7 @@ public static class Scenery
                 PropKind.House or PropKind.Farmhouse => 8.0,
                 _ => 3.0,
             };
-            if (course.DistanceToCenterline(x, z) < RoadHalfWidthM + clearance) return false;
+            if (course.DistanceToCenterline(x, z) < roadHalfWidthM + clearance) return false;
             double room = kind is PropKind.House or PropKind.Farmhouse ? 16.0 : 7.0;
             foreach (var h in houses)
                 if ((h.X - x) * (h.X - x) + (h.Z - z) * (h.Z - z) < room * room) return false;
@@ -55,7 +59,7 @@ public static class Scenery
         }
 
         // Hameaux : maisons des deux côtés, façade tournée vers la route.
-        foreach (var (from, to) in Hamlets)
+        foreach (var (from, to) in hamlets)
             for (double d = from; d < to; d += Rand(22, 38))
                 foreach (int side in new[] { -1, 1 })
                 {
@@ -68,10 +72,10 @@ public static class Scenery
                 }
 
         // Quelques fermes isolées, plus loin de la route.
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < (int)Math.Round(L / 500.0); i++)
         {
             double d = Rand(0, L);
-            if (In(Hamlets, d) || In(Woods, d)) continue;
+            if (In(hamlets, d) || In(woods, d)) continue;
             Place(PropKind.Farmhouse, d, (rng.NextDouble() < 0.5 ? -1 : 1) * Rand(35, 70), Rand(1.0, 1.3));
         }
 
@@ -79,7 +83,7 @@ public static class Scenery
         foreach (int side in new[] { -1, 1 })
             for (double d = 0; d < L;)
             {
-                bool wood = In(Woods, d), hamlet = In(Hamlets, d);
+                bool wood = In(woods, d), hamlet = In(hamlets, d);
                 d += wood ? Rand(3, 6) : Rand(7, 16);
                 if (hamlet && rng.NextDouble() < 0.7) continue;
                 if (!wood && rng.NextDouble() < 0.25) continue;

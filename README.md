@@ -74,7 +74,10 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
   caméra derrière lui comme dans Zwift. Mesures compactes en haut (puissance, cadence, cardio,
   vitesse, distance) ; toucher la puissance affiche la puissance moyenne pendant 5 s. Il avance de la distance calculée par l'appli, pédale à la
   cadence mesurée et s'arrête en pause. Tout est généré dans Godot en formes simples, sans fichier 3D.
-  Tracé et placement du décor dans `World/Core/` (C# pur, testé par `dotnet test`) ; le monde
+  La map (route, décor, repères) est un fichier JSON : `Maps/boucle-5km.json`, format décrit dans
+  `docs/format-des-maps.md`. Une map peut être générée (`ProceduralLoop`), importée d'une trace
+  GPX réelle (`GpxImport`) ou écrite à la main.
+  Lecture des maps et placement du décor dans `World/Core/` (C# pur, testé par `dotnet test`) ; le monde
   (`RideWorld`) est un nœud à part, réutilisable par d'autres écrans de sortie : il suffit de
   l'ajouter et de lui donner `Follow(distance, vitesse, cadence)` à chaque image.
   Pour le téléphone : décor instancié par tronçons de 500 m (seuls les proches sont dessinés),

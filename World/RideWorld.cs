@@ -5,8 +5,8 @@ using Godot;
 namespace Velom3d.World;
 
 /// <summary>
-/// Monde 3D d'une sortie : circuit plat de 5 km en boucle, décor (arbustes, arbres, maisons),
-/// cycliste et caméra qui le suit, comme dans Zwift. L'écran donne à chaque image la distance
+/// Monde 3D d'une sortie : la route et le décor d'une map (<see cref="CourseMap"/>, par défaut
+/// <c>Maps/boucle-5km.json</c>), le cycliste et la caméra qui le suit, comme dans Zwift. L'écran donne à chaque image la distance
 /// parcourue, la vitesse et la cadence (<see cref="Follow"/>) ; tout le reste se fait ici.
 /// Le monde se dessine dans la fenêtre, derrière l'interface de l'écran (qui doit laisser voir le fond).
 /// Pensé pour le téléphone : décor en quelques gros maillages instanciés par tronçon de route,
@@ -25,7 +25,10 @@ public partial class RideWorld : Node3D
     static readonly Color SkyHorizon = new(0.74f, 0.84f, 0.92f);
     static readonly Color Grass = new(0.36f, 0.55f, 0.24f);
 
-    public LoopCourse Course { get; } = new();
+    public const string DefaultMapPath = "res://Maps/boucle-5km.json";
+
+    public CourseMap Map { get; }
+    public Course Course { get; }
     public RiderAvatar Rider { get; private set; } = null!;
     public Camera3D Camera { get; private set; } = null!;
     /// <summary>Distance affichée (m), tours compris.</summary>
@@ -36,6 +39,28 @@ public partial class RideWorld : Node3D
     double _speedMps, _cadenceRpm;
     bool _cameraPlaced;
     float _previousScale = 1f;
+
+    public RideWorld() : this(LoadMap(DefaultMapPath)) { }
+
+    public RideWorld(CourseMap map)
+    {
+        Map = map;
+        Course = map.BuildCourse();
+    }
+
+    /// <summary>Lit une map (res:// ou user://). Si le fichier manque ou est abîmé, la boucle de 5 km est régénérée.</summary>
+    public static CourseMap LoadMap(string path)
+    {
+        try
+        {
+            return CourseMap.FromJson(FileAccess.GetFileAsString(path));
+        }
+        catch (System.Exception e)
+        {
+            GD.PushWarning($"Map {path} illisible ({e.Message}) : boucle de 5 km générée à la place.");
+            return ProceduralLoop.Generate("boucle-5km", "Boucle de 5 km");
+        }
+    }
 
     public override void _Ready()
     {
@@ -48,7 +73,8 @@ public partial class RideWorld : Node3D
         var material = LowPoly.Material();
         BuildGround();
         BuildRoad(material);
-        BuildStartArch(material);
+        foreach (var landmark in Map.Landmarks)
+            if (landmark.Kind == CourseMap.StartArch) BuildStartArch(material, landmark.DistanceM);
         BuildScenery(material);
 
         Rider = new RiderAvatar();
@@ -88,12 +114,9 @@ public partial class RideWorld : Node3D
     void PlaceCamera(double delta)
     {
         var rider = Rider.Position;
-        var behind = Course.At(DistanceM - 4.5);
-        var (bx, bz) = behind.Offset(LaneOffsetM);
-        var target = new Vector3((float)bx, 1.8f, (float)bz);
-        var ahead = Course.At(DistanceM + 10.0);
-        var (ax, az) = ahead.Offset(LaneOffsetM);
-        var look = new Vector3((float)ax, 0.2f, (float)az);
+        var here = Course.At(DistanceM);
+        var target = OnRoad(DistanceM - 4.5, here, 1.8f);
+        var look = OnRoad(DistanceM + 10.0, here, 0.2f);
 
         if (!_cameraPlaced)
         {
@@ -109,6 +132,20 @@ public partial class RideWorld : Node3D
         var flat = new Vector3(Camera.Position.X - rider.X, 0, Camera.Position.Z - rider.Z);
         if (flat.Length() > 7f) Camera.Position = new Vector3(rider.X, Camera.Position.Y, rider.Z) + flat.Normalized() * 7f;
         Camera.LookAt(look, Vector3.Up);
+    }
+
+    /// <summary>Point du couloir du cycliste à une distance donnée ; au-delà du départ ou de l'arrivée
+    /// d'un aller simple, dans le prolongement de la route.</summary>
+    Vector3 OnRoad(double distanceM, CoursePoint here, float y)
+    {
+        double wrapped = Course.Wrap(distanceM);
+        var p = Course.At(distanceM);
+        var (x, z) = p.Offset(LaneOffsetM);
+        double beyond = Course.IsLoop ? 0 : distanceM - wrapped;
+        if (Mathf.Abs((float)beyond) < 0.01) return new Vector3((float)x, y, (float)z);
+        var (hx, hz) = here.Offset(LaneOffsetM);
+        double along = distanceM - Course.Wrap(DistanceM);
+        return new Vector3((float)(hx + here.DirX * along), y, (float)(hz + here.DirZ * along));
     }
 
     void BuildEnvironment()
@@ -150,9 +187,19 @@ public partial class RideWorld : Node3D
 
     void BuildGround()
     {
+        // Herbe sous toute la map, avec de la marge pour l'horizon.
+        float minX = float.MaxValue, maxX = float.MinValue, minZ = float.MaxValue, maxZ = float.MinValue;
+        for (int i = 0; i < Course.PointCount; i++)
+        {
+            var (x, z) = Course.Point(i);
+            minX = Mathf.Min(minX, (float)x); maxX = Mathf.Max(maxX, (float)x);
+            minZ = Mathf.Min(minZ, (float)z); maxZ = Mathf.Max(maxZ, (float)z);
+        }
+        float margin = 2f * ViewDistanceM;
         var ground = new MeshInstance3D
         {
-            Mesh = new PlaneMesh { Size = new Vector2(4000, 4000) },
+            Mesh = new PlaneMesh { Size = new Vector2(maxX - minX + margin, maxZ - minZ + margin) },
+            Position = new Vector3((minX + maxX) / 2f, 0, (minZ + maxZ) / 2f),
             MaterialOverride = new StandardMaterial3D { AlbedoColor = Grass, Roughness = 1f },
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
@@ -165,9 +212,9 @@ public partial class RideWorld : Node3D
         var asphalt = new Color(0.28f, 0.28f, 0.29f);
         var gravel = new Color(0.55f, 0.50f, 0.42f);
         var paint = new Color(0.93f, 0.93f, 0.90f);
-        float half = (float)Scenery.RoadHalfWidthM;
+        float half = (float)Map.RoadWidthM / 2f;
         var mesh = new LowPoly();
-        int n = Course.PointCount;
+        int n = Course.IsLoop ? Course.PointCount : Course.PointCount - 1;
         for (int i = 0; i < n; i++)
         {
             var a = Course.At(i * Course.StepM);
@@ -179,7 +226,7 @@ public partial class RideWorld : Node3D
             Strip(mesh, a, b, -half + 0.2f, -half + 0.35f, 0.08f, paint);
         }
         // Pointillés : 4 m de trait tous les 10 m.
-        for (double d = 0; d < Course.LengthM - 1; d += 10.0)
+        for (double d = 0; d < Course.LengthM - 4; d += 10.0)
             Strip(mesh, Course.At(d), Course.At(d + 4.0), -0.07f, 0.07f, 0.08f, paint);
         AddChild(new MeshInstance3D { Mesh = mesh.Commit(material), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
@@ -195,25 +242,26 @@ public partial class RideWorld : Node3D
     }
 
     /// <summary>Arche de départ et ligne d'arrivée, pour voir passer les tours.</summary>
-    void BuildStartArch(Material material)
+    void BuildStartArch(Material material, double distanceM)
     {
         var accent = new Color(0.22f, 0.78f, 0.47f);
         var white = new Color(0.95f, 0.95f, 0.95f);
         var dark = new Color(0.12f, 0.12f, 0.14f);
         var mesh = new LowPoly();
-        float w = (float)Scenery.RoadHalfWidthM + 1.2f;
+        float half = (float)Map.RoadWidthM / 2f;
+        float w = half + 1.2f;
         mesh.Box(new Vector3(-w - 0.3f, 0, -0.3f), new Vector3(-w + 0.3f, 5.5f, 0.3f), white);
         mesh.Box(new Vector3(w - 0.3f, 0, -0.3f), new Vector3(w + 0.3f, 5.5f, 0.3f), white);
         mesh.Box(new Vector3(-w - 0.3f, 4.4f, -0.25f), new Vector3(w + 0.3f, 5.6f, 0.25f), accent, bottom: true);
         // Damier au sol.
-        for (int i = 0; i < 14; i++)
+        for (int i = 0; i < (int)(2 * half / 0.5f); i++)
             for (int j = 0; j < 2; j++)
             {
-                float x0 = -(float)Scenery.RoadHalfWidthM + i * 0.5f;
+                float x0 = -half + i * 0.5f;
                 mesh.Quad(new Vector3(x0, 0.085f, j * 0.5f - 0.5f), new Vector3(x0 + 0.5f, 0.085f, j * 0.5f - 0.5f),
                     new Vector3(x0 + 0.5f, 0.085f, j * 0.5f), new Vector3(x0, 0.085f, j * 0.5f), Vector3.Up, (i + j) % 2 == 0 ? white : dark);
             }
-        var start = Course.At(0);
+        var start = Course.At(distanceM);
         var forward = new Vector3((float)start.DirX, 0, (float)start.DirZ);
         AddChild(new MeshInstance3D
         {
@@ -225,7 +273,7 @@ public partial class RideWorld : Node3D
 
     void BuildScenery(Material material)
     {
-        var props = Scenery.Generate(Course);
+        var props = Map.BuildProps(Course);
         PropCount = props.Count;
         var meshes = new Dictionary<PropKind, ArrayMesh>
         {
