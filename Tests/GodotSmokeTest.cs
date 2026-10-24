@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using Godot;
@@ -147,6 +148,22 @@ public partial class GodotSmokeTest : Node
             await Wait(0.2);
             Check(summary.ChartCount == 4, $"Bilan : courbes puissance, cadence, vitesse, cardio ({summary.ChartCount})");
             Check(summary.Ride.Info.Summary.Tss > 0 && summary.Ride.Info.Summary.Kcal > 0, "Bilan : TSS et calories calculés");
+            var info = summary.Ride.Info;
+            var r = summary.Ride;
+            Check(info.RiderMassKg > 0 && info.EndedAt is not null && r.Pauses.Count == 1 && RideSummaryScreen.PausesText.StartsWith("Pause 1"),
+                $"Bilan : poids, heure de fin et pause ({r.Pauses.Count} pause)");
+            var trainer = info.Sensors.FirstOrDefault(x => x.Kind == DeviceKind.Trainer);
+            Check(trainer is { Specs.PowerMaxW: 2000, Specs.Model: "Home trainer démo" } && info.Sensors.Count == 3
+                  && RideSummaryScreen.SensorsText.Contains("0 à 2000 W"),
+                $"En-tête : capteurs et leur fiche ({info.Sensors.Count} capteurs, {RideSummaryScreen.SensorsText.Replace('\n','|')})");
+            Check(r.Events.Any(e => e.Sensor == trainer!.Index && e.Type == "power")
+                  && r.Events.Any(e => e.Type == "set_power" && e.Value == "220")
+                  && r.Events.Any(e => e.Type == "rr") && r.Events.Any(e => e.Type == "pause"),
+                $"Fichier de données : valeurs des capteurs, consignes et pause ({r.Events.Count} lignes : {string.Join(" ", r.Events.Select(e => e.Type + e.Sensor).Distinct())})");
+            var reloaded = Screen.Store.Load(info.Id)!;
+            Check(reloaded.Samples.Count == r.Samples.Count && reloaded.Samples.Count >= 3
+                  && Math.Abs(reloaded.Samples[^1].DistanceM - r.Samples[^1].DistanceM) < 0.5,
+                $"Réouverture : mesures reconstruites à l'identique ({reloaded.Samples.Count} s)");
             summary.QueueFree();
         }
 
@@ -230,6 +247,7 @@ public partial class GodotSmokeTest : Node
         AddChild(list);
         await Wait(0.1);
         Check(list.WorkoutCount == 2, $"Liste : deux exemples au premier lancement ({list.WorkoutCount})");
+        Check(list.FtpLabel.Text == $"FTP {Screen.Store.LoadProfile().FtpW} W", $"Liste : la FTP est affichée ({list.FtpLabel.Text})");
         list.NewButton.EmitSignal(BaseButton.SignalName.Pressed);
         await Wait(0.1);
         var editor = next() as WorkoutEditorScreen;
@@ -294,6 +312,14 @@ public partial class GodotSmokeTest : Node
         ride.SkipBlock();
         await Wait(1.0);
         Check(!sim.Model.ErgMode && sim.Model.TargetPowerW == 0, "Bloc libre : le trainer n'impose plus de puissance");
+        ride.ToggleFreeErg();
+        ride.ChangeFreeErg(+10);
+        await Wait(1.0);
+        Check(sim.Model.ErgMode && sim.Model.TargetPowerW == ride.FreeErgW && ride.Recorder!.TargetPowerW == ride.FreeErgW,
+            $"Bloc libre avec ERG choisi : consigne {ride.FreeErgW} W envoyée et enregistrée ({sim.Model.TargetPowerW} W)");
+        ride.ToggleFreeErg();
+        await Wait(1.0);
+        Check(!sim.Model.ErgMode, "ERG retiré : le bloc redevient libre");
         ride.SkipBlock();
         await Wait(1.0);
         Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 180, $"Dernier bloc : retour en ERG à 180 W ({sim.Model.TargetPowerW} W)");
@@ -328,6 +354,37 @@ public partial class GodotSmokeTest : Node
             summary.QueueFree();
         }
         else Check(false, "Fin de l'entraînement : ouverture du bilan");
+
+        // Test FTP raccourci : 4 s d'effort au lieu de 20 min, même calcul.
+        int oldFtp = Screen.Store.LoadProfile().FtpW;
+        var test = new Workout
+        {
+            Id = "test-ftp", Name = "Test FTP court", Unit = Velom3d.Rides.PowerUnit.PercentFtp,
+            Blocks = [new() { DurationS = 4, Kind = BlockPower.Free, FtpTest = true }, new() { DurationS = 60, Power = 50 }],
+        };
+        ride = Navigator.Create<FreeRideScreen>(Navigator.FreeRide);
+        ride.Workout = test;
+        AddChild(ride);
+        await Wait(5.0);
+        int? ftp = ride.Progress?.FtpTestResultW;
+        Check(ftp is > 100 and < 250, $"Test FTP : 95 % de la moyenne de l'effort ({ftp} W, moyenne {ride.Progress?.FtpTestAveragePowerW:0} W)");
+        ride.Finish();
+        await Wait(0.2);
+        ride.QueueFree();
+        Check(Screen.Store.LoadProfile() is { FtpTestedAt: not null } p && p.FtpW == ftp, "Test FTP : la nouvelle FTP est enregistrée dans les réglages");
+        if (next() is RideSummaryScreen ftpSummary)
+        {
+            setNext(null);
+            AddChild(ftpSummary);
+            await Wait(0.2);
+            Check(ftpSummary.Popup is not null && ftpSummary.Ride.Info.FtpTestW == ftp && ftpSummary.PreviousFtpW == oldFtp,
+                "Test FTP : fenêtre « Nouvelle FTP » à la fin");
+            ftpSummary.Popup?.YesButton.EmitSignal(BaseButton.SignalName.Pressed);
+            await Wait(0.1);
+            Check(ftpSummary.Popup is null, "La fenêtre se ferme avec OK");
+            ftpSummary.QueueFree();
+        }
+        else Check(false, "Test FTP : ouverture du bilan");
     }
 
     SignalAwaiter Wait(double s) => ToSignal(GetTree().CreateTimer(s), SceneTreeTimer.SignalName.Timeout);

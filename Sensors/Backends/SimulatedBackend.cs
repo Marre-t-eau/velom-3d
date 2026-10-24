@@ -71,7 +71,31 @@ public partial class SimulatedBackend : SensorBackend
             return;
         }
         await Wait(ConnectDelayS);
-        if (_connected.Add(address)) RaiseDeviceConnected(address, services);
+        if (!_connected.Add(address)) return;
+        // Fiche de l'appareil, lue avant d'annoncer la connexion comme le fait le plugin Android.
+        foreach (var (uuid, data) in SpecsOf(address)) RaiseRead(address, uuid, data);
+        RaiseDeviceConnected(address, services);
+    }
+
+    static (string, byte[])[] SpecsOf(string address)
+    {
+        static byte[] Text(string s) => System.Text.Encoding.UTF8.GetBytes(s);
+        (string, byte[])[] common = [(BleUuids.ManufacturerName, Text("Velom3d")), (BleUuids.FirmwareRevision, Text("1.0-demo"))];
+        return address switch
+        {
+            Trainer =>
+            [
+                .. common, (BleUuids.ModelNumber, Text("Home trainer démo")),
+                // Cadence, résistance, puissance ; consignes de résistance, de puissance, simulation.
+                (BleUuids.FitnessMachineFeature, [0x82, 0x40, 0x00, 0x00, 0x0C, 0x20, 0x00, 0x00]),
+                (BleUuids.SupportedPowerRange, [0x00, 0x00, 0xD0, 0x07, 0x01, 0x00]),       // 0 à 2000 W par 1 W
+                (BleUuids.SupportedResistanceLevelRange, [0x00, 0x00, 0xE8, 0x03, 0x0A, 0x00]), // 0 à 100 par 1
+                (BleUuids.SupportedInclinationRange, [0x9C, 0xFF, 0xC8, 0x00, 0x01, 0x00]),  // -10 à 20 % par 0,1
+            ],
+            Pedals => [.. common, (BleUuids.ModelNumber, Text("Pédales démo")), (BleUuids.CyclingPowerFeature, [0x09, 0x00, 0x00, 0x00]), (BleUuids.SensorLocation, [0x07])],
+            Hrm => [.. common, (BleUuids.ModelNumber, Text("Ceinture démo")), (BleUuids.BodySensorLocation, [0x01])],
+            _ => [],
+        };
     }
 
     public override void DisconnectDevice(string address)

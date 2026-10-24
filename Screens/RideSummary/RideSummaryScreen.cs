@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Velom3d.Rides;
+using Velom3d.Sensors;
 
 namespace Velom3d.Screens;
 
@@ -15,6 +17,8 @@ public partial class RideSummaryScreen : Screen
     public Ride Ride { get; set; } = null!;
     /// <summary>Ouvert à la fin d'une sortie : Retour mène au menu plutôt qu'à l'historique.</summary>
     public bool JustFinished { get; set; }
+    /// <summary>FTP avant la sortie, pour annoncer celle mesurée par un test FTP.</summary>
+    public int PreviousFtpW { get; set; }
 
     /// <summary>Graphiques affichés (pour les tests).</summary>
     internal int ChartCount { get; private set; }
@@ -33,7 +37,8 @@ public partial class RideSummaryScreen : Screen
         root.AddChild(header);
         var titles = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         titles.AddChild(Ui.Label(JustFinished ? "Bravo, sortie enregistrée !" : "Bilan de la sortie", 36));
-        titles.AddChild(Ui.Label($"{Ui.Date(info.StartedAt)}  ·  {RideHistoryScreen.ModeName(info)}  ·  FTP {info.FtpW} W", 19, Ui.Muted));
+        titles.AddChild(Ui.Label($"{Ui.Date(info.StartedAt)}  ·  {RideHistoryScreen.ModeName(info)}  ·  FTP {info.FtpW} W"
+                                 + (info.FtpTestW > 0 ? $"  ·  nouvelle FTP {info.FtpTestW} W" : ""), 19, Ui.Muted));
         header.AddChild(titles);
         header.AddChild(Ui.Button(JustFinished ? "Menu" : "Retour", OnBack, 200, 72));
 
@@ -55,8 +60,17 @@ public partial class RideSummaryScreen : Screen
         Stat(grid, "Vitesse moyenne", $"{s.AvgSpeedKmh:0.0} km/h", Ui.SpeedColor);
         Stat(grid, "FC moyenne", s.AvgHeartRateBpm > 0 ? $"{s.AvgHeartRateBpm:0} bpm" : "--", Ui.HeartRateColor);
         Stat(grid, "FC max", s.MaxHeartRateBpm > 0 ? $"{s.MaxHeartRateBpm} bpm" : "--", Ui.HeartRateColor);
+        if (info.RiderMassKg > 0)
+        {
+            // Rapport poids/puissance avec le poids du cycliste ce jour-là.
+            Stat(grid, "W/kg moyen", $"{Ride.PerKg(s.AvgPowerW, info):0.00}", Ui.PowerColor);
+            Stat(grid, "W/kg normalisé", $"{Ride.PerKg(s.NormalizedPowerW, info):0.00}", Ui.PowerColor);
+            Stat(grid, "W/kg max", $"{Ride.PerKg(s.MaxPowerW, info):0.00}", Ui.PowerColor);
+            Stat(grid, "Poids", $"{info.RiderMassKg:0.#} + {info.BikeMassKg:0.#} kg", Ui.Muted);
+        }
         content.AddChild(Ui.Label($"Travail : {s.WorkKj:0} kJ. Calories estimées avec un rendement musculaire de 24 %.", 16, Ui.Muted));
 
+        content.AddChild(Timeline(Ride));
         if (s.DurationS > 0) content.AddChild(Zones(s, info.FtpW));
 
         var t = Ride.Samples.Select(x => x.TimeS).ToArray();
@@ -90,6 +104,14 @@ public partial class RideSummaryScreen : Screen
         _deleteButton = Ui.Button("Supprimer cette sortie", OnDeletePressed, 320, 72, 20);
         _deleteButton.Modulate = Ui.Danger;
         actions.AddChild(_deleteButton);
+
+        if (JustFinished && info.FtpTestW > 0)
+        {
+            int diff = info.FtpTestW - PreviousFtpW;
+            string change = PreviousFtpW <= 0 ? "" : diff == 0 ? $" C'est la même qu'avant." : $" Avant : {PreviousFtpW} W ({diff:+0;-0} W).";
+            Inform($"Nouvelle FTP : {info.FtpTestW} W", $"95 % de votre moyenne sur les 20 minutes d'effort.{change} "
+                   + "Elle est enregistrée dans les Réglages : vos entraînements en % de FTP s'y adaptent.");
+        }
     }
 
     static void Stat(GridContainer grid, string title, string value, Color accent)
@@ -107,6 +129,51 @@ public partial class RideSummaryScreen : Screen
         ChartCount++;
         return chart;
     }
+
+    /// <summary>Heures de départ et de fin, et chaque pause avec sa durée.</summary>
+    static Control Timeline(Ride ride)
+    {
+        var info = ride.Info;
+        var panel = Ui.Panel(Ui.Card);
+        var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
+        box.AddThemeConstantOverride("separation", 4);
+        panel.AddChild(box);
+        string end = info.EndedAt is { } e ? $"  ·  fin {Clock(e)}" : "";
+        box.AddChild(Ui.Label($"Départ {Clock(info.StartedAt)}{end}", 20));
+        PausesText = ride.Pauses.Count == 0 ? "Aucune pause."
+            : string.Join("\n", ride.Pauses.Select((p, i) => p.ResumedAt is { } r
+                ? $"Pause {i + 1} : {Clock(p.PausedAt)} → {Clock(r)} ({Ui.Duration(p.DurationS)}), après {Ui.Duration(p.AtElapsedS)} de sortie"
+                : $"Pause {i + 1} : {Clock(p.PausedAt)}, après {Ui.Duration(p.AtElapsedS)} de sortie, jusqu'à la fin"));
+        box.AddChild(Ui.Label(PausesText, 17, Ui.Muted));
+        if (info.Crr > 0)
+            box.AddChild(Ui.Label(string.Create(System.Globalization.CultureInfo.GetCultureInfo("fr-FR"),
+                $"Résistance des pneus Crr {info.Crr:0.0000}  ·  aéro CdA {info.CdA:0.00} m²  ·  roue {info.WheelCircumferenceMm} mm"), 17, Ui.Muted));
+        SensorsText = string.Join("\n", info.Sensors.Select(SensorLine));
+        if (SensorsText != "") box.AddChild(Ui.Label("Capteurs\n" + SensorsText, 17, Ui.Muted));
+        return panel;
+    }
+
+    /// <summary>« 1. KICKR CORE · Home trainer · Wahoo KICKR CORE · 0 à 2000 W ».</summary>
+    static string SensorLine(RideSensor sensor)
+    {
+        var sp = sensor.Specs;
+        var parts = new List<string> { $"{sensor.Index}. {sensor.Name}", DeviceList.KindLabel(sensor.Kind) };
+        string model = string.Join(" ", new[] { sp.Manufacturer, sp.Model }.Where(x => !string.IsNullOrEmpty(x)));
+        if (model != "") parts.Add(model);
+        if (sp.PowerMaxW is { } max) parts.Add($"{sp.PowerMinW ?? 0} à {max} W");
+        if (sp.ResistanceMax is { } rmax) parts.Add($"résistance {sp.ResistanceMin ?? 0:0.#} à {rmax:0.#}");
+        if (sp.InclineMaxPct is { } imax) parts.Add($"pente {sp.InclineMinPct ?? 0:0.#} à {imax:0.#} %");
+        if (sp.Location is { Length: > 0 } loc) parts.Add(loc);
+        return string.Join("  ·  ", parts);
+    }
+
+    /// <summary>Texte des capteurs affiché (pour les tests).</summary>
+    internal static string SensorsText { get; private set; } = "";
+
+    /// <summary>Texte des pauses affiché (pour les tests).</summary>
+    internal static string PausesText { get; private set; } = "";
+
+    static string Clock(DateTimeOffset at) => at.ToLocalTime().ToString("HH:mm:ss");
 
     /// <summary>Barres horizontales : part du temps dans chaque zone de puissance.</summary>
     static Control Zones(RideSummary s, int ftpW)

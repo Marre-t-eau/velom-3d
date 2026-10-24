@@ -169,12 +169,16 @@ public class TargetHistoryTests : IDisposable
     [Fact]
     public void Recorder_saves_power_and_cadence_targets()
     {
-        var rec = new RideRecorder(RideMode.Workout, new RiderProfile(), DateTimeOffset.Now, 180, "Sweet spot");
+        var start = DateTimeOffset.UnixEpoch;
+        double now = 0;
+        var rec = new RideRecorder(RideMode.Workout, new RiderProfile(), start, 180, "Sweet spot") { Clock = () => start.AddSeconds(now) };
         rec.TargetCadenceRpm = 90;
         rec.Tick(2.0, 175, 88, 120);
+        now = 2;
         rec.TargetPowerW = 0;
         rec.TargetCadenceRpm = 0;
         rec.Tick(1.0, 150, 80, 120);
+        now = 3;
         var store = new RideStore(_dir);
         store.Save(rec.Finish());
         var back = store.Load(rec.Ride.Info.Id)!;
@@ -188,14 +192,54 @@ public class TargetHistoryTests : IDisposable
     public void Old_csv_without_cadence_target_still_loads()
     {
         var store = new RideStore(_dir);
-        var rec = new RideRecorder(RideMode.TargetPower, new RiderProfile(), DateTimeOffset.Now, 200);
-        rec.Tick(2.0, 200, 90, 0);
-        var ride = rec.Finish();
-        store.Save(ride);
-        var csv = Path.Combine(_dir, ride.Info.Id + ".csv");
-        File.WriteAllLines(csv, File.ReadAllLines(csv).Select(l => l[..l.LastIndexOf(',')]));
-        var back = store.Load(ride.Info.Id)!;
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Path.Combine(_dir, "old.json"), """{ "Id": "old", "Mode": "TargetPower", "FtpW": 200 }""");
+        File.WriteAllText(Path.Combine(_dir, "old.csv"),
+            "time_s,power_w,cadence_rpm,heart_rate_bpm,speed_kmh,distance_m,grade_pct,target_power_w\n1,200,90,0,30,8,0,200\n2,200,90,0,31,17,0,200\n");
+        var back = store.Load("old")!;
         Assert.Equal(2, back.Samples.Count);
         Assert.All(back.Samples, s => Assert.Equal((200, 0), (s.TargetPowerW, s.TargetCadenceRpm)));
     }
+}
+
+public class FtpTestTests
+{
+    [Fact]
+    public void Test_workout_has_one_20_minute_free_effort()
+    {
+        var w = Workout.FtpTestWorkout();
+        var effort = Assert.Single(w.Blocks, b => b.FtpTest);
+        Assert.Equal(BlockPower.Free, effort.Kind);
+        Assert.Equal(Workout.FtpTestEffortS, effort.DurationS);
+    }
+
+    [Fact]
+    public void Ftp_is_95_percent_of_the_effort_average()
+    {
+        var w = Workout.FtpTestWorkout();
+        var p = new WorkoutProgress(w, 200);
+        int start = w.StartOf(w.Blocks.FindIndex(b => b.FtpTest));
+        p.Advance(start, 150); // échauffement : ne compte pas
+        Assert.Null(p.FtpTestResultW);
+        for (int t = 0; t < Workout.FtpTestEffortS; t++) p.Advance(1, t % 2 == 0 ? 240 : 260);
+        Assert.Equal(250, p.FtpTestAveragePowerW, 3);
+        Assert.Equal(238, p.FtpTestResultW);
+        p.Advance(60, 100); // retour au calme : ne change rien
+        Assert.Equal(238, p.FtpTestResultW);
+    }
+
+    [Fact]
+    public void Skipped_or_cut_short_test_gives_no_ftp()
+    {
+        var w = Workout.FtpTestWorkout();
+        int index = w.Blocks.FindIndex(b => b.FtpTest);
+        var p = new WorkoutProgress(w, 200);
+        p.Advance(w.StartOf(index), 150);
+        p.Advance(600, 300); // 10 min sur 20
+        p.SkipBlock();
+        Assert.Null(p.FtpTestResultW);
+        Assert.Null(new WorkoutProgress(Examples()[0], 200).FtpTestResultW);
+    }
+
+    static System.Collections.Generic.List<Workout> Examples() => Workout.Examples(System.DateTimeOffset.Now);
 }

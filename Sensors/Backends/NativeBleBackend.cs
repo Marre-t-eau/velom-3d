@@ -29,6 +29,8 @@ public partial class NativeBleBackend : SensorBackend
             RaiseDeviceConnected(address, SplitServices(services))));
         _plugin.Connect("disconnected", Callable.From<string>(RaiseDeviceDisconnected));
         _plugin.Connect("notified", Callable.From<string, string, byte[]>(RaiseNotified));
+        if (_plugin.HasSignal("read_result")) // plugin plus ancien : pas de fiche, rien d'autre ne change
+            _plugin.Connect("read_result", Callable.From<string, string, byte[]>(RaiseRead));
         _plugin.Connect("error", Callable.From<string>(RaiseError));
         _plugin.Connect("permissions_result", Callable.From<bool>(OnPermissionsResult));
     }

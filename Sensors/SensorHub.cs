@@ -27,6 +27,12 @@ public partial class SensorHub : Node
     [Signal] public delegate void ControlResultEventHandler(int requestOpcode, bool ok);
     [Signal] public delegate void StatusMessageEventHandler(string text);
 
+    /// <summary>Chaque valeur reçue d'un capteur, telle qu'il l'envoie : adresse, type, valeur
+    /// (voir <see cref="SensorValues"/>). Sert au fichier de données des sorties.</summary>
+    public event System.Action<string, string, string>? Measured;
+    /// <summary>Chaque commande envoyée au trainer : adresse, type, valeur.</summary>
+    public event System.Action<string, string, string>? Commanded;
+
     public SensorFusion Fusion { get; } = new();
     /// <summary>Appareils vus au scan et état de leur connexion.</summary>
     public DeviceList Devices { get; } = new();
@@ -80,7 +86,13 @@ public partial class SensorHub : Node
         TrainerAddress = "";
         IsScanning = false;
         AddChild(backend);
-        backend.Notified += (address, charUuid, data) => Fusion.Feed(address, charUuid, data, Now);
+        backend.Notified += (address, charUuid, data) =>
+        {
+            if (Measured is { } measured)
+                foreach (var (type, value) in SensorValues.Decode(charUuid, data)) measured(address, type, value);
+            Fusion.Feed(address, charUuid, data, Now);
+        };
+        backend.Read += (address, charUuid, data) => Devices.Get(address)?.Specs.Apply(charUuid, data);
         backend.DeviceFound += (a, n, s, rssi) => Devices.Found(a, n, s, rssi, Now);
         backend.ScanFinished += () =>
         {
@@ -155,7 +167,14 @@ public partial class SensorHub : Node
             return;
         }
         // Le transport les envoie dans l'ordre, une à la fois.
-        foreach (var frame in frames) Backend.Write(TrainerAddress, BleUuids.FitnessMachineControlPoint, frame);
+        foreach (var frame in frames) Write(TrainerAddress, frame);
+    }
+
+    void Write(string address, byte[] frame)
+    {
+        if (Commanded is { } commanded)
+            foreach (var (type, value) in SensorValues.Command(frame)) commanded(address, type, value);
+        Backend!.Write(address, BleUuids.FitnessMachineControlPoint, frame);
     }
 
     void OnDeviceConnected(string address, string[] services)
@@ -171,8 +190,8 @@ public partial class SensorHub : Node
         {
             TrainerAddress = address;
             // FTMS exige de demander le contrôle avant toute commande.
-            Backend!.Write(address, BleUuids.FitnessMachineControlPoint, FtmsCommands.RequestControl());
-            Backend.Write(address, BleUuids.FitnessMachineControlPoint, FtmsCommands.Start());
+            Write(address, FtmsCommands.RequestControl());
+            Write(address, FtmsCommands.Start());
         }
         EmitSignal(SignalName.DeviceConnected, address, services);
     }

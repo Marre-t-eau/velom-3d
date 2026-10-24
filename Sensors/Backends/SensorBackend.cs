@@ -15,6 +15,9 @@ public abstract partial class SensorBackend : Node
     public event Action<string, string, byte[]>? Notified;
     /// <summary>Appareil trouvé au scan : adresse, nom, services annoncés (UUID courts), RSSI (dBm).</summary>
     public event Action<string, string, string[], int>? DeviceFound;
+    /// <summary>Caractéristique lue à la connexion (fiche de l'appareil) : adresse, UUID court, données.
+    /// Arrive avant <see cref="DeviceConnected"/>.</summary>
+    public event Action<string, string, byte[]>? Read;
     public event Action? ScanFinished;
     public event Action<string, string[]>? DeviceConnected;
     public event Action<string>? DeviceDisconnected;
@@ -29,6 +32,8 @@ public abstract partial class SensorBackend : Node
 
     protected void RaiseNotified(string address, string charUuid, byte[] data) =>
         Notified?.Invoke(address, BleUuids.ToShort(charUuid), data);
+    protected void RaiseRead(string address, string charUuid, byte[] data) =>
+        Read?.Invoke(address, BleUuids.ToShort(charUuid), data);
     protected void RaiseDeviceFound(string address, string name, string[] services, int rssi) =>
         DeviceFound?.Invoke(address, name, services.Select(BleUuids.ToShort).ToArray(), rssi);
     protected void RaiseScanFinished() => ScanFinished?.Invoke();

@@ -71,6 +71,11 @@ public partial class FreeRideScreen : Screen
     /// <summary>Le trainer est-il en ERG ? null au départ (rien envoyé encore).</summary>
     bool? _workoutErg;
     int _sentTargetW = -1, _sentBlock = -1;
+    /// <summary>Blocs libres : ERG choisi par le cycliste (watts réglables), ou vraiment libre.</summary>
+    internal bool FreeErg { get; private set; }
+    internal int FreeErgW { get; private set; }
+    Control _freeErgRow = null!;
+    Button _freeErgToggle = null!;
     double _sinceTargetSent;
 
     SensorHub Hub => SensorHub.Instance;
@@ -93,6 +98,7 @@ public partial class FreeRideScreen : Screen
     public override void _ExitTree()
     {
         Hub.StatusMessage -= ShowTrainerStatus;
+        StopDataLog();
         DisplayServer.ScreenSetKeepOn(false);
     }
 
@@ -335,6 +341,16 @@ public partial class FreeRideScreen : Screen
         _blockBar.AddThemeStyleboxOverride("fill", fill);
         _blockBar.AddThemeStyleboxOverride("background", back);
         box.AddChild(_blockBar);
+        // Bloc libre : le cycliste peut quand même faire imposer des watts par le trainer.
+        var freeErg = Ui.Row(10);
+        box.AddChild(freeErg);
+        _freeErgToggle = Ui.Button("", ToggleFreeErg, 190, 64, 20);
+        Ui.MakeSelectable(_freeErgToggle);
+        _freeErgToggle.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        freeErg.AddChild(_freeErgToggle);
+        foreach (var step in new[] { -10, -5, 5, 10 })
+            freeErg.AddChild(Ui.Button(step < 0 ? $"−{-step}" : $"+{step}", () => ChangeFreeErg(step), 72, 64, 22));
+        _freeErgRow = freeErg;
         // Profil de l'entraînement sous le bloc en cours : où on en est, ce qui reste.
         _workoutChart = new WorkoutChart { CustomMinimumSize = new Vector2(0, 46) };
         box.AddChild(_workoutChart);
@@ -371,6 +387,7 @@ public partial class FreeRideScreen : Screen
         _target = 0;
         Progress = new WorkoutProgress(workout, _profile.FtpW);
         Recorder = new RideRecorder(RideMode.Workout, _profile, DateTimeOffset.Now, Progress.TargetW ?? 0, workout.Name);
+        StartDataLog();
         Gears = null;
         _workoutChart.Workout = workout;
         _workoutChart.FtpW = _profile.FtpW;
@@ -381,6 +398,21 @@ public partial class FreeRideScreen : Screen
         _workoutPanel.Visible = true;
         _skipButton.Visible = true;
         ShowRiding();
+    }
+
+    /// <summary>ERG oui / non pendant les blocs libres ; démarre à la puissance du moment, arrondie à 5 W.</summary>
+    internal void ToggleFreeErg()
+    {
+        FreeErg = !FreeErg;
+        if (FreeErg && FreeErgW == 0) FreeErgW = Math.Clamp((int)Math.Round(Math.Max(Hub.Power, 100) / 5.0) * 5, 50, 1000);
+        _sinceTargetSent = 1.0;
+    }
+
+    internal void ChangeFreeErg(int delta)
+    {
+        if (!FreeErg) ToggleFreeErg();
+        FreeErgW = Math.Clamp(FreeErgW + delta, 50, 1000);
+        _sinceTargetSent = 1.0; // la nouvelle consigne part tout de suite
     }
 
     internal void SkipBlock()
@@ -396,7 +428,8 @@ public partial class FreeRideScreen : Screen
     void UpdateWorkoutControl(double delta)
     {
         var progress = Progress!;
-        int? target = progress.TargetW;
+        // Pas de consigne (bloc libre, séance finie) : celle du cycliste s'il a choisi l'ERG.
+        int? target = progress.TargetW ?? (FreeErg ? FreeErgW : null);
         int block = progress.BlockIndex;
         Recorder!.TargetPowerW = target ?? 0;
         Recorder.TargetCadenceRpm = progress.TargetCadenceRpm;
@@ -488,12 +521,14 @@ public partial class FreeRideScreen : Screen
 
         if (progress.Current is { } b)
         {
-            _blockTitle.Text = $"Bloc {index + 1} / {w.Blocks.Count} · reste";
+            _blockTitle.Text = b.FtpTest ? "Test FTP : à fond, régulier · reste" : $"Bloc {index + 1} / {w.Blocks.Count} · reste";
             _blockRemaining.Text = Ui.Duration(Math.Ceiling(progress.BlockRemainingS));
-            _blockPower.Text = b.Kind == BlockPower.Ramp && progress.TargetW is { } now ? $"{now} W, vers {w.ToWatts(b.PowerEnd, progress.FtpW)} W"
+            _blockPower.Text = b.FtpTest ? $"Moyenne {progress.FtpTestAveragePowerW:0} W"
+                : b.Kind == BlockPower.Ramp && progress.TargetW is { } now ? $"{now} W, vers {w.ToWatts(b.PowerEnd, progress.FtpW)} W"
                 : b.Kind == BlockPower.Free ? "Puissance libre" : BlockPowerText(b);
             _blockCadence.Text = b.FreeCadence ? "Cadence libre" : $"Cadence {b.CadenceRpm} tr/min";
             _blockBar.Value = 1.0 - progress.BlockRemainingS / Math.Max(1, b.DurationS);
+            _freeErgRow.Visible = b.Kind == BlockPower.Free;
             _skipButton.Disabled = false;
         }
         else
@@ -501,8 +536,10 @@ public partial class FreeRideScreen : Screen
             _blockTitle.Text = "Entraînement terminé";
             _blockRemaining.Text = "Bravo !";
             _blockPower.Text = "Puissance libre";
-            _blockCadence.Text = "Touchez Terminer pour enregistrer.";
+            _blockCadence.Text = progress.FtpTestResultW is { } ftp ? $"Nouvelle FTP : {ftp} W. Touchez Terminer pour enregistrer."
+                : "Touchez Terminer pour enregistrer.";
             _blockBar.Value = 1;
+            _freeErgRow.Visible = true;
             _skipButton.Disabled = true;
         }
     }
@@ -517,6 +554,7 @@ public partial class FreeRideScreen : Screen
 
         Recorder = new RideRecorder(mode, _profile, DateTimeOffset.Now, targetW);
         Gears = mode == RideMode.Simulation && _profile.VirtualGears ? _profile.CreateDrivetrain() : null;
+        StartDataLog();
         _smoothCadence = Hub.Cadence;
         if (Hub.TrainerAddress != "")
         {
@@ -579,7 +617,42 @@ public partial class FreeRideScreen : Screen
     }
 
     /// <summary>Nouvelle vitesse : la consigne part tout de suite, sans attendre le prochain envoi.</summary>
-    void GearChanged() => _sinceGearCommand = 2.0;
+    void GearChanged()
+    {
+        _sinceGearCommand = 2.0;
+        Recorder?.LogEvent("gear", Gears!.GearLabel);
+    }
+
+    /// <summary>Fichier de données : chaque valeur des capteurs et chaque commande au trainer à partir
+    /// d'ici, jusqu'à la fin. Les capteurs connectés entrent dans l'en-tête avec leur fiche.</summary>
+    void StartDataLog()
+    {
+        Hub.Measured -= OnMeasured;
+        Hub.Measured += OnMeasured;
+        Hub.Commanded -= OnMeasured;
+        Hub.Commanded += OnMeasured;
+        foreach (var d in Hub.Devices.Sorted)
+            if (d.State == LinkState.Connected) SensorIndex(d.Address);
+        if (Gears is not null) Recorder!.LogEvent("gear", Gears.GearLabel);
+    }
+
+    void StopDataLog()
+    {
+        Hub.Measured -= OnMeasured;
+        Hub.Commanded -= OnMeasured;
+    }
+
+    int SensorIndex(string address)
+    {
+        var d = Hub.Devices.Get(address);
+        return Recorder!.SensorIndex(address, d?.DisplayName ?? address, d?.Kind ?? DeviceKind.Unknown, d?.Services ?? [], d?.Specs ?? new DeviceSpecs());
+    }
+
+    void OnMeasured(string address, string type, string value)
+    {
+        if (Recorder is null) return;
+        Recorder.Log(DateTimeOffset.Now, type, SensorIndex(address), value);
+    }
 
     void ChangeTarget(int delta)
     {
@@ -618,12 +691,24 @@ public partial class FreeRideScreen : Screen
     internal void Finish()
     {
         if (Recorder is null) return;
+        // On rend la main au cycliste : plus de consigne ERG après la sortie (notée dans les données).
+        if (Hub.TrainerAddress != "") Hub.EnterSimulation(0.0);
         var ride = Recorder.Finish();
+        // Bilan calculé comme à la réouverture : depuis le fichier de données.
+        if (ride.Events.Exists(e => e.Sensor != RideEvent.App)) { ride.Rebuild(); ride.Summarize(); }
+        // Test FTP réussi : la nouvelle FTP est enregistrée tout de suite dans les réglages.
+        int? newFtp = Progress?.FtpTestResultW;
+        int oldFtp = _profile.FtpW;
+        if (newFtp is { } ftp)
+        {
+            ride.Info.FtpTestW = ftp;
+            _profile.FtpW = ftp;
+            _profile.FtpTestedAt = DateTimeOffset.Now;
+        }
         Recorder = null;
+        StopDataLog();
         Gears = null;
         Progress = null;
-        // On rend la main au cycliste : plus de consigne ERG après la sortie.
-        if (Hub.TrainerAddress != "") Hub.EnterSimulation(0.0);
         DisplayServer.ScreenSetKeepOn(false);
         if (ride.Samples.Count == 0)
         {
@@ -635,6 +720,7 @@ public partial class FreeRideScreen : Screen
         var summary = Navigator.Create<RideSummaryScreen>(Navigator.Summary);
         summary.Ride = ride;
         summary.JustFinished = true;
+        summary.PreviousFtpW = oldFtp;
         Navigator.GoTo(this, summary);
     }
 
@@ -644,7 +730,7 @@ public partial class FreeRideScreen : Screen
         if (Progress is not null) UpdateWorkoutControl(delta);
         double before = Recorder.ElapsedS;
         Recorder.Tick(delta, Hub.Power, Hub.Cadence, Hub.HeartRate);
-        Progress?.Advance(Recorder.ElapsedS - before);
+        Progress?.Advance(Recorder.ElapsedS - before, Hub.Power);
         bool moving = !Recorder.IsPaused;
         Scene3D?.Follow(Recorder.DistanceM, moving ? Recorder.Physics.SpeedMps : 0, moving ? Hub.Cadence : 0);
         if (Gears is not null) UpdateGearResistance(delta);
@@ -677,6 +763,8 @@ public partial class FreeRideScreen : Screen
         // Hors de la cadence demandée (± 5 tr/min) : la valeur passe en orange.
         _cadence.Modulate = Recorder.TargetCadenceRpm > 0 && Math.Abs(Hub.Cadence - Recorder.TargetCadenceRpm) > 5 ? Ui.Warning : Colors.White;
         if (Progress is not null) RefreshWorkout();
+        _freeErgToggle.SetPressedNoSignal(FreeErg);
+        _freeErgToggle.Text = FreeErg ? $"ERG {FreeErgW} W" : "ERG : non";
         _hr.Text = Hub.HeartRate > 0 ? $"{Hub.HeartRate} bpm" : "--";
         _speed.Text = $"{Recorder.SpeedKmh:0.0} km/h";
         _distance.Text = Ui.Km(Recorder.DistanceM);

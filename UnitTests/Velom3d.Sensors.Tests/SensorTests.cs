@@ -308,3 +308,51 @@ public class DeviceListTests
         Assert.Equal(4, n);
     }
 }
+
+public class SensorValuesTests
+{
+    [Fact]
+    public void Every_field_of_a_frame_becomes_a_value()
+    {
+        // Indoor Bike Data : vitesse 25,00 km/h, cadence 90 tr/min, résistance 12, puissance 210 W.
+        var ibd = SensorValues.Decode("2ad2", [0x64, 0x00, 0xC4, 0x09, 0xB4, 0x00, 0x0C, 0x00, 0xD2, 0x00]);
+        Assert.Equal(["speed 25", "cadence 90", "resistance 12", "power 210"], ibd.Select(v => $"{v.Type} {v.Value}"));
+
+        // Cardio 150 bpm avec deux intervalles RR.
+        var hr = SensorValues.Decode("2a37", [0x10, 150, 0x00, 0x04, 0x33, 0x03]);
+        Assert.Equal(["hr 150", "rr 1", "rr 0.7998"], hr.Select(v => $"{v.Type} {v.Value}"));
+
+        Assert.Equal([("raw_2a5b", "0102")], SensorValues.Decode("2a5b", [0x01, 0x02]));
+        Assert.Equal([("response", "set_power ok")], SensorValues.Decode("2ad9", [0x80, 0x05, 0x01]));
+    }
+
+    [Fact]
+    public void Commands_are_written_in_clear()
+    {
+        Assert.Equal([("set_power", "250")], SensorValues.Command(FtmsCommands.SetTargetPower(250)));
+        Assert.Equal(["set_wind 0", "set_grade 4.5", "set_crr 0.004", "set_cw 0.25"],
+            SensorValues.Command(FtmsCommands.SetSimulation(4.5, 0, 0.004, 0.25)).Select(v => $"{v.Type} {v.Value}"));
+        Assert.Equal([("command", "request_control")], SensorValues.Command(FtmsCommands.RequestControl()));
+    }
+
+    [Fact]
+    public void Specs_are_read_from_the_device_characteristics()
+    {
+        var specs = new DeviceSpecs();
+        specs.Apply("2a29", "Wahoo Fitness\0"u8);
+        specs.Apply("2a24", "KICKR CORE"u8);
+        specs.Apply("2ad8", [0x00, 0x00, 0xD0, 0x07, 0x01, 0x00]);
+        specs.Apply("2ad6", [0x00, 0x00, 0xE8, 0x03, 0x0A, 0x00]);
+        specs.Apply("2ad5", [0x9C, 0xFF, 0xC8, 0x00, 0x01, 0x00]);
+        specs.Apply("2acc", [0x82, 0x40, 0x00, 0x00, 0x0C, 0x20, 0x00, 0x00]);
+        Assert.Equal(("Wahoo Fitness", "KICKR CORE"), (specs.Manufacturer, specs.Model));
+        Assert.Equal((0, 2000, 1), (specs.PowerMinW, specs.PowerMaxW, specs.PowerStepW));
+        Assert.Equal(100, specs.ResistanceMax!.Value, 6);
+        Assert.Equal((-10.0, 20.0), (Math.Round(specs.InclineMinPct!.Value, 6), Math.Round(specs.InclineMaxPct!.Value, 6)));
+        Assert.Equal(["cadence", "niveau de résistance", "puissance", "consigne de résistance", "consigne de puissance (ERG)", "simulation (pente, vent, pneus)"],
+            specs.Features);
+        var hrm = new DeviceSpecs();
+        hrm.Apply("2a38", [0x01]);
+        Assert.Equal("poitrine", hrm.Location);
+    }
+}
