@@ -20,6 +20,20 @@ public static class BleUuids
     public const string CyclingPowerMeasurement = "2a63";     // notify
     public const string HeartRateMeasurement = "2a37";        // notify
 
+    // Caractéristiques lues une fois à la connexion : fiche de l'appareil (specs).
+    public const string SupportedInclinationRange = "2ad5";
+    public const string SupportedResistanceLevelRange = "2ad6";
+    public const string SupportedPowerRange = "2ad8";
+    public const string CyclingPowerFeature = "2a65";
+    public const string SensorLocation = "2a5d";
+    public const string BodySensorLocation = "2a38";
+    public const string ManufacturerName = "2a29";
+    public const string ModelNumber = "2a24";
+    public const string SerialNumber = "2a25";
+    public const string HardwareRevision = "2a27";
+    public const string FirmwareRevision = "2a26";
+    public const string SoftwareRevision = "2a28";
+
     const string BaseSuffix = "-0000-1000-8000-00805f9b34fb";
 
     /// <summary>"00002ad2-0000-1000-8000-00805f9b34fb" -> "2ad2". Laisse les UUID propriétaires intacts.</summary>

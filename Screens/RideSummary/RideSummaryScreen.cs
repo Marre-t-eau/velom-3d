@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Velom3d.Rides;
+using Velom3d.Sensors;
 
 namespace Velom3d.Screens;
 
@@ -68,7 +70,7 @@ public partial class RideSummaryScreen : Screen
         }
         content.AddChild(Ui.Label($"Travail : {s.WorkKj:0} kJ. Calories estimées avec un rendement musculaire de 24 %.", 16, Ui.Muted));
 
-        content.AddChild(Timeline(info));
+        content.AddChild(Timeline(Ride));
         if (s.DurationS > 0) content.AddChild(Zones(s, info.FtpW));
 
         var t = Ride.Samples.Select(x => x.TimeS).ToArray();
@@ -129,24 +131,44 @@ public partial class RideSummaryScreen : Screen
     }
 
     /// <summary>Heures de départ et de fin, et chaque pause avec sa durée.</summary>
-    static Control Timeline(RideInfo info)
+    static Control Timeline(Ride ride)
     {
+        var info = ride.Info;
         var panel = Ui.Panel(Ui.Card);
         var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
         box.AddThemeConstantOverride("separation", 4);
         panel.AddChild(box);
         string end = info.EndedAt is { } e ? $"  ·  fin {Clock(e)}" : "";
         box.AddChild(Ui.Label($"Départ {Clock(info.StartedAt)}{end}", 20));
-        PausesText = info.Pauses.Count == 0 ? "Aucune pause."
-            : string.Join("\n", info.Pauses.Select((p, i) => p.ResumedAt is { } r
+        PausesText = ride.Pauses.Count == 0 ? "Aucune pause."
+            : string.Join("\n", ride.Pauses.Select((p, i) => p.ResumedAt is { } r
                 ? $"Pause {i + 1} : {Clock(p.PausedAt)} → {Clock(r)} ({Ui.Duration(p.DurationS)}), après {Ui.Duration(p.AtElapsedS)} de sortie"
                 : $"Pause {i + 1} : {Clock(p.PausedAt)}, après {Ui.Duration(p.AtElapsedS)} de sortie, jusqu'à la fin"));
         box.AddChild(Ui.Label(PausesText, 17, Ui.Muted));
         if (info.Crr > 0)
             box.AddChild(Ui.Label(string.Create(System.Globalization.CultureInfo.GetCultureInfo("fr-FR"),
                 $"Résistance des pneus Crr {info.Crr:0.0000}  ·  aéro CdA {info.CdA:0.00} m²  ·  roue {info.WheelCircumferenceMm} mm"), 17, Ui.Muted));
+        SensorsText = string.Join("\n", info.Sensors.Select(SensorLine));
+        if (SensorsText != "") box.AddChild(Ui.Label("Capteurs\n" + SensorsText, 17, Ui.Muted));
         return panel;
     }
+
+    /// <summary>« 1. KICKR CORE · Home trainer · Wahoo KICKR CORE · 0 à 2000 W ».</summary>
+    static string SensorLine(RideSensor sensor)
+    {
+        var sp = sensor.Specs;
+        var parts = new List<string> { $"{sensor.Index}. {sensor.Name}", DeviceList.KindLabel(sensor.Kind) };
+        string model = string.Join(" ", new[] { sp.Manufacturer, sp.Model }.Where(x => !string.IsNullOrEmpty(x)));
+        if (model != "") parts.Add(model);
+        if (sp.PowerMaxW is { } max) parts.Add($"{sp.PowerMinW ?? 0} à {max} W");
+        if (sp.ResistanceMax is { } rmax) parts.Add($"résistance {sp.ResistanceMin ?? 0:0.#} à {rmax:0.#}");
+        if (sp.InclineMaxPct is { } imax) parts.Add($"pente {sp.InclineMinPct ?? 0:0.#} à {imax:0.#} %");
+        if (sp.Location is { Length: > 0 } loc) parts.Add(loc);
+        return string.Join("  ·  ", parts);
+    }
+
+    /// <summary>Texte des capteurs affiché (pour les tests).</summary>
+    internal static string SensorsText { get; private set; } = "";
 
     /// <summary>Texte des pauses affiché (pour les tests).</summary>
     internal static string PausesText { get; private set; } = "";

@@ -136,5 +136,11 @@ public sealed class SimulatedTrainer
         return b;
     }
 
-    public byte[] HeartRateFrame() => [0x00, (byte)Math.Clamp(HeartRate, 0, 255)];
+    /// <summary>FC sur 8 bits et un intervalle RR (1/1024 s) qui correspond à cette FC.</summary>
+    public byte[] HeartRateFrame()
+    {
+        int bpm = Math.Clamp(HeartRate, 0, 255);
+        int rr = bpm > 0 ? (int)Math.Round(60.0 / bpm * 1024.0) : 0;
+        return bpm > 0 ? [0x10, (byte)bpm, (byte)(rr & 0xFF), (byte)(rr >> 8)] : [0x00, 0x00];
+    }
 }

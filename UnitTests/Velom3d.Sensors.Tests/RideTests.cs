@@ -128,7 +128,7 @@ public class RecorderTests
     }
 
     [Fact]
-    public void Pauses_are_logged_with_times_and_sample_clock_skips_them()
+    public void Pauses_are_logged_as_events_with_their_times()
     {
         var start = new DateTimeOffset(2026, 10, 13, 18, 0, 0, TimeSpan.FromHours(2));
         var rec = new RideRecorder(RideMode.Simulation, new RiderProfile { RiderMassKg = 70, BikeMassKg = 7.5 }, start);
@@ -145,13 +145,76 @@ public class RecorderTests
         Assert.Equal(7.5, info.BikeMassKg);
         Assert.Equal(77.5, info.MassKg);
         Assert.Equal(start.AddSeconds(80), info.EndedAt);
-        Assert.Equal(2, info.Pauses.Count);
-        Assert.Equal(10, info.Pauses[0].AtElapsedS, 6);
-        Assert.Equal(60, info.Pauses[0].DurationS, 6);
-        Assert.Null(info.Pauses[1].ResumedAt); // terminée pendant la pause
-        Assert.Equal(start.AddSeconds(10), ride.ClockAt(ride.Samples[9].TimeS));
-        Assert.Equal(start.AddSeconds(71), ride.ClockAt(ride.Samples[10].TimeS));
+        Assert.Equal(2, ride.Pauses.Count);
+        Assert.Equal(10, ride.Pauses[0].AtElapsedS, 6);
+        Assert.Equal(60, ride.Pauses[0].DurationS, 6);
+        Assert.Null(ride.Pauses[1].ResumedAt); // terminée pendant la pause
+        Assert.Equal(
+            [(0.0, "start", "Simulation"), (0.0, "grade", "0"), (10.0, "pause", ""), (70.0, "resume", ""), (75.0, "pause", ""), (80.0, "finish", "")],
+            ride.Events.Select(e => (e.T, e.Type, e.Value)));
+        Assert.All(ride.Events, e => Assert.Equal(RideEvent.App, e.Sensor));
         Assert.Equal(200 / 70.0, Ride.PerKg(200, info), 6);
+    }
+
+    [Fact]
+    public void Target_changes_are_logged_once()
+    {
+        var start = DateTimeOffset.Now;
+        var rec = new RideRecorder(RideMode.Workout, new RiderProfile(), start, 150) { Clock = () => start.AddSeconds(5) };
+        rec.TargetPowerW = 150; // inchangée
+        rec.TargetPowerW = 200;
+        rec.TargetCadenceRpm = 90;
+        Assert.Equal(["start Workout", "grade 0", "target_power 150", "target_power 200", "target_cadence 90"],
+            rec.Ride.Events.Select(e => $"{e.Type} {e.Value}"));
+        Assert.Equal(5.0, rec.Ride.Events[^1].T);
+    }
+
+    [Fact]
+    public void Replay_rebuilds_the_live_samples()
+    {
+        var start = new DateTimeOffset(2026, 10, 13, 18, 0, 0, TimeSpan.Zero);
+        var rec = new RideRecorder(RideMode.TargetPower, new RiderProfile(), start, 200);
+        int trainer = rec.SensorIndex("AA", "KICKR", DeviceKind.Trainer, ["1826"], new DeviceSpecs());
+        int pedals = rec.SensorIndex("BB", "Assioma", DeviceKind.PowerMeter, ["1818"], new DeviceSpecs());
+        Assert.Equal((1, 2, 1), (trainer, pedals, rec.SensorIndex("AA", "KICKR", DeviceKind.Trainer, [], new DeviceSpecs())));
+        for (int i = 0; i < 60; i++)
+        {
+            var at = start.AddSeconds(i);
+            rec.Log(at, "power", trainer, "190");  // les pédales l'emportent tant qu'elles émettent
+            rec.Log(at, "power", pedals, "200");
+            rec.Log(at, "cadence", trainer, "88");
+            rec.Log(at, "hr", trainer, "140");
+            if (i == 30) rec.Pause(at);
+            if (i == 40) rec.Resume(at);
+            rec.Tick(1.0, 200, 88, 140);
+        }
+        var ride = rec.Finish(start.AddSeconds(60));
+        var live = ride.Samples.ToList();
+        ride.Rebuild();
+        Assert.Equal(live.Count, ride.Samples.Count);
+        Assert.Equal(50, ride.Samples.Count);
+        Assert.All(ride.Samples, x => Assert.Equal((200, 88.0, 140, 200), (x.PowerW, x.CadenceRpm, x.HeartRateBpm, x.TargetPowerW)));
+        Assert.Equal(live[^1].DistanceM, ride.Samples[^1].DistanceM, 3);
+        Assert.Equal(30, Assert.Single(ride.Pauses).AtElapsedS, 6);
+    }
+
+    [Fact]
+    public void Replay_falls_back_to_the_trainer_when_the_dedicated_sensor_stops()
+    {
+        var start = DateTimeOffset.UnixEpoch;
+        var rec = new RideRecorder(RideMode.Simulation, new RiderProfile(), start);
+        int trainer = rec.SensorIndex("AA", "KICKR", DeviceKind.Trainer, [], new DeviceSpecs());
+        int pedals = rec.SensorIndex("BB", "Assioma", DeviceKind.PowerMeter, [], new DeviceSpecs());
+        for (int i = 0; i < 20; i++)
+        {
+            rec.Log(start.AddSeconds(i), "power", trainer, "150");
+            if (i < 5) rec.Log(start.AddSeconds(i), "power", pedals, "250");
+        }
+        rec.Finish(start.AddSeconds(20));
+        rec.Ride.Rebuild();
+        var p = rec.Ride.Samples.Select(x => x.PowerW).ToArray();
+        Assert.Equal(250, p[4]);   // t = 5 s : les pédales comptent encore
+        Assert.Equal(150, p[10]);  // plus de 3 s sans les pédales : le trainer reprend
     }
 
     [Fact]
@@ -173,11 +236,20 @@ public class StoreTests : IDisposable
     readonly string _dir = Path.Combine(Path.GetTempPath(), "velom3d-tests-" + Guid.NewGuid().ToString("N"));
     public void Dispose() { if (Directory.Exists(_dir)) Directory.Delete(_dir, true); }
 
-    static Ride MakeRide(DateTimeOffset at, int watts)
+    /// <summary>Sortie avec un trainer qui envoie puissance, cadence et cardio chaque seconde.</summary>
+    static Ride MakeRide(DateTimeOffset at, int watts, int seconds = 90, RiderProfile? profile = null)
     {
-        var rec = new RideRecorder(RideMode.TargetPower, new RiderProfile(), at, watts);
-        for (int i = 0; i < 90; i++) rec.Tick(1.0, watts, 88.5, 150);
-        return rec.Finish();
+        var rec = new RideRecorder(RideMode.TargetPower, profile ?? new RiderProfile(), at, watts);
+        int trainer = rec.SensorIndex("AA:BB", "KICKR, CORE", DeviceKind.Trainer, ["1826"], new DeviceSpecs { PowerMaxW = 2200 });
+        for (int i = 0; i < seconds; i++)
+        {
+            var t = at.AddSeconds(i);
+            rec.Log(t, "power", trainer, watts.ToString());
+            rec.Log(t, "cadence", trainer, "88.5");
+            rec.Log(t, "hr", trainer, "150");
+            rec.Tick(1.0, watts, 88.5, 150);
+        }
+        return rec.Finish(at.AddSeconds(seconds));
     }
 
     [Fact]
@@ -204,16 +276,11 @@ public class StoreTests : IDisposable
     }
 
     [Fact]
-    public void Weights_pauses_and_clock_are_saved()
+    public void Header_keeps_weights_sensors_and_their_specs()
     {
         var store = new RideStore(_dir);
         var start = new DateTimeOffset(2026, 10, 13, 18, 0, 0, TimeSpan.FromHours(2));
-        var rec = new RideRecorder(RideMode.TargetPower, new RiderProfile { RiderMassKg = 68, BikeMassKg = 9 }, start, 200);
-        for (int i = 0; i < 5; i++) rec.Tick(1.0, 200, 90, 0);
-        rec.Pause(start.AddSeconds(5));
-        rec.Resume(start.AddSeconds(35));
-        for (int i = 0; i < 5; i++) rec.Tick(1.0, 200, 90, 0);
-        var ride = rec.Finish(start.AddSeconds(40));
+        var ride = MakeRide(start, 200, 10, new RiderProfile { RiderMassKg = 68, BikeMassKg = 9 });
         store.Save(ride);
 
         var info = store.List()[0];
@@ -222,39 +289,56 @@ public class StoreTests : IDisposable
         Assert.Equal(BikePhysics.DefaultCrr, info.Crr);
         Assert.Equal(BikePhysics.DefaultCdA, info.CdA);
         Assert.Equal(2105, info.WheelCircumferenceMm);
-        Assert.Equal(start.AddSeconds(40), info.EndedAt);
-        Assert.Equal(start.AddSeconds(35), Assert.Single(info.Pauses).ResumedAt);
-        var csv = File.ReadAllLines(Path.Combine(_dir, ride.Info.Id + ".csv"));
-        Assert.EndsWith(",clock", csv[0]);
-        Assert.EndsWith(",2026-10-13T18:00:36+02:00", csv[6]);
-        Assert.Equal(10, store.Load(ride.Info.Id)!.Samples.Count);
+        Assert.Equal(start.AddSeconds(10), info.EndedAt);
+        var sensor = Assert.Single(info.Sensors);
+        Assert.Equal((1, "KICKR, CORE", DeviceKind.Trainer, 2200), (sensor.Index, sensor.Name, sensor.Kind, sensor.Specs.PowerMaxW));
     }
 
     [Fact]
-    public void Raw_log_is_appended_untouched_and_kept_by_reloaded_rides()
+    public void Data_file_has_one_line_per_value_is_appended_and_kept_by_reloaded_rides()
     {
         var store = new RideStore(_dir);
         var start = new DateTimeOffset(2026, 10, 13, 18, 0, 0, TimeSpan.FromHours(2));
         var rec = new RideRecorder(RideMode.TargetPower, new RiderProfile(), start, 200);
-        rec.LogRaw(start.AddMilliseconds(250), RawDirection.Received, "KICKR, CORE", "AA:BB", "2ad2", RawEntry.Hex([0x44, 0x02, 0xC8, 0x00]));
-        rec.Tick(1.0, 200, 90, 0);
+        int trainer = rec.SensorIndex("AA:BB", "KICKR", DeviceKind.Trainer, [], new DeviceSpecs());
+        rec.Log(start.AddMilliseconds(250), "power", trainer, "203");
+        rec.Tick(1.0, 203, 90, 0);
         store.Save(rec.Ride); // sauvegarde automatique en cours de sortie
-        rec.LogRaw(start.AddSeconds(1.5), RawDirection.Sent, "KICKR", "AA:BB", "2ad9", RawEntry.Hex([0x05, 0xD2, 0x00]));
+        rec.Log(start.AddSeconds(1.5), "set_power", trainer, "210");
         rec.Pause(start.AddSeconds(2));
         store.Save(rec.Finish(start.AddSeconds(3)));
 
-        var path = store.RawFile(rec.Ride.Info.Id);
+        var path = Path.Combine(_dir, rec.Ride.Info.Id + ".csv");
         var lines = File.ReadAllLines(path);
-        Assert.Equal("clock,ride_s,dir,device,address,channel,data", lines[0]);
-        Assert.Equal("2026-10-13T18:00:00.250+02:00,0,rx,KICKR  CORE,AA:BB,2ad2,4402C800", lines[1]);
-        Assert.Equal("2026-10-13T18:00:01.500+02:00,1,tx,KICKR,AA:BB,2ad9,05D200", lines[2]);
-        Assert.EndsWith(",app,,,pause,", lines[3]);
-        Assert.EndsWith(",app,,,finish,", lines[4]);
-        Assert.Equal(5, lines.Length);
+        Assert.Equal(
+            ["t,type,sensor,value", "0,start,0,TargetPower", "0,grade,0,0", "0,target_power,0,200", "0.25,power,1,203",
+             "1.5,set_power,1,210", "2,pause,0,", "3,finish,0,"],
+            lines);
+        Assert.Equal(2, Directory.GetFiles(_dir).Length - 0); // {id}.json + {id}.csv, rien d'autre
 
-        // Relue depuis l'historique puis réenregistrée : le journal brut reste intact.
-        store.Save(store.Load(rec.Ride.Info.Id)!);
+        // Relue depuis l'historique puis réenregistrée : le fichier de données reste intact.
+        var loaded = store.Load(rec.Ride.Info.Id)!;
+        Assert.Equal(7, loaded.Events.Count);
+        Assert.Equal(2, loaded.Samples.Count);
+        Assert.Equal(203, loaded.Samples[1].PowerW);
+        Assert.Single(loaded.Pauses);
+        store.Save(loaded);
         Assert.Equal(lines, File.ReadAllLines(path));
+    }
+
+    [Fact]
+    public void Rides_saved_in_the_old_per_second_format_still_load()
+    {
+        var store = new RideStore(_dir);
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Path.Combine(_dir, "old.json"), """{ "Id": "old", "Mode": "TargetPower", "FtpW": 200 }""");
+        File.WriteAllText(Path.Combine(_dir, "old.csv"),
+            "time_s,power_w,cadence_rpm,heart_rate_bpm,speed_kmh,distance_m,grade_pct,target_power_w\n1,210,90,140,30,8,0,200\n2,220,91,141,31,17,0,200\n");
+        var ride = store.Load("old")!;
+        Assert.Equal([210, 220], ride.Samples.Select(x => x.PowerW));
+        Assert.Empty(ride.Events);
+        store.Save(ride);
+        Assert.StartsWith("time_s", File.ReadAllLines(Path.Combine(_dir, "old.csv"))[0]);
     }
 
     [Fact]

@@ -72,8 +72,9 @@ public sealed class RideInfo
     public int WheelCircumferenceMm { get; set; }
     /// <summary>Heure de fin (appui sur Terminer), absente tant que la sortie est en cours.</summary>
     public DateTimeOffset? EndedAt { get; set; }
-    /// <summary>Pauses dans l'ordre, avec leurs heures.</summary>
-    public List<RidePause> Pauses { get; set; } = new();
+    /// <summary>Capteurs utilisés, avec leur fiche. Leur numéro (1, 2, 3…) est celui de la colonne
+    /// <c>sensor</c> du fichier de données ; 0 désigne l'appli.</summary>
+    public List<RideSensor> Sensors { get; set; } = new();
     /// <summary>Transmission virtuelle utilisée (« 52/36 × 11-30 (12 v.) »), vide sinon.</summary>
     public string VirtualGears { get; set; } = "";
     /// <summary>Nom de l'entraînement structuré suivi, vide sinon.</summary>
@@ -83,23 +84,17 @@ public sealed class RideInfo
     public RideSummary Summary { get; set; } = new();
 }
 
-/// <summary>Une pause : heure de début et de reprise, et temps de sortie écoulé à ce moment.
-/// <see cref="ResumedAt"/> reste vide pour une sortie terminée pendant la pause.</summary>
-public sealed class RidePause
-{
-    public DateTimeOffset PausedAt { get; set; }
-    public DateTimeOffset? ResumedAt { get; set; }
-    public double AtElapsedS { get; set; }
-
-    [JsonIgnore] public double DurationS => ResumedAt is { } r ? Math.Max(0, (r - PausedAt).TotalSeconds) : 0;
-}
-
 public sealed class Ride
 {
     public RideInfo Info { get; }
-    public List<RideSample> Samples { get; }
-    /// <summary>Tout ce qui a été reçu des capteurs et envoyé au trainer pendant la sortie (vide pour une sortie relue).</summary>
-    public RawLog Raw { get; } = new();
+    /// <summary>Mesures seconde par seconde, reconstruites depuis <see cref="Events"/> (pour les graphiques et le bilan).</summary>
+    public List<RideSample> Samples { get; private set; }
+    /// <summary>Pauses, déduites de <see cref="Events"/>.</summary>
+    public List<RidePause> Pauses { get; private set; } = new();
+    /// <summary>Le fichier de données : chaque valeur reçue, chaque consigne et chaque événement, dans l'ordre.</summary>
+    public List<RideEvent> Events { get; } = new();
+    /// <summary>Lignes de <see cref="Events"/> déjà écrites sur l'appareil.</summary>
+    public int SavedEvents { get; set; }
 
     public Ride(RideInfo info, List<RideSample>? samples = null)
     {
@@ -109,13 +104,10 @@ public sealed class Ride
 
     public static string NewId(DateTimeOffset startedAt) => startedAt.ToUniversalTime().ToString("yyyyMMdd-HHmmss");
 
-    /// <summary>Heure réelle d'une mesure : départ + temps de sortie + pauses terminées avant elle.</summary>
-    public DateTimeOffset ClockAt(double timeS)
+    /// <summary>Recalcule les mesures et les pauses à partir du fichier de données.</summary>
+    public void Rebuild()
     {
-        double paused = 0;
-        foreach (var p in Info.Pauses)
-            if (p.AtElapsedS < timeS) paused += p.DurationS;
-        return Info.StartedAt.AddSeconds(timeS + paused);
+        (Samples, Pauses) = RideReplay.Run(Info, Events);
     }
 
     /// <summary>W/kg avec le poids du cycliste enregistré, 0 si inconnu.</summary>

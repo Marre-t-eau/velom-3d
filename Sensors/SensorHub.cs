@@ -27,9 +27,11 @@ public partial class SensorHub : Node
     [Signal] public delegate void ControlResultEventHandler(int requestOpcode, bool ok);
     [Signal] public delegate void StatusMessageEventHandler(string text);
 
-    /// <summary>Chaque trame BLE telle quelle : adresse, UUID court, octets, true si envoyée au trainer.
-    /// Sert au journal brut des sorties.</summary>
-    public event System.Action<string, string, byte[], bool>? RawFrame;
+    /// <summary>Chaque valeur reçue d'un capteur, telle qu'il l'envoie : adresse, type, valeur
+    /// (voir <see cref="SensorValues"/>). Sert au fichier de données des sorties.</summary>
+    public event System.Action<string, string, string>? Measured;
+    /// <summary>Chaque commande envoyée au trainer : adresse, type, valeur.</summary>
+    public event System.Action<string, string, string>? Commanded;
 
     public SensorFusion Fusion { get; } = new();
     /// <summary>Appareils vus au scan et état de leur connexion.</summary>
@@ -86,9 +88,11 @@ public partial class SensorHub : Node
         AddChild(backend);
         backend.Notified += (address, charUuid, data) =>
         {
-            RawFrame?.Invoke(address, charUuid, data, false);
+            if (Measured is { } measured)
+                foreach (var (type, value) in SensorValues.Decode(charUuid, data)) measured(address, type, value);
             Fusion.Feed(address, charUuid, data, Now);
         };
+        backend.Read += (address, charUuid, data) => Devices.Get(address)?.Specs.Apply(charUuid, data);
         backend.DeviceFound += (a, n, s, rssi) => Devices.Found(a, n, s, rssi, Now);
         backend.ScanFinished += () =>
         {
@@ -168,7 +172,8 @@ public partial class SensorHub : Node
 
     void Write(string address, byte[] frame)
     {
-        RawFrame?.Invoke(address, BleUuids.ToShort(BleUuids.FitnessMachineControlPoint), frame, true);
+        if (Commanded is { } commanded)
+            foreach (var (type, value) in SensorValues.Command(frame)) commanded(address, type, value);
         Backend!.Write(address, BleUuids.FitnessMachineControlPoint, frame);
     }
 

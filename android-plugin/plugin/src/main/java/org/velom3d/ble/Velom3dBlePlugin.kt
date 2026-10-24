@@ -58,6 +58,7 @@ class Velom3dBlePlugin(godot: Godot) : GodotPlugin(godot) {
         SignalInfo("connected", String::class.java, String::class.java),
         SignalInfo("disconnected", String::class.java),
         SignalInfo("notified", String::class.java, String::class.java, ByteArray::class.java),
+        SignalInfo("read_result", String::class.java, String::class.java, ByteArray::class.java),
         SignalInfo("error", String::class.java),
         SignalInfo("permissions_result", Boolean::class.javaObjectType),
     )
@@ -206,6 +207,7 @@ class Velom3dBlePlugin(godot: Godot) : GodotPlugin(godot) {
     private sealed class GattOp {
         class Subscribe(val characteristic: BluetoothGattCharacteristic) : GattOp()
         class Write(val uuid: UUID, val data: ByteArray) : GattOp()
+        class Read(val characteristic: BluetoothGattCharacteristic) : GattOp()
         /** Fin des abonnements : l'appareil est prêt, on prévient le jeu. */
         object Ready : GattOp()
     }
@@ -243,6 +245,7 @@ class Velom3dBlePlugin(godot: Godot) : GodotPlugin(godot) {
             val started = when (op) {
                 is GattOp.Subscribe -> subscribe(g, op.characteristic)
                 is GattOp.Write -> write(g, op)
+                is GattOp.Read -> g.readCharacteristic(op.characteristic)
                 GattOp.Ready -> {
                     emit("connected", address, services)
                     false
@@ -320,6 +323,10 @@ class Velom3dBlePlugin(godot: Godot) : GodotPlugin(godot) {
                 g.services.flatMap { it.characteristics }
                     .filter { it.uuid in SUBSCRIBE }
                     .forEach { enqueue(GattOp.Subscribe(it)) }
+                // Fiche de l'appareil (fabricant, plages de puissance…), lue une fois avant d'annoncer la connexion.
+                g.services.flatMap { it.characteristics }
+                    .filter { it.uuid in READ && it.properties and BluetoothGattCharacteristic.PROPERTY_READ != 0 }
+                    .forEach { enqueue(GattOp.Read(it)) }
                 enqueue(GattOp.Ready)
             }
         }
@@ -331,6 +338,24 @@ class Velom3dBlePlugin(godot: Godot) : GodotPlugin(godot) {
         override fun onCharacteristicWrite(g: BluetoothGatt, ch: BluetoothGattCharacteristic, status: Int) {
             main.post {
                 if (status != BluetoothGatt.GATT_SUCCESS) emit("error", "Écriture refusée par $address (code $status).")
+                if (busy) done()
+            }
+        }
+
+        override fun onCharacteristicRead(g: BluetoothGatt, ch: BluetoothGattCharacteristic, value: ByteArray, status: Int) {
+            main.post {
+                if (status == BluetoothGatt.GATT_SUCCESS) emit("read_result", address, ch.uuid.toString(), value.copyOf())
+                if (busy) done()
+            }
+        }
+
+        @Deprecated("Remplacée par la version avec value à partir d'Android 13")
+        override fun onCharacteristicRead(g: BluetoothGatt, ch: BluetoothGattCharacteristic, status: Int) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return
+            @Suppress("DEPRECATION")
+            val value = ch.value ?: ByteArray(0)
+            main.post {
+                if (status == BluetoothGatt.GATT_SUCCESS) emit("read_result", address, ch.uuid.toString(), value.copyOf())
                 if (busy) done()
             }
         }
@@ -360,6 +385,12 @@ class Velom3dBlePlugin(godot: Godot) : GodotPlugin(godot) {
         val SCAN_SERVICES = listOf(sig("1826"), sig("1818"), sig("180d"), sig("1816"))
 
         /** Mesures (notify) et Control Point FTMS (indicate) auxquels on s'abonne. */
+        /** Lues une fois à la connexion : informations de l'appareil, plages FTMS, fonctions. */
+        val READ = setOf(
+            sig("2a29"), sig("2a24"), sig("2a25"), sig("2a27"), sig("2a26"), sig("2a28"),
+            sig("2acc"), sig("2ad5"), sig("2ad6"), sig("2ad8"), sig("2a65"), sig("2a5d"), sig("2a38"),
+        )
+
         val SUBSCRIBE = setOf(sig("2ad2"), sig("2ad9"), sig("2ada"), sig("2a63"), sig("2a37"), sig("2a5b"))
     }
 }

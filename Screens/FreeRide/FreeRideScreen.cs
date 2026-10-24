@@ -89,7 +89,7 @@ public partial class FreeRideScreen : Screen
     public override void _ExitTree()
     {
         Hub.StatusMessage -= ShowTrainerStatus;
-        Hub.RawFrame -= OnRawFrame;
+        StopDataLog();
         DisplayServer.ScreenSetKeepOn(false);
     }
 
@@ -330,7 +330,7 @@ public partial class FreeRideScreen : Screen
         _target = 0;
         Progress = new WorkoutProgress(workout, _profile.FtpW);
         Recorder = new RideRecorder(RideMode.Workout, _profile, DateTimeOffset.Now, Progress.TargetW ?? 0, workout.Name);
-        StartRawLog($"workout {workout.Name}");
+        StartDataLog();
         Gears = null;
         _workoutChart.Workout = workout;
         _workoutChart.FtpW = _profile.FtpW;
@@ -496,7 +496,7 @@ public partial class FreeRideScreen : Screen
 
         Recorder = new RideRecorder(mode, _profile, DateTimeOffset.Now, targetW);
         Gears = mode == RideMode.Simulation && _profile.VirtualGears ? _profile.CreateDrivetrain() : null;
-        StartRawLog(Gears is null ? mode.ToString() : $"{mode} {Gears.Describe()} {Gears.GearLabel}");
+        StartDataLog();
         _smoothCadence = Hub.Cadence;
         if (Hub.TrainerAddress != "")
         {
@@ -556,19 +556,36 @@ public partial class FreeRideScreen : Screen
         Recorder?.LogEvent("gear", Gears!.GearLabel);
     }
 
-    /// <summary>Journal brut : toutes les trames BLE à partir d'ici, jusqu'à la fin de la sortie.</summary>
-    void StartRawLog(string mode)
+    /// <summary>Fichier de données : chaque valeur des capteurs et chaque commande au trainer à partir
+    /// d'ici, jusqu'à la fin. Les capteurs connectés entrent dans l'en-tête avec leur fiche.</summary>
+    void StartDataLog()
     {
-        Hub.RawFrame -= OnRawFrame;
-        Hub.RawFrame += OnRawFrame;
+        Hub.Measured -= OnMeasured;
+        Hub.Measured += OnMeasured;
+        Hub.Commanded -= OnMeasured;
+        Hub.Commanded += OnMeasured;
         foreach (var d in Hub.Devices.Sorted)
-            if (d.State == LinkState.Connected) Recorder!.LogEvent("device", $"{d.DisplayName} {d.Address}");
-        Recorder!.LogEvent("start", mode);
+            if (d.State == LinkState.Connected) SensorIndex(d.Address);
+        if (Gears is not null) Recorder!.LogEvent("gear", Gears.GearLabel);
     }
 
-    void OnRawFrame(string address, string channel, byte[] data, bool sent) =>
-        Recorder?.LogRaw(DateTimeOffset.Now, sent ? RawDirection.Sent : RawDirection.Received,
-            Hub.Devices.Get(address)?.DisplayName ?? "", address, channel, RawEntry.Hex(data));
+    void StopDataLog()
+    {
+        Hub.Measured -= OnMeasured;
+        Hub.Commanded -= OnMeasured;
+    }
+
+    int SensorIndex(string address)
+    {
+        var d = Hub.Devices.Get(address);
+        return Recorder!.SensorIndex(address, d?.DisplayName ?? address, d?.Kind ?? DeviceKind.Unknown, d?.Services ?? [], d?.Specs ?? new DeviceSpecs());
+    }
+
+    void OnMeasured(string address, string type, string value)
+    {
+        if (Recorder is null) return;
+        Recorder.Log(DateTimeOffset.Now, type, SensorIndex(address), value);
+    }
 
     void ChangeTarget(int delta)
     {
@@ -606,7 +623,11 @@ public partial class FreeRideScreen : Screen
     internal void Finish()
     {
         if (Recorder is null) return;
+        // On rend la main au cycliste : plus de consigne ERG après la sortie (notée dans les données).
+        if (Hub.TrainerAddress != "") Hub.EnterSimulation(0.0);
         var ride = Recorder.Finish();
+        // Bilan calculé comme à la réouverture : depuis le fichier de données.
+        if (ride.Events.Exists(e => e.Sensor != RideEvent.App)) { ride.Rebuild(); ride.Summarize(); }
         // Test FTP réussi : la nouvelle FTP est enregistrée tout de suite dans les réglages.
         int? newFtp = Progress?.FtpTestResultW;
         int oldFtp = _profile.FtpW;
@@ -617,11 +638,9 @@ public partial class FreeRideScreen : Screen
             _profile.FtpTestedAt = DateTimeOffset.Now;
         }
         Recorder = null;
-        Hub.RawFrame -= OnRawFrame;
+        StopDataLog();
         Gears = null;
         Progress = null;
-        // On rend la main au cycliste : plus de consigne ERG après la sortie.
-        if (Hub.TrainerAddress != "") Hub.EnterSimulation(0.0);
         DisplayServer.ScreenSetKeepOn(false);
         if (ride.Samples.Count == 0)
         {

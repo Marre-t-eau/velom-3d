@@ -85,18 +85,20 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
   entraînement comme en sortie libre à puissance imposée.
 - **Mes sorties** (`Screens/RideHistory/`) : toutes les sorties, la plus récente en haut.
 
-Les sorties sont enregistrées sur l'appareil, dans `user://rides/` : `{id}.json` (en-tête et
-résumé) et `{id}.csv` (une ligne par seconde, lisible dans un tableur), plus `profile.json`
-(FTP, poids, roue, vitesses virtuelles, dernier mode). Le CSV garde à chaque seconde la consigne
-ERG et la cadence demandée (`target_power_w`, `target_cadence_rpm`, 0 sans cible) et l'heure réelle
-(`clock`, pauses déduites). Le JSON garde le poids du cycliste et du vélo (W/kg dans le bilan), la résistance des
-pneus (Crr), le CdA et la roue,
-l'heure de fin et chaque pause (début, reprise, temps de sortie écoulé).
-`{id}.raw.csv` est le journal brut : chaque trame BLE reçue des capteurs (`rx`) ou envoyée au
-trainer (`tx`), en hexadécimal, sans décodage, à la milliseconde, pauses comprises, plus les
-événements de l'appli (`app` : départ, capteurs connectés, vitesse, pause, reprise, fin). Il
-permet de tout retraiter plus tard (intervalles RR, équilibre gauche/droite…). Compter environ
-6 Mo par heure. Les
+Les sorties sont enregistrées sur l'appareil, dans `user://rides/`, deux fichiers par sortie
+(détail dans `docs/format-des-donnees.md`) :
+- `{id}.csv`, le fichier de données, sans aucun traitement : une ligne par valeur reçue,
+  `t,type,sensor,value` (secondes depuis le départ, pauses comprises ; `power`, `cadence`, `hr`,
+  `rr`, `resistance`, `speed`, `crank_revs`… ; n° du capteur dans l'en-tête, 0 pour l'appli).
+  L'appli y note aussi ses événements et ses commandes : départ, consignes, vitesses, pause,
+  reprise, fin, commandes envoyées au trainer (`set_power`, `set_grade`…).
+- `{id}.json`, l'en-tête : réglages du jour (FTP, poids du cycliste et du vélo, Crr, CdA, roue),
+  capteurs numérotés avec leur fiche lue à la connexion (fabricant, modèle, plages de puissance,
+  de résistance et de pente, fonctions), et le bilan pour la liste.
+
+Les mesures seconde par seconde (graphiques, bilan) sont reconstruites en rejouant le fichier de
+données avec la même physique (`Rides/Core/RideEvents.cs`). Les sorties enregistrées avant ce
+format (une ligne par seconde) restent lisibles. `profile.json` garde les réglages. Les
 entraînements sont dans `user://workouts/{id}.json`. Pendant une sortie, enregistrement toutes les 30 s et à la mise en
 arrière-plan. Le calcul (`Rides/Core/`) ne dépend pas de Godot et est testé par `dotnet test`.
 

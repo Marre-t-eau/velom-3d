@@ -19,6 +19,8 @@ public sealed class DeviceEntry
     public LinkState State { get; internal set; } = LinkState.Available;
     public double LastSeen { get; internal set; }
     internal double ConnectingSince;
+    /// <summary>Fiche lue à la connexion (fabricant, plages de puissance…).</summary>
+    public DeviceSpecs Specs { get; } = new();
 
     public string DisplayName => Name.Length > 0 ? Name : Address;
 }
