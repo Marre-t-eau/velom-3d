@@ -19,6 +19,8 @@ public partial class RideSummaryScreen : Screen
     public bool JustFinished { get; set; }
     /// <summary>FTP avant la sortie, pour annoncer celle mesurée par un test FTP.</summary>
     public int PreviousFtpW { get; set; }
+    /// <summary>D'où vient la FTP mesurée (20 min ou rampe).</summary>
+    public string FtpTestExplanation { get; set; } = "";
 
     /// <summary>Graphiques affichés (pour les tests).</summary>
     internal int ChartCount { get; private set; }
@@ -109,7 +111,7 @@ public partial class RideSummaryScreen : Screen
         {
             int diff = info.FtpTestW - PreviousFtpW;
             string change = PreviousFtpW <= 0 ? "" : diff == 0 ? $" C'est la même qu'avant." : $" Avant : {PreviousFtpW} W ({diff:+0;-0} W).";
-            Inform($"Nouvelle FTP : {info.FtpTestW} W", $"95 % de votre moyenne sur les 20 minutes d'effort.{change} "
+            Inform($"Nouvelle FTP : {info.FtpTestW} W", $"{FtpTestExplanation}{change} "
                    + "Elle est enregistrée dans les Réglages : vos entraînements en % de FTP s'y adaptent.");
         }
     }

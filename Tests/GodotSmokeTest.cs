@@ -351,8 +351,8 @@ public partial class GodotSmokeTest : Node
         int oldFtp = Screen.Store.LoadProfile().FtpW;
         var test = new Workout
         {
-            Id = "test-ftp", Name = "Test FTP court", Unit = Velom3d.Rides.PowerUnit.PercentFtp,
-            Blocks = [new() { DurationS = 4, Kind = BlockPower.Free, FtpTest = true }, new() { DurationS = 60, Power = 50 }],
+            Id = "test-ftp", Name = "Test FTP court", Unit = Velom3d.Rides.PowerUnit.Watts,
+            Blocks = [new() { DurationS = 4, Kind = BlockPower.Free, FtpTest = true }, new() { DurationS = 60, Power = 100 }],
         };
         ride = Navigator.Create<FreeRideScreen>(Navigator.FreeRide);
         ride.Workout = test;
@@ -377,6 +377,25 @@ public partial class GodotSmokeTest : Node
             ftpSummary.QueueFree();
         }
         else Check(false, "Test FTP : ouverture du bilan");
+
+        // Test rampe : paliers en ERG ; le cycliste ne tient plus (cadence < 40) : retour au calme.
+        ride = Navigator.Create<FreeRideScreen>(Navigator.FreeRide);
+        ride.Workout = Workout.RampTestWorkout();
+        AddChild(ride);
+        await Wait(0.3);
+        ride.SkipBlock(); // échauffement
+        await Wait(1.0);
+        Check(ride.Progress?.Current?.RampTest == true && sim.Model.ErgMode && sim.Model.TargetPowerW == Workout.RampStartW,
+            $"Test rampe : premier palier en ERG à {Workout.RampStartW} W, quelle que soit la FTP ({sim.Model.TargetPowerW} W)");
+        sim.Model.RiderCadenceRpm = 20;
+        await Wait(10.0); // la cadence mesurée met ~3 s à tomber, puis 5 s sous 40 tr/min
+        Check(ride.Progress?.Current is { RampTest: false }, "Test rampe : cadence effondrée, le test s'arrête et passe au retour au calme");
+        sim.Model.RiderCadenceRpm = 88;
+        ride.Finish();
+        await Wait(0.2);
+        ride.QueueFree();
+        (next() as Node)?.Free();
+        setNext(null);
     }
 
     SignalAwaiter Wait(double s) => ToSignal(GetTree().CreateTimer(s), SceneTreeTimer.SignalName.Timeout);
