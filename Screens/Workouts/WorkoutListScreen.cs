@@ -41,6 +41,8 @@ public partial class WorkoutListScreen : Screen
 
         var list = Ui.AddScroll(root, 12);
         list.AddChild(Card(Workout.FtpTestWorkout(), "Test FTP : 20 min à fond, la FTP vaut 95 % de la moyenne."));
+        list.AddChild(Card(Workout.RampTestWorkout(), "Test FTP : paliers de 1 min, de 100 W, +20 W chaque minute, jusqu'à ne plus tenir. "
+                                                      + "La FTP vaut 75 % de la meilleure minute."));
         var workouts = Workouts.List();
         WorkoutCount = workouts.Count;
         if (workouts.Count == 0)
@@ -61,8 +63,10 @@ public partial class WorkoutListScreen : Screen
         var titles = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass };
         top.AddChild(titles);
         titles.AddChild(Ui.Label(w.Name.Length > 0 ? w.Name : "Sans nom", 26));
-        titles.AddChild(Ui.Label($"{Ui.Duration(w.TotalDurationS)} · {w.Blocks.Count} bloc(s) · ≈ {w.EstimatedTss(_ftpW):0} TSS · "
-                                 + (w.Unit == PowerUnit.PercentFtp ? "en % de FTP" : "en watts"), 18, Ui.Muted));
+        // Test rampe : sa durée dépend de quand on lâche, la durée et le TSS « prévus » n'ont pas de sens.
+        titles.AddChild(Ui.Label(w.Blocks.Exists(b => b.RampTest) ? "20 à 30 min selon votre forme"
+            : $"{Ui.Duration(w.TotalDurationS)} · {w.Blocks.Count} bloc(s) · ≈ {w.EstimatedTss(_ftpW):0} TSS · "
+              + (w.Unit == PowerUnit.PercentFtp ? "en % de FTP" : "en watts"), 18, Ui.Muted));
         if (fixedNote.Length > 0) titles.AddChild(Ui.Label(fixedNote, 18, Ui.Accent));
         else top.AddChild(Ui.Button("Modifier", () => Edit(w), 180, 72, 22));
         var start = Ui.Button("Démarrer", () => StartWorkout(w), 200, 72, 22);
