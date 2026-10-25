@@ -243,3 +243,45 @@ public class FtpTestTests
 
     static System.Collections.Generic.List<Workout> Examples() => Workout.Examples(System.DateTimeOffset.Now);
 }
+
+public class RampTestTests
+{
+    [Fact]
+    public void Ramp_test_climbs_6_percent_per_minute()
+    {
+        var w = Workout.RampTestWorkout();
+        var steps = w.Blocks.FindAll(b => b.RampTest);
+        Assert.Equal(Workout.RampSteps, steps.Count);
+        Assert.All(steps, s => Assert.Equal(60, s.DurationS));
+        Assert.Equal(100, w.TargetW(steps[0], 0, 200));
+        Assert.Equal(112, w.TargetW(steps[1], 0, 200));
+    }
+
+    [Fact]
+    public void Ftp_is_75_percent_of_best_minute_and_stops_on_failure()
+    {
+        var w = Workout.RampTestWorkout();
+        var p = new WorkoutProgress(w, 200);
+        p.Advance(300, 90); // échauffement : ne compte pas
+        // Le cycliste tient les paliers (à la consigne) pendant 10 min, par secondes.
+        for (int t = 0; t < 600; t++) p.Advance(1, p.TargetW ?? 0);
+        Assert.Equal(11, p.BlockIndex); // échauffement + 10 paliers passés : 11e palier
+        double best = p.RampBestMinuteW;
+        Assert.Equal(208, best, 0); // palier 10 : 50 + 9 × 6 = 104 % de 200 W
+        p.EndRampTest();
+        Assert.False(p.Current!.RampTest);
+        Assert.Equal(156, p.FtpTestResultW);
+        p.Advance(300, 50);
+        Assert.Equal(156, p.FtpTestResultW);
+    }
+
+    [Fact]
+    public void Too_short_ramp_gives_no_ftp()
+    {
+        var p = new WorkoutProgress(Workout.RampTestWorkout(), 200);
+        p.Advance(300, 90);
+        for (int t = 0; t < 120; t++) p.Advance(1, 400);
+        p.EndRampTest();
+        Assert.Null(p.FtpTestResultW);
+    }
+}

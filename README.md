@@ -50,6 +50,9 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
   intégré est toujours proposé en premier : échauffement, trois accélérations, 20 min à fond en
   puissance libre, retour au calme. Si l'effort a été roulé au moins à 90 %, la nouvelle FTP
   (95 % de la moyenne) est enregistrée dans les Réglages à la fin et annoncée dans une fenêtre.
+  Second test au choix, le **test rampe** : paliers de 1 min en ERG à partir de 50 % de FTP,
+  +6 % chaque minute, jusqu'à ne plus tenir (cadence sous 40 tr/min pendant 5 s, ou « J'arrête
+  le test ») ; la FTP vaut 75 % de la meilleure minute (au moins 3 min de paliers).
 - **Édition** (`Screens/WorkoutEditor/`) : nom, puissances en watts ou en % de FTP (la FTP des
   Réglages, au moment de rouler ; changer d'unité convertit les valeurs), et les blocs. Chaque bloc
   a une durée, une puissance *fixe*, *libre* ou en *rampe* (début → fin), et une cadence *libre* ou

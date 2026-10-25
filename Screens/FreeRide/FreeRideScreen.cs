@@ -59,6 +59,9 @@ public partial class FreeRideScreen : Screen
     VBoxContainer _upcoming = null!;
     readonly System.Collections.Generic.List<(Label Label, int StartS)> _upcomingStarts = new();
     Button _skipButton = null!;
+    /// <summary>Test rampe : temps passé sous 40 tr/min (le cycliste ne tient plus le palier).</summary>
+    double _rampStallS;
+    const double RampStallLimitS = 5.0;
     int _shownBlock = -1;
     /// <summary>Le trainer est-il en ERG ? null au départ (rien envoyé encore).</summary>
     bool? _workoutErg;
@@ -363,7 +366,9 @@ public partial class FreeRideScreen : Screen
     internal void SkipBlock()
     {
         if (Progress is null || Recorder is null) return;
-        Progress.SkipBlock();
+        // Pendant les paliers du test rampe, le bouton arrête le test (direction retour au calme).
+        if (Progress.Current is { RampTest: true }) Progress.EndRampTest();
+        else Progress.SkipBlock();
         UpdateWorkoutControl(0);
     }
 
@@ -416,9 +421,16 @@ public partial class FreeRideScreen : Screen
         var w = Workout!;
         foreach (var child in _upcoming.GetChildren()) child.QueueFree();
         _upcomingStarts.Clear();
+        int rampRows = 0;
         for (int i = current + 1; i < w.Blocks.Count; i++)
         {
             var b = w.Blocks[i];
+            // Test rampe : les 4 prochains paliers suffisent, la suite est « jusqu'à ne plus tenir ».
+            if (b.RampTest && ++rampRows > 4)
+            {
+                if (rampRows == 5) _upcoming.AddChild(Ui.Label("… +6 % de FTP chaque minute, jusqu'à ne plus tenir", 18, Ui.Muted));
+                continue;
+            }
             var row = Ui.Row(12);
             _upcoming.AddChild(row);
             var duration = Ui.Label(Ui.Duration(b.DurationS), 20);
@@ -463,12 +475,16 @@ public partial class FreeRideScreen : Screen
 
         if (progress.Current is { } b)
         {
-            _blockTitle.Text = b.FtpTest ? "Test FTP : à fond, régulier · reste" : $"Bloc {index + 1} / {w.Blocks.Count} · reste";
+            _blockTitle.Text = b.FtpTest ? "Test FTP : à fond, régulier · reste"
+                : b.RampTest ? $"Test rampe · palier {index - w.Blocks.FindIndex(x => x.RampTest) + 1} · reste"
+                : $"Bloc {index + 1} / {w.Blocks.Count} · reste";
             _blockRemaining.Text = Ui.Duration(Math.Ceiling(progress.BlockRemainingS));
             _blockPower.Text = b.FtpTest ? $"Moyenne {progress.FtpTestAveragePowerW:0} W"
                 : b.Kind == BlockPower.Ramp && progress.TargetW is { } now ? $"{now} W, vers {w.ToWatts(b.PowerEnd, progress.FtpW)} W"
                 : b.Kind == BlockPower.Free ? "Puissance libre" : BlockPowerText(b);
-            _blockCadence.Text = b.FreeCadence ? "Cadence libre" : $"Cadence {b.CadenceRpm} tr/min";
+            _blockCadence.Text = b.RampTest ? progress.RampBestMinuteW > 0 ? $"Meilleure minute {progress.RampBestMinuteW:0} W" : "Tenez le palier"
+                : b.FreeCadence ? "Cadence libre" : $"Cadence {b.CadenceRpm} tr/min";
+            _skipButton.Text = b.RampTest ? "J'arrête le test" : "Bloc suivant";
             _blockBar.Value = 1.0 - progress.BlockRemainingS / Math.Max(1, b.DurationS);
             _freeErgRow.Visible = b.Kind == BlockPower.Free;
             _skipButton.Disabled = false;
@@ -630,6 +646,7 @@ public partial class FreeRideScreen : Screen
         if (ride.Events.Exists(e => e.Sensor != RideEvent.App)) { ride.Rebuild(); ride.Summarize(); }
         // Test FTP réussi : la nouvelle FTP est enregistrée tout de suite dans les réglages.
         int? newFtp = Progress?.FtpTestResultW;
+        string ftpExplanation = Progress?.FtpTestExplanation ?? "";
         int oldFtp = _profile.FtpW;
         if (newFtp is { } ftp)
         {
@@ -653,6 +670,7 @@ public partial class FreeRideScreen : Screen
         summary.Ride = ride;
         summary.JustFinished = true;
         summary.PreviousFtpW = oldFtp;
+        summary.FtpTestExplanation = ftpExplanation;
         Navigator.GoTo(this, summary);
     }
 
@@ -663,6 +681,16 @@ public partial class FreeRideScreen : Screen
         double before = Recorder.ElapsedS;
         Recorder.Tick(delta, Hub.Power, Hub.Cadence, Hub.HeartRate);
         Progress?.Advance(Recorder.ElapsedS - before, Hub.Power);
+        // Test rampe : sous 40 tr/min pendant 5 s, le palier n'est plus tenu, le test s'arrête.
+        if (Progress?.Current is { RampTest: true } && !Recorder.IsPaused)
+        {
+            _rampStallS = Hub.Cadence < 40 ? _rampStallS + delta : 0;
+            if (_rampStallS >= RampStallLimitS)
+            {
+                _rampStallS = 0;
+                SkipBlock();
+            }
+        }
         if (Gears is not null) UpdateGearResistance(delta);
 
         _sinceAutosave += delta;

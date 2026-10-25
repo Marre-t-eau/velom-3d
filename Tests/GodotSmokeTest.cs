@@ -377,6 +377,26 @@ public partial class GodotSmokeTest : Node
             ftpSummary.QueueFree();
         }
         else Check(false, "Test FTP : ouverture du bilan");
+
+        // Test rampe : paliers en ERG ; le cycliste ne tient plus (cadence < 40) : retour au calme.
+        ride = Navigator.Create<FreeRideScreen>(Navigator.FreeRide);
+        ride.Workout = Workout.RampTestWorkout();
+        AddChild(ride);
+        await Wait(0.3);
+        ride.SkipBlock(); // échauffement
+        await Wait(1.0);
+        int ftpNow = Screen.Store.LoadProfile().FtpW;
+        Check(ride.Progress?.Current?.RampTest == true && sim.Model.ErgMode && sim.Model.TargetPowerW == ftpNow / 2,
+            $"Test rampe : premier palier en ERG à 50 % de FTP ({sim.Model.TargetPowerW} W)");
+        sim.Model.RiderCadenceRpm = 20;
+        await Wait(10.0); // la cadence mesurée met ~3 s à tomber, puis 5 s sous 40 tr/min
+        Check(ride.Progress?.Current is { RampTest: false }, "Test rampe : cadence effondrée, le test s'arrête et passe au retour au calme");
+        sim.Model.RiderCadenceRpm = 88;
+        ride.Finish();
+        await Wait(0.2);
+        ride.QueueFree();
+        (next() as Node)?.Free();
+        setNext(null);
     }
 
     SignalAwaiter Wait(double s) => ToSignal(GetTree().CreateTimer(s), SceneTreeTimer.SignalName.Timeout);

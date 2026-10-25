@@ -39,6 +39,8 @@ public sealed class WorkoutBlock
     public int CadenceRpm { get; set; }
     /// <summary>Bloc d'effort du test FTP : sa puissance moyenne donne la nouvelle FTP.</summary>
     public bool FtpTest { get; set; }
+    /// <summary>Palier du test rampe : la meilleure minute tenue sur ces paliers donne la nouvelle FTP.</summary>
+    public bool RampTest { get; set; }
 
     [JsonIgnore] public bool FreeCadence => CadenceRpm <= 0;
 
@@ -204,6 +206,27 @@ public sealed class Workout
         return w;
     }
 
+    public const string RampTestId = "ftp-ramp-test";
+    /// <summary>Test rampe : la FTP vaut 75 % de la meilleure minute.</summary>
+    public const double RampTestFactor = 0.75;
+    /// <summary>Paliers de 1 min, de 50 % de FTP, +6 % par minute (jusqu'à 254 %, bien au-delà de ce qu'on tient).</summary>
+    public const int RampStartPct = 50, RampStepPct = 6, RampSteps = 35;
+
+    /// <summary>Test rampe : échauffement, puis paliers de 1 min de plus en plus durs jusqu'à ne
+    /// plus tenir (le test s'arrête alors de lui-même), retour au calme. Toujours proposé, non modifiable.</summary>
+    public static Workout RampTestWorkout()
+    {
+        var w = new Workout
+        {
+            Id = RampTestId, Name = "Test FTP rampe", Unit = PowerUnit.PercentFtp,
+            Blocks = [new() { DurationS = 300, Kind = BlockPower.Ramp, Power = 30, PowerEnd = 45 }],
+        };
+        for (int i = 0; i < RampSteps; i++)
+            w.Blocks.Add(new() { DurationS = 60, Power = RampStartPct + i * RampStepPct, RampTest = true });
+        w.Blocks.Add(new() { DurationS = 300, Kind = BlockPower.Ramp, Power = 45, PowerEnd = 30 });
+        return w;
+    }
+
     /// <summary>Exemples proposés au premier lancement.</summary>
     public static List<Workout> Examples(DateTimeOffset at)
     {
@@ -269,20 +292,44 @@ public sealed class WorkoutProgress
     public int TargetCadenceRpm => Current is { FreeCadence: false } b ? b.CadenceRpm : 0;
 
     double _testWorkJ;
+    // Test rampe : fenêtre glissante de 60 s sur les paliers.
+    readonly Queue<(double Dt, double Work)> _window = new();
+    double _windowTimeS, _windowWorkJ;
+    /// <summary>Temps roulé sur les paliers du test rampe (s).</summary>
+    public double RampTestTimeS { get; private set; }
+    /// <summary>Meilleure puissance moyenne sur 60 s pendant les paliers (0 avant la première minute).</summary>
+    public double RampBestMinuteW { get; private set; }
+
     /// <summary>Temps roulé dans le bloc de test FTP (s).</summary>
     public double FtpTestTimeS { get; private set; }
     public double FtpTestAveragePowerW => FtpTestTimeS > 0 ? _testWorkJ / FtpTestTimeS : 0;
 
     /// <summary>Nouvelle FTP (95 % de la moyenne de l'effort) si le bloc de test a été roulé
     /// au moins à 90 % ; null sinon (pas de test, bloc sauté, sortie arrêtée trop tôt).</summary>
+    /// <summary>Test rampe : 75 % de la meilleure minute, si au moins 3 min de paliers ont été roulées.</summary>
     public int? FtpTestResultW
     {
         get
         {
-            var test = Workout.Blocks.Find(b => b.FtpTest);
-            if (test is null || FtpTestTimeS < test.DurationS * 0.9 || FtpTestAveragePowerW <= 0) return null;
-            return Math.Clamp((int)Math.Round(FtpTestAveragePowerW * Workout.FtpTestFactor), 50, 600);
+            if (Workout.Blocks.Find(b => b.FtpTest) is { } test)
+            {
+                if (FtpTestTimeS < test.DurationS * 0.9 || FtpTestAveragePowerW <= 0) return null;
+                return Math.Clamp((int)Math.Round(FtpTestAveragePowerW * Workout.FtpTestFactor), 50, 600);
+            }
+            if (!Workout.Blocks.Exists(b => b.RampTest) || RampTestTimeS < 180 || RampBestMinuteW <= 0) return null;
+            return Math.Clamp((int)Math.Round(RampBestMinuteW * Workout.RampTestFactor), 50, 600);
         }
+    }
+
+    /// <summary>D'où vient la FTP, en une phrase (fenêtre de fin).</summary>
+    public string FtpTestExplanation => Workout.Blocks.Exists(b => b.FtpTest)
+        ? $"95 % de votre moyenne sur les 20 minutes d'effort ({FtpTestAveragePowerW:0} W)."
+        : $"75 % de votre meilleure minute sur la rampe ({RampBestMinuteW:0} W).";
+
+    /// <summary>Fin des paliers du test rampe (le cycliste ne tient plus) : passe au retour au calme.</summary>
+    public void EndRampTest()
+    {
+        while (Current is { RampTest: true }) SkipBlock();
     }
 
     /// <summary>Avance de <paramref name="dt"/> secondes roulées à <paramref name="powerW"/>.</summary>
@@ -293,6 +340,21 @@ public sealed class WorkoutProgress
         {
             _testWorkJ += Math.Max(0, powerW) * dt;
             FtpTestTimeS += dt;
+        }
+        if (Current is { RampTest: true })
+        {
+            double work = Math.Max(0, powerW) * dt;
+            RampTestTimeS += dt;
+            _window.Enqueue((dt, work));
+            _windowTimeS += dt;
+            _windowWorkJ += work;
+            while (_window.Count > 1 && _windowTimeS - _window.Peek().Dt >= 60.0)
+            {
+                var (oldDt, oldWork) = _window.Dequeue();
+                _windowTimeS -= oldDt;
+                _windowWorkJ -= oldWork;
+            }
+            if (_windowTimeS >= 59.999) RampBestMinuteW = Math.Max(RampBestMinuteW, _windowWorkJ / _windowTimeS);
         }
         PositionS += dt;
     }
