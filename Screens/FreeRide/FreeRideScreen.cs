@@ -428,7 +428,7 @@ public partial class FreeRideScreen : Screen
             // Test rampe : les 4 prochains paliers suffisent, la suite est « jusqu'à ne plus tenir ».
             if (b.RampTest && ++rampRows > 4)
             {
-                if (rampRows == 5) _upcoming.AddChild(Ui.Label("… +6 % de FTP chaque minute, jusqu'à ne plus tenir", 18, Ui.Muted));
+                if (rampRows == 5) _upcoming.AddChild(Ui.Label("… +20 W chaque minute, jusqu'à ne plus tenir", 18, Ui.Muted));
                 continue;
             }
             var row = Ui.Row(12);

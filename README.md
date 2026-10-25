@@ -47,11 +47,12 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
 - **Entraînements** (`Screens/Workouts/`) : la liste des séances structurées, avec leur profil
   (couleur = zone de puissance), leur durée et le TSS prévu. Deux exemples sont créés au premier
   lancement. La FTP est rappelée en haut (avec la date du dernier test), et un **test FTP**
-  intégré est toujours proposé en premier : échauffement, trois accélérations, 20 min à fond en
+  intégré est toujours proposé en premier (en watts fixes, comme le test rampe, pour ne pas
+  dépendre de l'ancienne FTP) : échauffement, trois accélérations, 20 min à fond en
   puissance libre, retour au calme. Si l'effort a été roulé au moins à 90 %, la nouvelle FTP
   (95 % de la moyenne) est enregistrée dans les Réglages à la fin et annoncée dans une fenêtre.
-  Second test au choix, le **test rampe** : paliers de 1 min en ERG à partir de 50 % de FTP,
-  +6 % chaque minute, jusqu'à ne plus tenir (cadence sous 40 tr/min pendant 5 s, ou « J'arrête
+  Second test au choix, le **test rampe** : paliers de 1 min en ERG à partir de 100 W,
+  +20 W chaque minute, jusqu'à ne plus tenir (cadence sous 40 tr/min pendant 5 s, ou « J'arrête
   le test ») ; la FTP vaut 75 % de la meilleure minute (au moins 3 min de paliers).
 - **Édition** (`Screens/WorkoutEditor/`) : nom, puissances en watts ou en % de FTP (la FTP des
   Réglages, au moment de rouler ; changer d'unité convertit les valeurs), et les blocs. Chaque bloc

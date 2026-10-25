@@ -208,6 +208,7 @@ public class FtpTestTests
     public void Test_workout_has_one_20_minute_free_effort()
     {
         var w = Workout.FtpTestWorkout();
+        Assert.Equal(PowerUnit.Watts, w.Unit);
         var effort = Assert.Single(w.Blocks, b => b.FtpTest);
         Assert.Equal(BlockPower.Free, effort.Kind);
         Assert.Equal(Workout.FtpTestEffortS, effort.DurationS);
@@ -247,14 +248,16 @@ public class FtpTestTests
 public class RampTestTests
 {
     [Fact]
-    public void Ramp_test_climbs_6_percent_per_minute()
+    public void Ramp_test_climbs_20_watts_per_minute_whatever_the_ftp()
     {
         var w = Workout.RampTestWorkout();
         var steps = w.Blocks.FindAll(b => b.RampTest);
         Assert.Equal(Workout.RampSteps, steps.Count);
         Assert.All(steps, s => Assert.Equal(60, s.DurationS));
+        Assert.Equal(PowerUnit.Watts, w.Unit);
         Assert.Equal(100, w.TargetW(steps[0], 0, 200));
-        Assert.Equal(112, w.TargetW(steps[1], 0, 200));
+        Assert.Equal(120, w.TargetW(steps[1], 0, 200));
+        Assert.Equal(120, w.TargetW(steps[1], 0, 350));
     }
 
     [Fact]
@@ -267,12 +270,12 @@ public class RampTestTests
         for (int t = 0; t < 600; t++) p.Advance(1, p.TargetW ?? 0);
         Assert.Equal(11, p.BlockIndex); // échauffement + 10 paliers passés : 11e palier
         double best = p.RampBestMinuteW;
-        Assert.Equal(208, best, 0); // palier 10 : 50 + 9 × 6 = 104 % de 200 W
+        Assert.Equal(280, best, 0); // palier 10 : 100 + 9 × 20 W
         p.EndRampTest();
         Assert.False(p.Current!.RampTest);
-        Assert.Equal(156, p.FtpTestResultW);
+        Assert.Equal(210, p.FtpTestResultW);
         p.Advance(300, 50);
-        Assert.Equal(156, p.FtpTestResultW);
+        Assert.Equal(210, p.FtpTestResultW);
     }
 
     [Fact]

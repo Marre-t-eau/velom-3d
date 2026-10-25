@@ -187,30 +187,32 @@ public sealed class Workout
     public const double FtpTestFactor = 0.95;
 
     /// <summary>Test FTP de 20 minutes (protocole classique) : échauffement, trois accélérations,
-    /// récupération, 20 min à fond en puissance libre, retour au calme. Toujours proposé, non modifiable.</summary>
+    /// récupération, 20 min à fond en puissance libre, retour au calme. Toujours proposé, non modifiable.
+    /// En watts fixes : un test qui mesure la FTP ne dépend pas de l'ancienne.</summary>
     public static Workout FtpTestWorkout()
     {
         var w = new Workout
         {
-            Id = FtpTestId, Name = "Test FTP (20 min)", Unit = PowerUnit.PercentFtp,
-            Blocks = [new() { DurationS = 600, Kind = BlockPower.Ramp, Power = 50, PowerEnd = 75 }],
+            Id = FtpTestId, Name = "Test FTP (20 min)", Unit = PowerUnit.Watts,
+            Blocks = [new() { DurationS = 600, Kind = BlockPower.Ramp, Power = 100, PowerEnd = 150 }],
         };
         for (int i = 0; i < 3; i++)
         {
-            w.Blocks.Add(new() { DurationS = 60, Power = 100, CadenceRpm = 105 });
-            w.Blocks.Add(new() { DurationS = 60, Power = 55 });
+            w.Blocks.Add(new() { DurationS = 60, Power = 220, CadenceRpm = 105 });
+            w.Blocks.Add(new() { DurationS = 60, Power = 110 });
         }
-        w.Blocks.Add(new() { DurationS = 300, Power = 60 });
+        w.Blocks.Add(new() { DurationS = 300, Power = 130 });
         w.Blocks.Add(new() { DurationS = FtpTestEffortS, Kind = BlockPower.Free, FtpTest = true });
-        w.Blocks.Add(new() { DurationS = 600, Kind = BlockPower.Ramp, Power = 60, PowerEnd = 40 });
+        w.Blocks.Add(new() { DurationS = 600, Kind = BlockPower.Ramp, Power = 130, PowerEnd = 90 });
         return w;
     }
 
     public const string RampTestId = "ftp-ramp-test";
     /// <summary>Test rampe : la FTP vaut 75 % de la meilleure minute.</summary>
     public const double RampTestFactor = 0.75;
-    /// <summary>Paliers de 1 min, de 50 % de FTP, +6 % par minute (jusqu'à 254 %, bien au-delà de ce qu'on tient).</summary>
-    public const int RampStartPct = 50, RampStepPct = 6, RampSteps = 35;
+    /// <summary>Paliers de 1 min en watts fixes, de 100 W, +20 W par minute (jusqu'à 680 W, bien au-delà
+    /// de ce qu'on tient), indépendants de l'ancienne FTP.</summary>
+    public const int RampStartW = 100, RampStepW = 20, RampSteps = 30;
 
     /// <summary>Test rampe : échauffement, puis paliers de 1 min de plus en plus durs jusqu'à ne
     /// plus tenir (le test s'arrête alors de lui-même), retour au calme. Toujours proposé, non modifiable.</summary>
@@ -218,12 +220,12 @@ public sealed class Workout
     {
         var w = new Workout
         {
-            Id = RampTestId, Name = "Test FTP rampe", Unit = PowerUnit.PercentFtp,
-            Blocks = [new() { DurationS = 300, Kind = BlockPower.Ramp, Power = 30, PowerEnd = 45 }],
+            Id = RampTestId, Name = "Test FTP rampe", Unit = PowerUnit.Watts,
+            Blocks = [new() { DurationS = 300, Kind = BlockPower.Ramp, Power = 70, PowerEnd = 100 }],
         };
         for (int i = 0; i < RampSteps; i++)
-            w.Blocks.Add(new() { DurationS = 60, Power = RampStartPct + i * RampStepPct, RampTest = true });
-        w.Blocks.Add(new() { DurationS = 300, Kind = BlockPower.Ramp, Power = 45, PowerEnd = 30 });
+            w.Blocks.Add(new() { DurationS = 60, Power = RampStartW + i * RampStepW, RampTest = true });
+        w.Blocks.Add(new() { DurationS = 300, Kind = BlockPower.Ramp, Power = 100, PowerEnd = 70 });
         return w;
     }
 

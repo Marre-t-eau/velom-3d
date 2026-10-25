@@ -351,8 +351,8 @@ public partial class GodotSmokeTest : Node
         int oldFtp = Screen.Store.LoadProfile().FtpW;
         var test = new Workout
         {
-            Id = "test-ftp", Name = "Test FTP court", Unit = Velom3d.Rides.PowerUnit.PercentFtp,
-            Blocks = [new() { DurationS = 4, Kind = BlockPower.Free, FtpTest = true }, new() { DurationS = 60, Power = 50 }],
+            Id = "test-ftp", Name = "Test FTP court", Unit = Velom3d.Rides.PowerUnit.Watts,
+            Blocks = [new() { DurationS = 4, Kind = BlockPower.Free, FtpTest = true }, new() { DurationS = 60, Power = 100 }],
         };
         ride = Navigator.Create<FreeRideScreen>(Navigator.FreeRide);
         ride.Workout = test;
@@ -385,9 +385,8 @@ public partial class GodotSmokeTest : Node
         await Wait(0.3);
         ride.SkipBlock(); // échauffement
         await Wait(1.0);
-        int ftpNow = Screen.Store.LoadProfile().FtpW;
-        Check(ride.Progress?.Current?.RampTest == true && sim.Model.ErgMode && sim.Model.TargetPowerW == ftpNow / 2,
-            $"Test rampe : premier palier en ERG à 50 % de FTP ({sim.Model.TargetPowerW} W)");
+        Check(ride.Progress?.Current?.RampTest == true && sim.Model.ErgMode && sim.Model.TargetPowerW == Workout.RampStartW,
+            $"Test rampe : premier palier en ERG à {Workout.RampStartW} W, quelle que soit la FTP ({sim.Model.TargetPowerW} W)");
         sim.Model.RiderCadenceRpm = 20;
         await Wait(10.0); // la cadence mesurée met ~3 s à tomber, puis 5 s sous 40 tr/min
         Check(ride.Progress?.Current is { RampTest: false }, "Test rampe : cadence effondrée, le test s'arrête et passe au retour au calme");
