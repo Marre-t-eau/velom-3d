@@ -87,6 +87,9 @@ public abstract partial class Screen : Control
     public override void _Notification(int what)
     {
         if (what == NotificationWMGoBackRequest) Back();
+        // Chaque écran se décale au-dessus du clavier du téléphone pendant une saisie.
+        else if (what == NotificationReady)
+            Callable.From(() => AddChild(new KeyboardAvoider { Name = "KeyboardAvoider" })).CallDeferred();
     }
 
     public override void _UnhandledInput(InputEvent e)

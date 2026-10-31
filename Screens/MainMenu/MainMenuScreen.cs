@@ -21,6 +21,7 @@ public partial class MainMenuScreen : Screen
         Choice(FreeRideButton, Navigator.FreeRide);
         Choice(GetNode<Button>("%HistoryButton"), Navigator.History);
         Choice(GetNode<Button>("%SensorsButton"), Navigator.Connection);
+        ShowAccount();
         // Au retour au menu (lancement, fin de sortie…) : envoie les nouveautés si la synchro est activée.
         SyncInBackground();
     }
@@ -33,6 +34,17 @@ public partial class MainMenuScreen : Screen
         _sensors.Text = connected == 0 ? "Aucun capteur connecté"
             : hub.TrainerAddress == "" ? $"{connected} capteur(s) connecté(s), pas de home trainer pilotable"
             : $"{connected} capteur(s) connecté(s), home trainer prêt";
+    }
+
+    /// <summary>Pseudo du compte de synchronisation, s'il y en a un.</summary>
+    void ShowAccount()
+    {
+        var account = GetNode<Label>("%Account");
+        var state = Sync.State;
+        account.Visible = state.LoggedIn;
+        account.Text = state.Enabled
+            ? $"Connecté en tant que {state.Username}"
+            : $"Compte {state.Username} (synchronisation désactivée)";
     }
 
     protected override void OnBack() => GetTree().Quit();

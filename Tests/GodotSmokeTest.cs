@@ -111,6 +111,7 @@ public partial class GodotSmokeTest : Node
         await Wait(0.1);
         Check(!menu.StructuredButton.Disabled && !menu.FreeRideButton.Disabled,
             "Menu : entraînement structuré et sortie libre disponibles");
+        Check(!menu.GetNode<Label>("%Account").Visible, "pas de compte : pas de pseudo dans le menu");
         menu.FreeRideButton.EmitSignal(BaseButton.SignalName.Pressed);
         await Wait(0.1);
         Check(next is FreeRideScreen, "Le menu ouvre la sortie libre");
@@ -195,6 +196,7 @@ public partial class GodotSmokeTest : Node
         Check(syncOptions.Visible && settings.GetNode<Control>("%SyncLoginForm").Visible
               && !settings.GetNode<Control>("%SyncAccount").Visible, "synchro activée : formulaire de connexion");
         settings.GetNode<CheckButton>("%SyncToggle").ButtonPressed = false;
+        Check(settings.GetNodeOrNull<KeyboardAvoider>("KeyboardAvoider") is not null, "écran décalé au-dessus du clavier pendant une saisie");
         settings.Profile.VirtualGears = true;
         settings.Profile.Chainrings = [52, 36];
         settings.Profile.Cogs = [11, 12, 13, 14, 15, 16, 17, 19, 21, 24, 27, 30];

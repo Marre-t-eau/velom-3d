@@ -375,6 +375,7 @@ custom_minimum_size = Vector2(0, 72)
 size_flags_horizontal = 3
 mouse_filter = 1
 theme_override_font_sizes/font_size = 22
+theme_type_variation = &"PrimaryButton"
 text = "Se connecter"
 
 [node name="RegisterButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm/Buttons"]
@@ -410,6 +411,7 @@ custom_minimum_size = Vector2(0, 72)
 size_flags_horizontal = 3
 mouse_filter = 1
 theme_override_font_sizes/font_size = 22
+theme_type_variation = &"PrimaryButton"
 text = "Synchroniser maintenant"
 
 [node name="LogoutButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount/Buttons"]

@@ -144,7 +144,7 @@ arrière-plan. Le calcul (`Rides/Core/`) ne dépend pas de Godot et est testé p
 *Réglages > Synchronisation* : activer, saisir l'adresse d'un serveur, puis créer un compte ou se
 connecter. Les réglages, les entraînements et les sorties sont alors copiés sur le serveur et
 retrouvés sur les autres appareils du compte ; l'appli synchronise à chaque retour au menu, en
-arrière-plan, ou avec *Synchroniser maintenant*. Sans serveur, rien ne change : tout reste sur
+arrière-plan, ou avec *Synchroniser maintenant* ; le menu principal affiche le pseudo du compte utilisé. Sans serveur, rien ne change : tout reste sur
 l'appareil, et ces fichiers restent la référence. Une modification faite sur l'appareil l'emporte
 sur celle du serveur ; un fichier non modifié ici prend la version d'un autre appareil.
 
