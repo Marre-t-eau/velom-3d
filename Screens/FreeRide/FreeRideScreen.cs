@@ -205,7 +205,7 @@ public partial class FreeRideScreen : Screen
         GetNode<Button>("%MenuResume").Pressed += CloseMenu;
         _menuSkip = GetNode<Button>("%MenuSkip");
         _menuSkip.Pressed += () => { CloseMenu(); SkipBlock(); };
-        GetNode<Button>("%MenuSensors").Pressed += () => { CloseMenu(); OpenSensors(); };
+        GetNode<Button>("%MenuSensors").Pressed += OpenSensors;
         GetNode<Button>("%MenuFinish").Pressed += () =>
         {
             CloseMenu();
@@ -234,6 +234,7 @@ public partial class FreeRideScreen : Screen
     internal void OpenSensors()
     {
         if (Recorder is null || SensorsPage is not null) return;
+        CloseMenu();
         _resumeAfterSensors = !Recorder.IsPaused;
         if (_resumeAfterSensors) Recorder.Pause();
         _finishArmed = false;
