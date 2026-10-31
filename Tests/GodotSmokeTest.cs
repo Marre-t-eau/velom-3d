@@ -139,16 +139,7 @@ public partial class GodotSmokeTest : Node
         Check(ride.FinishButtonShown, "Sortie libre : Terminer reste dans la barre du bas");
         ride.OpenMenu();
         Check(ride.MenuOpen && !ride.MenuSkipButton.Visible, "Menu : ouvert, pas de bloc suivant en sortie libre");
-        ride.OpenSensors();
-        await Wait(0.2);
-        Check(!ride.MenuOpen && ride.SensorsPage is { } page && page.ContinueButton.Text == "Revenir à la sortie" && rec.IsPaused,
-            "Menu > Capteurs : page des capteurs par-dessus la sortie, mise en pause");
-        int sentBefore = rec.Ride.Events.Count(e => e.Type == "set_power");
-        ride.SensorsPage?.ContinueButton.EmitSignal(BaseButton.SignalName.Pressed);
-        await Wait(0.3);
-        Check(ride.SensorsPage is null && ride.Recorder == rec && !rec.IsPaused && sim.Model.ErgMode && sim.Model.TargetPowerW == 220
-              && rec.Ride.Events.Count(e => e.Type == "set_power") > sentBefore,
-            $"Retour à la sortie : la même sortie reprend, consigne renvoyée ({sim.Model.TargetPowerW} W)");
+        ride.CloseMenu();
         ride.OnFinishPressed();
         await Wait(0.1);
         Check(rec.IsPaused && ride.PauseButtonText == "Reprendre", "Terminer : la sortie se met en pause, Pause devient Reprendre");
@@ -192,6 +183,19 @@ public partial class GodotSmokeTest : Node
         Check(sim.Model.TargetPowerW == 0, "Simulation après ERG : l'ancienne consigne est effacée");
         Check(!sim.Model.ErgMode && sim.Model.GradePct == 0 && Mathf.IsEqualApprox(sim.Model.Crr, 0.004)
               && Mathf.IsEqualApprox(sim.Model.Cw, 0.25), $"Simulation : plat, pneus et air envoyés (Crr {sim.Model.Crr}, Cw {sim.Model.Cw})");
+        // Menu > Capteurs (sortie sans contrôle des pauses du bilan) : aller-retour sans perdre la sortie.
+        var simRec = ride.Recorder!;
+        ride.OpenMenu();
+        ride.OpenSensors();
+        await Wait(0.2);
+        Check(!ride.MenuOpen && ride.SensorsPage is { } page && page.ContinueButton.Text == "Revenir à la sortie" && simRec.IsPaused,
+            "Menu > Capteurs : page des capteurs par-dessus la sortie, mise en pause");
+        int sentBefore = simRec.Ride.Events.Count(e => e.Type.StartsWith("set_"));
+        ride.SensorsPage?.ContinueButton.EmitSignal(BaseButton.SignalName.Pressed);
+        await Wait(0.3);
+        Check(ride.SensorsPage is null && ride.Recorder == simRec && !simRec.IsPaused && !sim.Model.ErgMode
+              && simRec.Ride.Events.Count(e => e.Type.StartsWith("set_")) > sentBefore,
+            "Retour à la sortie : la même sortie reprend, simulation renvoyée au trainer");
         ride.Finish();
         await Wait(0.2);
         ride.QueueFree();
