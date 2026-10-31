@@ -37,7 +37,7 @@ public partial class SettingsScreen : Screen
         _profile = Store.LoadProfile();
         GetNode<Button>("%BackButton").Pressed += OnBack;
 
-        _ftp = Stepper("%FtpStepper", d => _profile.FtpW = Math.Clamp(_profile.FtpW + d * 5, 50, 600));
+        _ftp = Stepper("%FtpStepper", d => _profile.FtpW = Math.Clamp(_profile.FtpW + d, 50, 600));
         _riderMass = Stepper("%RiderMassStepper", d => _profile.RiderMassKg = Math.Clamp(_profile.RiderMassKg + d, 30, 200));
         _bikeMass = Stepper("%BikeMassStepper", d => _profile.BikeMassKg = Math.Clamp(_profile.BikeMassKg + d * 0.5, 4, 30));
 
