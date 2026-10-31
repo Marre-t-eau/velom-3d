@@ -10,6 +10,8 @@ et s'y connecte : home trainer (FTMS), capteur de puissance, ceinture cardio.
 ```
  capteurs BLE ──► backend ──(octets bruts)──► SensorHub (autoload "Sensors") ──► écrans du jeu
                   ├─ NativeBleBackend   (plugin Android « Velom3dBle »)
+                  ├─ RelayBackend       (PC : Bluetooth de Windows via Velom3dBleHelper.exe,
+                  │                      ou téléphone en mode relais sur le Wi-Fi)
                   └─ SimulatedBackend   (faux appareils : mode debug et tests automatiques)
 ```
 
@@ -30,8 +32,8 @@ Le transport est une classe `SensorBackend` à deux implémentations, choisie pa
   `VELOM3D_DEBUG_SENSORS=1`, ou l'argument `--debug-sensors`
   (`godot --path . -- --debug-sensors`, ou *Projet > Paramètres > Éditeur > Run > Main Run Args*).
 
-Sans mode debug et sans plugin natif (ordinateur, éditeur), l'écran indique que le Bluetooth est
-indisponible.
+Sans mode debug et sans Bluetooth (PC sans Bluetooth, Linux, éditeur sans le programme d'aide), l'écran
+l'indique et propose le relais par téléphone.
 
 ## Écrans
 
@@ -41,7 +43,7 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
                                             ├─ Réglages (cycliste, vélo, vitesses virtuelles, synchronisation)
                                             ├─ Sortie libre ──Terminer──► Bilan
                                             ├─ Mes sorties ──► Bilan d'une sortie
-                                            └─ Capteurs (retour à la connexion)
+                                            └─ Capteurs (retour à la connexion) ──► Relais pour PC (téléphone)
 ```
 
 - **Entraînements** (`Screens/Workouts/`) : la liste des séances structurées, avec leur profil
@@ -139,6 +141,62 @@ format (une ligne par seconde) restent lisibles. `profile.json` garde les régla
 entraînements sont dans `user://workouts/{id}.json`. Pendant une sortie, enregistrement toutes les 30 s et à la mise en
 arrière-plan. Le calcul (`Rides/Core/`) ne dépend pas de Godot et est testé par `dotnet test`.
 
+## Version PC (Windows)
+
+Le même projet tourne sur PC : sorties, entraînements et leur édition, historique, réglages,
+synchronisation, tout est identique (fichiers dans `%APPDATA%\Godot\app_userdata\Velom3d`). Pour
+retrouver les mêmes sorties et entraînements sur le téléphone et le PC, activer la synchronisation
+sur les deux avec le même compte. Seuls les capteurs changent, au choix dans *Connexion des capteurs* :
+
+- **Bluetooth du PC** (par défaut). Le C# du jeu n'a pas accès au Bluetooth de Windows : un petit
+  programme d'aide, `Desktop/BleHelper` (`Velom3dBleHelper.exe`, API Bluetooth de Windows 10/11),
+  fait le scan, la connexion et les échanges, et passe les octets bruts au jeu sur 127.0.0.1 (rien
+  n'est ouvert sur le réseau). Le jeu le lance tout seul et il s'arrête avec lui. Si le PC n'a pas
+  de Bluetooth, ou s'il est coupé, l'écran le dit.
+- **Téléphone relais**, si le PC n'a pas de Bluetooth. Sur le téléphone : *Connexion des capteurs >
+  Relais pour PC*. Le téléphone capte les capteurs et transmet les mesures en direct au PC sur le
+  réseau local, sans aucun serveur. Sur le PC, le téléphone apparaît tout seul (bouton
+  *Chercher les téléphones*, fait aussi à l'ouverture de l'écran quand le PC n'a pas de Bluetooth) ;
+  sinon, saisir l'adresse affichée sur le téléphone. Le PC recherche, connecte et pilote ensuite
+  les capteurs comme s'ils étaient à lui (ERG, pente, vitesses virtuelles). Le dernier téléphone
+  utilisé est repris automatiquement. Garder l'appli du téléphone ouverte au premier plan : l'écran
+  reste allumé pendant le relais. Si le PC part (ou le Wi-Fi coupe plus de 8 s), le téléphone
+  déconnecte les capteurs, pour ne pas laisser le trainer en ERG.
+
+Fonctionnement du relais (`Relay/`) : connexion TCP du PC vers le téléphone (port 47801), un message
+JSON par ligne, qui transporte les mêmes octets que le Bluetooth (le décodage reste celui du jeu) ;
+découverte par une question UDP diffusée par le PC (port 47800), à laquelle le téléphone répond.
+Le protocole est décrit dans `Relay/Core/RelayProtocol.cs` ; le programme d'aide Windows utilise le
+même, sur 127.0.0.1:47802.
+
+**Pare-feu.** Le PC ne fait qu'appeler le téléphone et recevoir la réponse à sa question : le pare-feu
+Windows n'a normalement rien à autoriser. Si le téléphone n'est pas trouvé :
+- vérifier que les deux sont sur le **même réseau** (pas le Wi-Fi « invités », souvent isolé, ni la
+  4G du téléphone) ;
+- saisir l'adresse affichée sur le téléphone (ex. `192.168.1.20`) dans *adresse du téléphone* :
+  la connexion directe ne passe pas par la diffusion ;
+- certaines box isolent les appareils Wi-Fi entre eux (« isolation des clients », « AP isolation ») :
+  la désactiver dans les réglages de la box.
+Pour tester sans téléphone avec deux PC, l'un lancé en mode debug (`--debug-sensors`) peut servir de
+relais (bouton *Relais pour PC*) : ce PC-là écoute sur le réseau, et Windows demande alors au premier
+lancement d'autoriser Velom3d sur les **réseaux privés** (à accepter ; sinon *Pare-feu Windows >
+Autoriser une application*, ou en administrateur :
+`netsh advfirewall firewall add rule name="Velom3d relais" dir=in action=allow protocol=TCP localport=47801`
+et la même avec `protocol=UDP localport=47800`).
+
+### Export Windows
+
+1. SDK .NET 8 installé (déjà nécessaire pour Godot .NET) et modèles d'export Godot installés.
+2. Dans Godot : *Projet > Exporter > Ajouter… > Windows Desktop*, puis *Exporter le projet*.
+   L'extension « Velom3d BLE » compile alors `Desktop/BleHelper` (`dotnet publish`, ~40 Mo, sans
+   dépendance) et place `Velom3dBleHelper.exe` à côté de `Velom3d.exe`. Garder les deux ensemble
+   (avec le dossier `data_Velom3d_windows_x86_64`).
+3. À la main si besoin : `dotnet publish Desktop/BleHelper -c Release -o <dossier du jeu>`.
+
+Depuis l'éditeur sous Windows (F5), le jeu lance le programme d'aide avec `dotnet run` (la première
+compilation prend une minute) ; pour démarrer plus vite :
+`dotnet publish Desktop/BleHelper -c Release -o Desktop/BleHelper/publish`.
+
 ## Synchronisation (facultative)
 
 *Réglages > Synchronisation* : activer, saisir l'adresse d'un serveur, puis créer un compte ou se
@@ -171,7 +229,8 @@ iOS : pas encore de plugin. Un plugin iOS (CoreBluetooth) qui expose le même si
 ## Tests
 
 ```
-dotnet test UnitTests/Velom3d.Sensors.Tests
+dotnet test UnitTests/Velom3d.Sensors.Tests       # dont le relais téléphone → PC, sur 127.0.0.1
+dotnet build Desktop/BleHelper                     # programme d'aide Bluetooth de Windows (compile aussi sous Linux)
 dotnet test UnitTests/Velom3d.Server.Tests      # serveur de synchronisation, de bout en bout
 dotnet build Velom3d.csproj && godot --headless --import --path . && godot --headless --path . res://Tests/GodotSmokeTest.tscn
 ```

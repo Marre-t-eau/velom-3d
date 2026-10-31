@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Programme d'aide Bluetooth de Windows, lancé par le jeu (Sensors/Backends/WindowsBle.cs).
+       Publié à côté du jeu à l'export Windows (addons/velom3d_ble), ou à la main :
+       dotnet publish Desktop/BleHelper -c Release -r win-x64 -o Desktop/BleHelper/publish -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Velom3dBleHelper</AssemblyName>
+    <RootNamespace>Velom3d.BleHelper</RootNamespace>
+    <!-- Compilable aussi depuis Linux (CI) ; il ne tourne que sous Windows. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Pas de fenêtre de console : il tourne en arrière-plan du jeu. -->
+    <OutputType>WinExe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Même protocole que le relais du téléphone. -->
+    <Compile Include="../../Relay/Core/*.cs" Link="Relay/%(Filename)%(Extension)" />
+    <Compile Include="../../Sensors/Core/BleUuids.cs" Link="Sensors/BleUuids.cs" />
+  </ItemGroup>
+</Project>

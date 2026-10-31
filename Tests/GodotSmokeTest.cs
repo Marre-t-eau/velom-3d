@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using Godot;
+using Velom3d.Relay;
 using Velom3d.Rides;
 using Velom3d.Screens;
 using Velom3d.Sensors;
@@ -90,6 +93,8 @@ public partial class GodotSmokeTest : Node
         hub.DisconnectDevice(SimulatedBackend.Trainer);
         Check(hub.TrainerAddress == "" && hub.Devices.Get(SimulatedBackend.Trainer)?.State == LinkState.Available,
             "Déconnexion du trainer");
+
+        await RelayMode();
 
         GD.Print(_failures == 0 ? "\nTOUS LES TESTS PASSENT" : $"\n{_failures} ÉCHEC(S)");
         GetTree().Quit(_failures == 0 ? 0 : 1);
@@ -419,6 +424,55 @@ public partial class GodotSmokeTest : Node
         ride.QueueFree();
         (next() as Node)?.Free();
         setNext(null);
+    }
+
+    /// <summary>6. Mode relais du téléphone : un PC (ici un simple RelayClient) trouve le relais,
+    /// recherche, connecte et pilote les capteurs simulés par le réseau.</summary>
+    async System.Threading.Tasks.Task RelayMode()
+    {
+        var hub = SensorHub.Instance;
+        var sim = new SimulatedBackend { ScanDelayS = 0.0, ConnectDelayS = 0.0 };
+        hub.UseBackend(sim);
+        var screen = Navigator.Create<RelayScreen>(Navigator.Relay);
+        AddChild(screen);
+        await Wait(0.2);
+        Check(screen.Host.IsRunning, $"Relais : port {RelayProtocol.TcpPort} ouvert ({screen.Host.StartError})");
+        var found = await RelayDiscovery.FindAsync(TimeSpan.FromSeconds(1),
+            [new IPEndPoint(IPAddress.Loopback, RelayProtocol.DiscoveryPort)]);
+        Check(found.Count == 1 && found[0].Port == RelayProtocol.TcpPort, $"Relais : trouvé par la découverte ({found.Count})");
+
+        using var pc = new RelayClient("127.0.0.1", RelayProtocol.TcpPort, "PC test");
+        var messages = new List<RelayMessage>();
+        pc.Received += messages.Add;
+        pc.Start();
+        async System.Threading.Tasks.Task Pump(double seconds)
+        {
+            for (double t = 0; t < seconds; t += 0.05)
+            {
+                pc.Poll();
+                await Wait(0.05);
+            }
+        }
+        pc.Send(RelayMessage.Scan(5));
+        await Pump(1.0);
+        Check(screen.Host.ClientName == "PC test", "Relais : le téléphone affiche le PC connecté");
+        Check(messages.Any(m => m.T == RelayOp.Found && m.Address == SimulatedBackend.Trainer), "Relais : le PC voit le trainer");
+
+        pc.Send(RelayMessage.Connect(SimulatedBackend.Trainer));
+        await Pump(1.5);
+        Check(messages.Any(m => m.T == RelayOp.Connected && m.Address == SimulatedBackend.Trainer), "Relais : trainer connecté pour le PC");
+        Check(messages.Any(m => m.T == RelayOp.Read && m.Char == BleUuids.SupportedPowerRange), "Relais : fiche du trainer transmise");
+        Check(messages.Any(m => m.T == RelayOp.Notify && m.Char == BleUuids.IndoorBikeData), "Relais : mesures brutes transmises");
+
+        pc.Send(RelayMessage.Write(SimulatedBackend.Trainer, BleUuids.FitnessMachineControlPoint, FtmsCommands.SetTargetPower(250)));
+        await Pump(1.0);
+        Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 250, $"Relais : consigne ERG du PC appliquée ({sim.Model.TargetPowerW} W)");
+
+        pc.Dispose();
+        await Wait(0.5);
+        Check(hub.Devices.Get(SimulatedBackend.Trainer)?.State is null or LinkState.Available, "Relais : PC parti, trainer libéré");
+        screen.QueueFree();
+        await Wait(0.1);
     }
 
     SignalAwaiter Wait(double s) => ToSignal(GetTree().CreateTimer(s), SceneTreeTimer.SignalName.Timeout);
