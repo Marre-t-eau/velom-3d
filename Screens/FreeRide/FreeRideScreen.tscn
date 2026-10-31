@@ -181,451 +181,468 @@ mouse_filter = 1
 text = "Démarrer"
 size_flags_horizontal = 3
 
-[node name="Riding" type="VBoxContainer" parent="Margin/Page"]
+[node name="RidingMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="Riding" type="VBoxContainer" parent="RidingMargin"]
 unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 16
-size_flags_vertical = 3
 visible = false
-
-[node name="Header" type="HBoxContainer" parent="Margin/Page/Riding"]
 layout_mode = 2
-theme_override_constants/separation = 16
+mouse_filter = 2
+theme_override_constants/separation = 8
 
-[node name="Clock" type="Label" parent="Margin/Page/Riding/Header"]
+[node name="TopBar" type="HBoxContainer" parent="RidingMargin/Riding"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="Left" type="VBoxContainer" parent="RidingMargin/Riding/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = -4
+
+[node name="Clock" type="Label" parent="RidingMargin/Riding/TopBar/Left"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
 theme_type_variation = &"OverlayLabel"
+theme_override_font_sizes/font_size = 30
 text = "0:00"
 
-[node name="ModeLabel" type="Label" parent="Margin/Page/Riding/Header"]
+[node name="ModeLabel" type="Label" parent="RidingMargin/Riding/TopBar/Left"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 17
-theme_override_colors/font_color = Color(0.62, 0.66, 0.72, 1)
 theme_type_variation = &"OverlayLabel"
+theme_override_colors/font_color = Color(0.85, 0.88, 0.92, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 13
 text = ""
-autowrap_mode = 3
-size_flags_horizontal = 3
-horizontal_alignment = 2
-vertical_alignment = 1
+text_overrun_behavior = 3
 
-[node name="Scroll" type="ScrollContainer" parent="Margin/Page/Riding"]
+[node name="Tiles" type="HBoxContainer" parent="RidingMargin/Riding/TopBar"]
 layout_mode = 2
-size_flags_vertical = 3
-horizontal_scroll_mode = 0
-scroll_deadzone = 12
+mouse_filter = 2
+theme_override_constants/separation = 6
 
-[node name="Content" type="VBoxContainer" parent="Margin/Page/Riding/Scroll"]
-layout_mode = 2
-theme_override_constants/separation = 14
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="Tiles" type="HBoxContainer" parent="Margin/Page/Riding/Scroll/Content"]
-layout_mode = 2
-theme_override_constants/separation = 10
-alignment = 1
-
-[node name="PowerTile" type="PanelContainer" parent="Margin/Page/Riding/Scroll/Content/Tiles"]
+[node name="PowerTile" type="PanelContainer" parent="RidingMargin/Riding/TopBar/Tiles"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
-self_modulate = Color(1, 1, 1, 0.8)
-custom_minimum_size = Vector2(240, 0)
-size_flags_horizontal = 4
 theme_type_variation = &"OverlayPanel"
 
-[node name="Box" type="VBoxContainer" parent="Margin/Page/Riding/Scroll/Content/Tiles/PowerTile"]
+[node name="Box" type="VBoxContainer" parent="RidingMargin/Riding/TopBar/Tiles/PowerTile"]
 layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = -2
 
-[node name="Title" type="Label" parent="Margin/Page/Riding/Scroll/Content/Tiles/PowerTile/Box"]
+[node name="Title" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/PowerTile/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.98, 0.62, 0.2, 1)
+theme_override_font_sizes/font_size = 12
 text = "Puissance"
-autowrap_mode = 3
 
-[node name="Value" type="Label" parent="Margin/Page/Riding/Scroll/Content/Tiles/PowerTile/Box"]
+[node name="Value" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/PowerTile/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 26
 text = "--"
 
-[node name="CadenceTile" type="PanelContainer" parent="Margin/Page/Riding/Scroll/Content/Tiles"]
+[node name="CadenceTile" type="PanelContainer" parent="RidingMargin/Riding/TopBar/Tiles"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(118, 0)
 layout_mode = 2
-self_modulate = Color(1, 1, 1, 0.8)
-custom_minimum_size = Vector2(190, 0)
-size_flags_horizontal = 4
 theme_type_variation = &"OverlayPanel"
 
-[node name="Box" type="VBoxContainer" parent="Margin/Page/Riding/Scroll/Content/Tiles/CadenceTile"]
+[node name="Box" type="VBoxContainer" parent="RidingMargin/Riding/TopBar/Tiles/CadenceTile"]
 layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = -2
 
-[node name="Title" type="Label" parent="Margin/Page/Riding/Scroll/Content/Tiles/CadenceTile/Box"]
+[node name="Title" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/CadenceTile/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.35, 0.7, 0.98, 1)
+theme_override_font_sizes/font_size = 12
 text = "Cadence"
-autowrap_mode = 3
 
-[node name="Value" type="Label" parent="Margin/Page/Riding/Scroll/Content/Tiles/CadenceTile/Box"]
+[node name="Value" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/CadenceTile/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+size_flags_vertical = 10
+theme_override_font_sizes/font_size = 22
 text = "--"
 
-[node name="HeartRateTile" type="PanelContainer" parent="Margin/Page/Riding/Scroll/Content/Tiles"]
+[node name="HeartRateTile" type="PanelContainer" parent="RidingMargin/Riding/TopBar/Tiles"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(96, 0)
 layout_mode = 2
-self_modulate = Color(1, 1, 1, 0.8)
-custom_minimum_size = Vector2(190, 0)
-size_flags_horizontal = 4
 theme_type_variation = &"OverlayPanel"
 
-[node name="Box" type="VBoxContainer" parent="Margin/Page/Riding/Scroll/Content/Tiles/HeartRateTile"]
+[node name="Box" type="VBoxContainer" parent="RidingMargin/Riding/TopBar/Tiles/HeartRateTile"]
 layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = -2
 
-[node name="Title" type="Label" parent="Margin/Page/Riding/Scroll/Content/Tiles/HeartRateTile/Box"]
+[node name="Title" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/HeartRateTile/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.95, 0.36, 0.45, 1)
+theme_override_font_sizes/font_size = 12
 text = "Cardio"
-autowrap_mode = 3
 
-[node name="Value" type="Label" parent="Margin/Page/Riding/Scroll/Content/Tiles/HeartRateTile/Box"]
+[node name="Value" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/HeartRateTile/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+size_flags_vertical = 10
+theme_override_font_sizes/font_size = 22
 text = "--"
 
-[node name="SpeedTile" type="PanelContainer" parent="Margin/Page/Riding/Scroll/Content/Tiles"]
+[node name="SpeedTile" type="PanelContainer" parent="RidingMargin/Riding/TopBar/Tiles"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(112, 0)
 layout_mode = 2
-self_modulate = Color(1, 1, 1, 0.8)
-custom_minimum_size = Vector2(190, 0)
-size_flags_horizontal = 4
 theme_type_variation = &"OverlayPanel"
 
-[node name="Box" type="VBoxContainer" parent="Margin/Page/Riding/Scroll/Content/Tiles/SpeedTile"]
+[node name="Box" type="VBoxContainer" parent="RidingMargin/Riding/TopBar/Tiles/SpeedTile"]
 layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = -2
 
-[node name="Title" type="Label" parent="Margin/Page/Riding/Scroll/Content/Tiles/SpeedTile/Box"]
+[node name="Title" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/SpeedTile/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.3, 0.85, 0.55, 1)
+theme_override_font_sizes/font_size = 12
 text = "Vitesse"
-autowrap_mode = 3
 
-[node name="Value" type="Label" parent="Margin/Page/Riding/Scroll/Content/Tiles/SpeedTile/Box"]
+[node name="Value" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/SpeedTile/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+size_flags_vertical = 10
+theme_override_font_sizes/font_size = 22
 text = "--"
 
-[node name="DistanceTile" type="PanelContainer" parent="Margin/Page/Riding/Scroll/Content/Tiles"]
+[node name="DistanceTile" type="PanelContainer" parent="RidingMargin/Riding/TopBar/Tiles"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
-self_modulate = Color(1, 1, 1, 0.8)
-custom_minimum_size = Vector2(190, 0)
-size_flags_horizontal = 4
 theme_type_variation = &"OverlayPanel"
 
-[node name="Box" type="VBoxContainer" parent="Margin/Page/Riding/Scroll/Content/Tiles/DistanceTile"]
+[node name="Box" type="VBoxContainer" parent="RidingMargin/Riding/TopBar/Tiles/DistanceTile"]
 layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = -2
 
-[node name="Title" type="Label" parent="Margin/Page/Riding/Scroll/Content/Tiles/DistanceTile/Box"]
+[node name="Title" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/DistanceTile/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.62, 0.66, 0.72, 1)
+theme_override_font_sizes/font_size = 12
 text = "Distance"
-autowrap_mode = 3
 
-[node name="Value" type="Label" parent="Margin/Page/Riding/Scroll/Content/Tiles/DistanceTile/Box"]
+[node name="Value" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/DistanceTile/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+size_flags_vertical = 10
+theme_override_font_sizes/font_size = 22
 text = "--"
 
-[node name="WorkoutPanel" type="VBoxContainer" parent="Margin/Page/Riding/Scroll/Content"]
+[node name="Right" type="Control" parent="RidingMargin/Riding/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="WorkoutPanel" type="HBoxContainer" parent="RidingMargin/Riding"]
 unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 14
 visible = false
-
-[node name="Row" type="HBoxContainer" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel"]
 layout_mode = 2
-theme_override_constants/separation = 14
+mouse_filter = 2
+theme_override_constants/separation = 10
 
-[node name="Current" type="PanelContainer" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row"]
+[node name="Current" type="PanelContainer" parent="RidingMargin/Riding/WorkoutPanel"]
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
-self_modulate = Color(1, 1, 1, 0.82)
-custom_minimum_size = Vector2(400, 0)
+size_flags_vertical = 0
 theme_type_variation = &"OverlayAccentPanel"
 
-[node name="Box" type="VBoxContainer" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current"]
+[node name="Box" type="VBoxContainer" parent="RidingMargin/Riding/WorkoutPanel/Current"]
 layout_mode = 2
+theme_override_constants/separation = 4
 
-[node name="BlockTitle" type="Label" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box"]
+[node name="BlockTitle" type="Label" parent="RidingMargin/Riding/WorkoutPanel/Current/Box"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
 theme_type_variation = &"AccentLabel"
+theme_override_font_sizes/font_size = 13
 text = "Bloc 1 / 5 · reste"
 autowrap_mode = 3
 
-[node name="Line" type="HBoxContainer" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box"]
+[node name="Line" type="HBoxContainer" parent="RidingMargin/Riding/WorkoutPanel/Current/Box"]
 layout_mode = 2
-theme_override_constants/separation = 20
+theme_override_constants/separation = 14
 
-[node name="BlockRemaining" type="Label" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box/Line"]
+[node name="BlockRemaining" type="Label" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/Line"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 38
+theme_override_font_sizes/font_size = 30
 text = "5:00"
 vertical_alignment = 1
 
-[node name="Targets" type="VBoxContainer" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box/Line"]
+[node name="Targets" type="VBoxContainer" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/Line"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_constants/separation = 0
 alignment = 1
 
-[node name="BlockPower" type="Label" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box/Line/Targets"]
+[node name="BlockPower" type="Label" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/Line/Targets"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 21
 theme_override_colors/font_color = Color(0.98, 0.62, 0.2, 1)
+theme_override_font_sizes/font_size = 16
 text = "200 W"
 autowrap_mode = 3
 
-[node name="BlockCadence" type="Label" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box/Line/Targets"]
+[node name="BlockCadence" type="Label" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/Line/Targets"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
 theme_override_colors/font_color = Color(0.35, 0.7, 0.98, 1)
+theme_override_font_sizes/font_size = 14
 text = "Cadence libre"
 autowrap_mode = 3
 
-[node name="BlockBar" type="ProgressBar" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box"]
+[node name="BlockBar" type="ProgressBar" parent="RidingMargin/Riding/WorkoutPanel/Current/Box"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
-custom_minimum_size = Vector2(0, 10)
 mouse_filter = 1
 max_value = 1.0
 show_percentage = false
 
-[node name="FreeErgRow" type="HBoxContainer" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box"]
+[node name="FreeErgRow" type="HBoxContainer" parent="RidingMargin/Riding/WorkoutPanel/Current/Box"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 6
 
-[node name="FreeErgToggle" type="Button" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box/FreeErgRow"]
+[node name="FreeErgToggle" type="Button" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/FreeErgRow"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 44)
 layout_mode = 2
-custom_minimum_size = Vector2(190, 64)
-mouse_filter = 1
-theme_override_font_sizes/font_size = 20
-text = "ERG : non"
 size_flags_horizontal = 3
-toggle_mode = true
-theme_type_variation = &"ChoiceButton"
-
-[node name="FreeErgMinus10" type="Button" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box/FreeErgRow"]
-unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(72, 64)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 22
+theme_type_variation = &"ChoiceButton"
+theme_override_font_sizes/font_size = 15
+toggle_mode = true
+text = "ERG : non"
+
+[node name="FreeErgMinus10" type="Button" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/FreeErgRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(46, 44)
+layout_mode = 2
+mouse_filter = 1
+theme_override_font_sizes/font_size = 15
 text = "−10"
 
-[node name="FreeErgMinus5" type="Button" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box/FreeErgRow"]
+[node name="FreeErgMinus5" type="Button" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/FreeErgRow"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(46, 44)
 layout_mode = 2
-custom_minimum_size = Vector2(72, 64)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 15
 text = "−5"
 
-[node name="FreeErgPlus5" type="Button" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box/FreeErgRow"]
+[node name="FreeErgPlus5" type="Button" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/FreeErgRow"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(46, 44)
 layout_mode = 2
-custom_minimum_size = Vector2(72, 64)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 15
 text = "+5"
 
-[node name="FreeErgPlus10" type="Button" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box/FreeErgRow"]
+[node name="FreeErgPlus10" type="Button" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/FreeErgRow"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(46, 44)
 layout_mode = 2
-custom_minimum_size = Vector2(72, 64)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 15
 text = "+10"
 
-[node name="WorkoutChart" type="Control" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Current/Box"]
+[node name="WorkoutChart" type="Control" parent="RidingMargin/Riding/WorkoutPanel/Current/Box"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-custom_minimum_size = Vector2(0, 46)
 size_flags_horizontal = 3
 mouse_filter = 1
 script = ExtResource("2")
 
-[node name="Spacer" type="Control" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row"]
+[node name="Spacer" type="Control" parent="RidingMargin/Riding/WorkoutPanel"]
 layout_mode = 2
 size_flags_horizontal = 3
-mouse_filter = 1
+mouse_filter = 2
 
-[node name="Next" type="PanelContainer" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row"]
+[node name="Next" type="PanelContainer" parent="RidingMargin/Riding/WorkoutPanel"]
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
-self_modulate = Color(1, 1, 1, 0.82)
-custom_minimum_size = Vector2(440, 0)
+size_flags_vertical = 0
 theme_type_variation = &"OverlayPanel"
 
-[node name="Box" type="VBoxContainer" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Next"]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="Title" type="Label" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Next/Box"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 16
-theme_type_variation = &"MutedLabel"
-text = "À venir"
-autowrap_mode = 3
-
-[node name="Upcoming" type="VBoxContainer" parent="Margin/Page/Riding/Scroll/Content/WorkoutPanel/Row/Next/Box"]
-unique_name_in_owner = true
+[node name="Box" type="VBoxContainer" parent="RidingMargin/Riding/WorkoutPanel/Next"]
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Spacer" type="Control" parent="Margin/Page/Riding/Scroll/Content"]
+[node name="Title" type="Label" parent="RidingMargin/Riding/WorkoutPanel/Next/Box"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 12
+text = "À venir"
+
+[node name="Upcoming" type="VBoxContainer" parent="RidingMargin/Riding/WorkoutPanel/Next/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Spacer" type="Control" parent="RidingMargin/Riding"]
 layout_mode = 2
 size_flags_vertical = 3
-mouse_filter = 1
+mouse_filter = 2
 
-[node name="ErgControls" type="HBoxContainer" parent="Margin/Page/Riding/Scroll/Content"]
+[node name="TrainerStatus" type="Label" parent="RidingMargin/Riding"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"OverlayLabel"
+theme_override_colors/font_color = Color(1, 0.72, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+text = ""
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="BottomBar" type="HBoxContainer" parent="RidingMargin/Riding"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="BottomLeft" type="Control" parent="RidingMargin/Riding/BottomBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="ErgControls" type="HBoxContainer" parent="RidingMargin/Riding/BottomBar"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 16
-alignment = 1
+theme_override_constants/separation = 6
 
-[node name="Minus10" type="Button" parent="Margin/Page/Riding/Scroll/Content/ErgControls"]
+[node name="Minus10" type="Button" parent="RidingMargin/Riding/BottomBar/ErgControls"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(76, 48)
 layout_mode = 2
-custom_minimum_size = Vector2(120, 68)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 17
 text = "−10 W"
 
-[node name="Minus5" type="Button" parent="Margin/Page/Riding/Scroll/Content/ErgControls"]
+[node name="Minus5" type="Button" parent="RidingMargin/Riding/BottomBar/ErgControls"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(76, 48)
 layout_mode = 2
-custom_minimum_size = Vector2(120, 68)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 17
 text = "−5 W"
 
-[node name="RideTarget" type="Label" parent="Margin/Page/Riding/Scroll/Content/ErgControls"]
+[node name="RideTarget" type="Label" parent="RidingMargin/Riding/BottomBar/ErgControls"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(130, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
 theme_type_variation = &"OverlayLabel"
+theme_override_font_sizes/font_size = 20
 text = "Cible 200 W"
-autowrap_mode = 3
-custom_minimum_size = Vector2(220, 0)
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Plus5" type="Button" parent="Margin/Page/Riding/Scroll/Content/ErgControls"]
+[node name="Plus5" type="Button" parent="RidingMargin/Riding/BottomBar/ErgControls"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(76, 48)
 layout_mode = 2
-custom_minimum_size = Vector2(120, 68)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 17
 text = "+5 W"
 
-[node name="Plus10" type="Button" parent="Margin/Page/Riding/Scroll/Content/ErgControls"]
+[node name="Plus10" type="Button" parent="RidingMargin/Riding/BottomBar/ErgControls"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(76, 48)
 layout_mode = 2
-custom_minimum_size = Vector2(120, 68)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 17
 text = "+10 W"
 
-[node name="GearControls" type="HBoxContainer" parent="Margin/Page/Riding/Scroll/Content"]
+[node name="GearControls" type="HBoxContainer" parent="RidingMargin/Riding/BottomBar"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 16
-alignment = 1
+theme_override_constants/separation = 6
 
-[node name="FrontButton" type="Button" parent="Margin/Page/Riding/Scroll/Content/GearControls"]
+[node name="FrontButton" type="Button" parent="RidingMargin/Riding/BottomBar/GearControls"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 48)
 layout_mode = 2
-custom_minimum_size = Vector2(160, 68)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 16
 text = "Plateau"
 
-[node name="EasierButton" type="Button" parent="Margin/Page/Riding/Scroll/Content/GearControls"]
+[node name="EasierButton" type="Button" parent="RidingMargin/Riding/BottomBar/GearControls"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 48)
 layout_mode = 2
-custom_minimum_size = Vector2(190, 68)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 16
 text = "− Plus souple"
 
-[node name="GearLabel" type="Label" parent="Margin/Page/Riding/Scroll/Content/GearControls"]
+[node name="GearLabel" type="Label" parent="RidingMargin/Riding/BottomBar/GearControls"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
 theme_type_variation = &"OverlayLabel"
-text = "52×17\n7/12"
-autowrap_mode = 3
-custom_minimum_size = Vector2(180, 0)
+theme_override_constants/line_spacing = -4
+theme_override_font_sizes/font_size = 17
+text = "52×17
+7/12"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="HarderButton" type="Button" parent="Margin/Page/Riding/Scroll/Content/GearControls"]
+[node name="HarderButton" type="Button" parent="RidingMargin/Riding/BottomBar/GearControls"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 48)
 layout_mode = 2
-custom_minimum_size = Vector2(190, 68)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 16
 text = "Plus dur +"
 
-[node name="TrainerStatus" type="Label" parent="Margin/Page/Riding/Scroll/Content"]
-unique_name_in_owner = true
+[node name="Actions" type="HBoxContainer" parent="RidingMargin/Riding/BottomBar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
-theme_override_colors/font_color = Color(1, 0.72, 0.3, 1)
-theme_type_variation = &"OverlayLabel"
-text = ""
-autowrap_mode = 3
-visible = false
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 6
+alignment = 2
 
-[node name="Actions" type="HBoxContainer" parent="Margin/Page/Riding"]
-layout_mode = 2
-theme_override_constants/separation = 16
-
-[node name="PauseButton" type="Button" parent="Margin/Page/Riding/Actions"]
+[node name="PauseButton" type="Button" parent="RidingMargin/Riding/BottomBar/Actions"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(104, 48)
 layout_mode = 2
-custom_minimum_size = Vector2(260, 60)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 16
 text = "Pause"
-size_flags_horizontal = 3
 
-[node name="SkipButton" type="Button" parent="Margin/Page/Riding/Actions"]
+[node name="SkipButton" type="Button" parent="RidingMargin/Riding/BottomBar/Actions"]
 unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(260, 60)
-mouse_filter = 1
-theme_override_font_sizes/font_size = 22
-text = "Bloc suivant"
-size_flags_horizontal = 3
 visible = false
-
-[node name="FinishButton" type="Button" parent="Margin/Page/Riding/Actions"]
-unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 48)
 layout_mode = 2
-custom_minimum_size = Vector2(260, 60)
 mouse_filter = 1
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 16
+text = "Bloc suivant"
+
+[node name="FinishButton" type="Button" parent="RidingMargin/Riding/BottomBar/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(104, 48)
+layout_mode = 2
+mouse_filter = 1
+theme_override_font_sizes/font_size = 16
 text = "Terminer"
-size_flags_horizontal = 3
