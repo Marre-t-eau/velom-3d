@@ -6,21 +6,20 @@ using Velom3d.Sensors;
 namespace Velom3d.Screens;
 
 /// <summary>
-/// Premier écran : recherche et connexion du home trainer, du capteur de puissance et de la
+/// Premier écran (mise en page : DeviceConnectionScreen.tscn) : recherche et connexion du home trainer, du capteur de puissance et de la
 /// ceinture cardio, par le Bluetooth du téléphone. Pensé pour le tactile (grandes cibles,
 /// liste qui défile au doigt). Sans plugin Bluetooth natif (éditeur, ordinateur), l'écran
 /// l'indique et ne cherche rien, sauf en mode debug (capteurs simulés, voir SensorBackends). « Continuer » mène au menu principal.
 /// </summary>
 public partial class DeviceConnectionScreen : Control
 {
-    static readonly Color Background = new(0.07f, 0.08f, 0.10f);
-    static readonly Color Card = new(0.13f, 0.15f, 0.18f);
-    static readonly Color CardConnected = new(0.10f, 0.24f, 0.17f);
-    static readonly Color Muted = new(0.62f, 0.66f, 0.72f);
-    static readonly Color Accent = new(0.22f, 0.78f, 0.47f);
-    static readonly Color Warning = new(1.0f, 0.72f, 0.30f);
+    /// <summary>Une ligne de la liste des appareils (DeviceRow.tscn).</summary>
+    [Export] public PackedScene RowScene { get; set; } = null!;
 
-    static readonly DeviceKind[] SlotKinds = [DeviceKind.Trainer, DeviceKind.PowerMeter, DeviceKind.HeartRate];
+    static readonly Color Muted = new(0.62f, 0.66f, 0.72f);
+
+    static readonly (DeviceKind Kind, string Node)[] Slots =
+        [(DeviceKind.Trainer, "%TrainerSlot"), (DeviceKind.PowerMeter, "%PowerSlot"), (DeviceKind.HeartRate, "%HeartRateSlot")];
 
     sealed record Row(PanelContainer Panel, Label Name, Label Detail, Button Button);
 
@@ -39,7 +38,7 @@ public partial class DeviceConnectionScreen : Control
 
     public override void _Ready()
     {
-        BuildUi();
+        FindNodes();
         Sensors.DevicesChanged += Refresh;
         Sensors.StatusMessage += ShowStatus;
         // Retour depuis le menu : on garde le transport, sinon les appareils seraient déconnectés.
@@ -74,7 +73,7 @@ public partial class DeviceConnectionScreen : Control
     public override void _Process(double delta)
     {
         _continueButton.Text = Sensors.Devices.Sorted.Any(d => d.State == LinkState.Connected) ? "Continuer" : "Continuer sans capteur";
-        foreach (var kind in SlotKinds)
+        foreach (var (kind, _) in Slots)
         {
             var (panel, name, value) = _slots[kind];
             var device = Sensors.Devices.ConnectedFor(kind);
@@ -86,7 +85,7 @@ public partial class DeviceConnectionScreen : Control
                 DeviceKind.PowerMeter => $"{Sensors.Power} W  ·  {Sensors.Cadence:0} tr/min",
                 _ => $"{Sensors.HeartRate} bpm",
             };
-            SetPanelColor(panel, device is null ? Card : CardConnected);
+            SetConnected(panel, device is not null);
         }
     }
 
@@ -128,39 +127,19 @@ public partial class DeviceConnectionScreen : Control
 
     Row CreateRow(string address)
     {
-        // Pass partout : un glissé qui commence sur une ligne ou un bouton doit faire défiler la liste.
-        var panel = new PanelContainer { MouseFilter = MouseFilterEnum.Pass };
-        var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        row.AddThemeConstantOverride("separation", 16);
-        panel.AddChild(row);
-
-        var text = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass };
-        var name = MakeLabel("", 24);
-        text.AddChild(name);
-        var detail = MakeLabel("", 18);
-        detail.Modulate = Muted;
-        text.AddChild(detail);
-        row.AddChild(text);
-
-        var button = new Button
-        {
-            CustomMinimumSize = new Vector2(220, 72),
-            SizeFlagsVertical = SizeFlags.ShrinkCenter,
-            MouseFilter = MouseFilterEnum.Pass,
-        };
-        button.AddThemeFontSizeOverride("font_size", 22);
+        var panel = RowScene.Instantiate<PanelContainer>();
+        var button = panel.GetNode<Button>("%ConnectButton");
         button.Pressed += () =>
         {
             if (Sensors.Devices.Get(address)?.State == LinkState.Connected) Sensors.DisconnectDevice(address);
             else Sensors.ConnectDevice(address);
         };
-        row.AddChild(button);
-        return new Row(panel, name, detail, button);
+        return new Row(panel, panel.GetNode<Label>("%Name"), panel.GetNode<Label>("%Detail"), button);
     }
 
     void UpdateRow(Row row, DeviceEntry d)
     {
-        SetPanelColor(row.Panel, d.State == LinkState.Connected ? CardConnected : Card);
+        SetConnected(row.Panel, d.State == LinkState.Connected);
         row.Name.Text = d.DisplayName;
         row.Detail.Text = $"{DeviceList.KindLabel(d.Kind)}  ·  signal {SignalLabel(d.Rssi)}";
         row.Button.Text = d.State switch
@@ -194,101 +173,30 @@ public partial class DeviceConnectionScreen : Control
         else Sensors.StartScan();
     }
 
-    void BuildUi()
+    void FindNodes()
     {
-        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        var bg = new ColorRect { Color = Background };
-        bg.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        AddChild(bg);
-
-        var margin = new MarginContainer();
-        margin.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        foreach (var side in new[] { "left", "right", "top", "bottom" })
-            margin.AddThemeConstantOverride("margin_" + side, 32);
-        AddChild(margin);
-
-        var root = new VBoxContainer();
-        root.AddThemeConstantOverride("separation", 18);
-        margin.AddChild(root);
-
-        root.AddChild(MakeLabel("Connexion des capteurs", 40));
-        var hint = MakeLabel("Allumez votre home trainer et vos capteurs, puis touchez « Connecter ».", 20);
-        hint.Modulate = Muted;
-        root.AddChild(hint);
-
-        var slots = new HBoxContainer();
-        slots.AddThemeConstantOverride("separation", 16);
-        root.AddChild(slots);
-        foreach (var kind in SlotKinds)
+        foreach (var (kind, node) in Slots)
         {
-            var panel = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-            var box = new VBoxContainer();
-            panel.AddChild(box);
-            var title = MakeLabel(DeviceList.KindLabel(kind), 18);
-            title.Modulate = Muted;
-            box.AddChild(title);
-            var name = MakeLabel("", 22);
-            name.AutowrapMode = TextServer.AutowrapMode.Off;
-            name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-            name.ClipText = true;
-            box.AddChild(name);
-            var value = MakeLabel("--", 30);
-            box.AddChild(value);
-            slots.AddChild(panel);
-            _slots[kind] = (panel, name, value);
+            var panel = GetNode<PanelContainer>(node);
+            _slots[kind] = (panel, panel.GetNode<Label>("Box/Name"), panel.GetNode<Label>("Box/Value"));
         }
-
-        var actions = new HBoxContainer();
-        actions.AddThemeConstantOverride("separation", 16);
-        root.AddChild(actions);
-        _scanButton = new Button { Text = "Rechercher", CustomMinimumSize = new Vector2(320, 72) };
-        _scanButton.AddThemeFontSizeOverride("font_size", 24);
+        _scanButton = GetNode<Button>("%ScanButton");
         _scanButton.Pressed += OnScanPressed;
-        actions.AddChild(_scanButton);
-        _continueButton = new Button { Text = "Continuer", CustomMinimumSize = new Vector2(320, 72), SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        _continueButton.AddThemeFontSizeOverride("font_size", 24);
+        _continueButton = GetNode<Button>("%ContinueButton");
         _continueButton.Pressed += () =>
         {
             Sensors.StopScan();
             Navigator.GoTo(this, Navigator.Menu);
         };
-        actions.AddChild(_continueButton);
-
-        _status = MakeLabel("", 20);
-        _status.Modulate = Warning;
-        _status.Visible = false;
-        root.AddChild(_status);
-
-        var scroll = new ScrollContainer
-        {
-            SizeFlagsVertical = SizeFlags.ExpandFill,
-            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
-            // Au doigt : un petit mouvement suffit à faire défiler plutôt qu'à appuyer.
-            ScrollDeadzone = 12,
-        };
-        root.AddChild(scroll);
-        _list = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass };
-        _list.AddThemeConstantOverride("separation", 12);
-        scroll.AddChild(_list);
-        _empty = MakeLabel("", 20);
-        _empty.Modulate = Muted;
-        _list.AddChild(_empty);
+        _status = GetNode<Label>("%Status");
+        _list = GetNode<VBoxContainer>("%List");
+        _empty = GetNode<Label>("%Empty");
     }
 
-    static Label MakeLabel(string text, int size)
+    /// <summary>Carte verte bordée quand l'appareil est connecté (styles du thème).</summary>
+    static void SetConnected(PanelContainer panel, bool connected)
     {
-        var label = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart, MouseFilter = MouseFilterEnum.Pass };
-        label.AddThemeFontSizeOverride("font_size", size);
-        return label;
-    }
-
-    static void SetPanelColor(PanelContainer panel, Color color)
-    {
-        if (panel.GetThemeStylebox("panel") is StyleBoxFlat { } current && current.BgColor == color
-            && panel.HasThemeStyleboxOverride("panel")) return;
-        var style = new StyleBoxFlat { BgColor = color, ContentMarginLeft = 20, ContentMarginRight = 20, ContentMarginTop = 14, ContentMarginBottom = 14 };
-        style.SetCornerRadiusAll(14);
-        if (color == CardConnected) { style.BorderColor = Accent; style.SetBorderWidthAll(2); }
-        panel.AddThemeStyleboxOverride("panel", style);
+        StringName variation = connected ? "ActivePanel" : "";
+        if (panel.ThemeTypeVariation != variation) panel.ThemeTypeVariation = variation;
     }
 }

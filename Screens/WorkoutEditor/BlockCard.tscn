@@ -1,0 +1,362 @@
+[gd_scene format=3]
+
+[node name="BlockCard" type="PanelContainer"]
+offset_right = 1100.0
+offset_bottom = 400.0
+
+[node name="Box" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Top" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Box/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Bloc 1"
+autowrap_mode = 3
+size_flags_horizontal = 3
+vertical_alignment = 1
+
+[node name="UpButton" type="Button" parent="Box/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(140, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "Monter"
+
+[node name="DownButton" type="Button" parent="Box/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(160, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "Descendre"
+
+[node name="DuplicateButton" type="Button" parent="Box/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(160, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "Dupliquer"
+
+[node name="RemoveButton" type="Button" parent="Box/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(160, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "Supprimer"
+modulate = Color(0.95, 0.38, 0.36, 1)
+
+[node name="Kinds" type="HFlowContainer" parent="Box"]
+layout_mode = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
+
+[node name="PowerLabel" type="Label" parent="Box/Kinds"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_type_variation = &"MutedLabel"
+text = "Puissance"
+custom_minimum_size = Vector2(0, 64)
+vertical_alignment = 1
+
+[node name="FixedChip" type="Button" parent="Box/Kinds"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Fixe"
+toggle_mode = true
+theme_type_variation = &"ChoiceButton"
+
+[node name="FreeChip" type="Button" parent="Box/Kinds"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Libre"
+toggle_mode = true
+theme_type_variation = &"ChoiceButton"
+
+[node name="RampChip" type="Button" parent="Box/Kinds"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Rampe"
+toggle_mode = true
+theme_type_variation = &"ChoiceButton"
+
+[node name="CadenceLabel" type="Label" parent="Box/Kinds"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_type_variation = &"MutedLabel"
+text = "   Cadence"
+custom_minimum_size = Vector2(0, 64)
+vertical_alignment = 1
+
+[node name="FreeCadenceChip" type="Button" parent="Box/Kinds"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Libre"
+toggle_mode = true
+theme_type_variation = &"ChoiceButton"
+
+[node name="FixedCadenceChip" type="Button" parent="Box/Kinds"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Imposée"
+toggle_mode = true
+theme_type_variation = &"ChoiceButton"
+
+[node name="DurationField" type="HBoxContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Box/DurationField"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Durée"
+autowrap_mode = 3
+custom_minimum_size = Vector2(250, 0)
+vertical_alignment = 1
+
+[node name="BigMinus" type="Button" parent="Box/DurationField"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "−1 min"
+visible = true
+
+[node name="Minus" type="Button" parent="Box/DurationField"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 28
+text = "−"
+
+[node name="Edit" type="LineEdit" parent="Box/DurationField"]
+layout_mode = 2
+custom_minimum_size = Vector2(150, 64)
+theme_override_font_sizes/font_size = 26
+alignment = 1
+select_all_on_focus = true
+
+[node name="Plus" type="Button" parent="Box/DurationField"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 28
+text = "+"
+
+[node name="BigPlus" type="Button" parent="Box/DurationField"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "+1 min"
+visible = true
+
+[node name="Unit" type="Label" parent="Box/DurationField"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_type_variation = &"MutedLabel"
+text = ""
+vertical_alignment = 1
+
+[node name="PowerField" type="HBoxContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Box/PowerField"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Puissance"
+autowrap_mode = 3
+custom_minimum_size = Vector2(250, 0)
+vertical_alignment = 1
+
+[node name="BigMinus" type="Button" parent="Box/PowerField"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "−25"
+visible = true
+
+[node name="Minus" type="Button" parent="Box/PowerField"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 28
+text = "−"
+
+[node name="Edit" type="LineEdit" parent="Box/PowerField"]
+layout_mode = 2
+custom_minimum_size = Vector2(150, 64)
+theme_override_font_sizes/font_size = 26
+alignment = 1
+select_all_on_focus = true
+
+[node name="Plus" type="Button" parent="Box/PowerField"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 28
+text = "+"
+
+[node name="BigPlus" type="Button" parent="Box/PowerField"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "+25"
+visible = true
+
+[node name="Unit" type="Label" parent="Box/PowerField"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_type_variation = &"MutedLabel"
+text = "% FTP"
+vertical_alignment = 1
+
+[node name="PowerEndField" type="HBoxContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Box/PowerEndField"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Puissance à la fin"
+autowrap_mode = 3
+custom_minimum_size = Vector2(250, 0)
+vertical_alignment = 1
+
+[node name="BigMinus" type="Button" parent="Box/PowerEndField"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "−25"
+visible = true
+
+[node name="Minus" type="Button" parent="Box/PowerEndField"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 28
+text = "−"
+
+[node name="Edit" type="LineEdit" parent="Box/PowerEndField"]
+layout_mode = 2
+custom_minimum_size = Vector2(150, 64)
+theme_override_font_sizes/font_size = 26
+alignment = 1
+select_all_on_focus = true
+
+[node name="Plus" type="Button" parent="Box/PowerEndField"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 28
+text = "+"
+
+[node name="BigPlus" type="Button" parent="Box/PowerEndField"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "+25"
+visible = true
+
+[node name="Unit" type="Label" parent="Box/PowerEndField"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_type_variation = &"MutedLabel"
+text = "% FTP"
+vertical_alignment = 1
+
+[node name="FreeNote" type="Label" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_type_variation = &"MutedLabel"
+text = "Pas de consigne : le trainer passe en simulation sur le plat, vous roulez comme vous voulez."
+autowrap_mode = 3
+
+[node name="CadenceField" type="HBoxContainer" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Box/CadenceField"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Cadence"
+autowrap_mode = 3
+custom_minimum_size = Vector2(250, 0)
+vertical_alignment = 1
+
+[node name="BigMinus" type="Button" parent="Box/CadenceField"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "−"
+visible = false
+
+[node name="Minus" type="Button" parent="Box/CadenceField"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 28
+text = "−"
+
+[node name="Edit" type="LineEdit" parent="Box/CadenceField"]
+layout_mode = 2
+custom_minimum_size = Vector2(150, 64)
+theme_override_font_sizes/font_size = 26
+alignment = 1
+select_all_on_focus = true
+
+[node name="Plus" type="Button" parent="Box/CadenceField"]
+layout_mode = 2
+custom_minimum_size = Vector2(80, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 28
+text = "+"
+
+[node name="BigPlus" type="Button" parent="Box/CadenceField"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 64)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 20
+text = "+"
+visible = false
+
+[node name="Unit" type="Label" parent="Box/CadenceField"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_type_variation = &"MutedLabel"
+text = "tr/min"
+vertical_alignment = 1

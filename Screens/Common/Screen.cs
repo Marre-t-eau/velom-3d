@@ -4,7 +4,7 @@ using Velom3d.Rides;
 
 namespace Velom3d.Screens;
 
-/// <summary>Écran plein page : le bouton Retour d'Android (et Échap sur ordinateur) appelle <see cref="OnBack"/>,
+/// <summary>Écran plein page, dont la mise en page est dans sa scène (.tscn) : le bouton Retour d'Android (et Échap sur ordinateur) appelle <see cref="OnBack"/>,
 /// ou ferme la fenêtre de confirmation ouverte.</summary>
 public abstract partial class Screen : Control
 {
@@ -33,7 +33,8 @@ public abstract partial class Screen : Control
     protected void Confirm(string question, string detail, string yes, Action onYes)
     {
         Popup?.QueueFree();
-        Popup = new ConfirmPopup(question, detail, yes, () => { ClosePopup(); onYes(); }, ClosePopup);
+        Popup = Navigator.Create<ConfirmPopup>(ConfirmPopup.ScenePath);
+        Popup.Setup(question, detail, yes, () => { ClosePopup(); onYes(); }, ClosePopup);
         AddChild(Popup);
     }
 
@@ -41,7 +42,8 @@ public abstract partial class Screen : Control
     protected void Inform(string title, string detail, string ok = "OK")
     {
         Popup?.QueueFree();
-        Popup = new ConfirmPopup(title, detail, ok, ClosePopup, null);
+        Popup = Navigator.Create<ConfirmPopup>(ConfirmPopup.ScenePath);
+        Popup.Setup(title, detail, ok, ClosePopup, null);
         AddChild(Popup);
     }
 

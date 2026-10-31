@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://Screens/RideHistory/RideHistoryScreen.cs" id="1"]
+[ext_resource type="PackedScene" path="res://Screens/RideHistory/RideCard.tscn" id="2"]
 
 [node name="RideHistoryScreen" type="Control"]
 layout_mode = 3
@@ -10,3 +11,75 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
+CardScene = ExtResource("2")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.07, 0.08, 0.1, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 32
+
+[node name="Page" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Header" type="HBoxContainer" parent="Margin/Page"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="Margin/Page/Header"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Mes sorties"
+autowrap_mode = 3
+size_flags_horizontal = 3
+
+[node name="BackButton" type="Button" parent="Margin/Page/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(200, 72)
+mouse_filter = 1
+text = "Retour"
+
+[node name="Totals" type="Label" parent="Margin/Page"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_type_variation = &"MutedLabel"
+text = ""
+autowrap_mode = 3
+
+[node name="Scroll" type="ScrollContainer" parent="Margin/Page"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+scroll_deadzone = 12
+
+[node name="List" type="VBoxContainer" parent="Margin/Page/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+size_flags_horizontal = 3
+
+[node name="Empty" type="Label" parent="Margin/Page/Scroll/List"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+theme_type_variation = &"MutedLabel"
+text = "Pas encore de sortie. Lancez une sortie libre depuis le menu : elle apparaîtra ici."
+autowrap_mode = 3
