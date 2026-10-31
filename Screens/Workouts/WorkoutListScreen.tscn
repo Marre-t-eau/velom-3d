@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://Screens/Workouts/WorkoutListScreen.cs" id="1"]
 [ext_resource type="PackedScene" path="res://Screens/Workouts/WorkoutCard.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://Screens/Common/Background.tscn" id="bg"]
 
 [node name="WorkoutListScreen" type="Control"]
 layout_mode = 3
@@ -13,14 +14,8 @@ grow_vertical = 2
 script = ExtResource("1")
 CardScene = ExtResource("2")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" parent="." instance=ExtResource("bg")]
 layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.07, 0.08, 0.1, 1)
 
 [node name="Margin" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -45,6 +40,7 @@ theme_override_constants/separation = 16
 [node name="Title" type="Label" parent="Margin/Page/Header"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 40
+theme_type_variation = &"TitleLabel"
 text = "Entraînements"
 autowrap_mode = 3
 size_flags_horizontal = 3
@@ -52,6 +48,7 @@ size_flags_horizontal = 3
 [node name="NewButton" type="Button" parent="Margin/Page/Header"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_type_variation = &"PrimaryButton"
 custom_minimum_size = Vector2(300, 72)
 mouse_filter = 1
 text = "Nouvel entraînement"

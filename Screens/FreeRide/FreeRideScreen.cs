@@ -145,7 +145,8 @@ public partial class FreeRideScreen : Screen
         _clock = GetNode<Label>("%Clock");
         _modeLabel = GetNode<Label>("%ModeLabel");
 
-        // Mesures sur une ligne en haut, commandes en bas : la route reste visible au milieu.
+        // HUD compact : chrono à gauche et mesures en bandeau en haut, commandes en bas,
+        // entraînement en deux petits panneaux sur les côtés : la route reste visible au milieu.
         // La puissance moyenne n'a pas sa tuile : toucher la puissance l'affiche quelques secondes.
         var powerTile = GetNode<Control>("%PowerTile");
         _power = powerTile.GetNode<Label>("Box/Value");
@@ -214,7 +215,7 @@ public partial class FreeRideScreen : Screen
     }
 
     /// <summary>Nombre de blocs à venir listés : au-delà, une ligne « + N autres blocs ».</summary>
-    const int UpcomingShown = 4;
+    const int UpcomingShown = 3;
 
     internal void StartWorkout(Workout workout)
     {
@@ -320,37 +321,37 @@ public partial class FreeRideScreen : Screen
                 if (!b.RampTest) hidden++;
                 else if (!rampNote)
                 {
-                    _upcoming.AddChild(Ui.Label("… +20 W chaque minute, jusqu'à ne plus tenir", 15, Ui.Muted));
+                    _upcoming.AddChild(Ui.Label("… +20 W chaque minute, jusqu'à ne plus tenir", 12, Ui.Muted));
                     rampNote = true;
                 }
                 continue;
             }
             shown++;
-            var row = Ui.Row(12);
+            var row = Ui.Row(8);
             _upcoming.AddChild(row);
-            var duration = Ui.Label(Ui.Duration(b.DurationS), 17);
-            duration.CustomMinimumSize = new Vector2(62, 0);
+            var duration = Ui.Label(Ui.Duration(b.DurationS), 14);
+            duration.CustomMinimumSize = new Vector2(44, 0);
             duration.AutowrapMode = TextServer.AutowrapMode.Off;
             row.AddChild(duration);
-            var power = Ui.Label(BlockPowerText(b), 17, Ui.PowerColor);
+            var power = Ui.Label(BlockPowerText(b), 14, Ui.PowerColor);
             power.AutowrapMode = TextServer.AutowrapMode.Off;
             power.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             row.AddChild(power);
-            var cadence = Ui.Label(CadenceText(b), 17, Ui.CadenceColor);
-            cadence.CustomMinimumSize = new Vector2(120, 0);
+            var cadence = Ui.Label(CadenceText(b), 14, Ui.CadenceColor);
+            cadence.CustomMinimumSize = new Vector2(92, 0);
             cadence.AutowrapMode = TextServer.AutowrapMode.Off;
             row.AddChild(cadence);
-            var start = Ui.Label("", 15, Ui.Muted);
-            start.CustomMinimumSize = new Vector2(90, 0);
+            var start = Ui.Label("", 12, Ui.Muted);
+            start.CustomMinimumSize = new Vector2(66, 0);
             start.HorizontalAlignment = HorizontalAlignment.Right;
             start.AutowrapMode = TextServer.AutowrapMode.Off;
             row.AddChild(start);
             _upcomingStarts.Add((start, w.StartOf(i)));
         }
         if (hidden > 0)
-            _upcoming.AddChild(Ui.Label($"+ {hidden} autre{(hidden > 1 ? "s" : "")} bloc{(hidden > 1 ? "s" : "")}", 15, Ui.Muted));
+            _upcoming.AddChild(Ui.Label($"+ {hidden} autre{(hidden > 1 ? "s" : "")} bloc{(hidden > 1 ? "s" : "")}", 12, Ui.Muted));
         if (current + 1 >= w.Blocks.Count)
-            _upcoming.AddChild(Ui.Label(current >= w.Blocks.Count ? "Rien : entraînement terminé." : "Rien : c'est le dernier bloc.", 15, Ui.Muted));
+            _upcoming.AddChild(Ui.Label(current >= w.Blocks.Count ? "Rien : entraînement terminé." : "Rien : c'est le dernier bloc.", 12, Ui.Muted));
     }
 
     /// <summary>Nombre de blocs listés « à venir » (pour les tests).</summary>
