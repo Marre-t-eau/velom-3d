@@ -9,7 +9,7 @@ using Velom3d.Sensors;
 namespace Velom3d.Tests;
 
 /// <summary>
-/// Vérifie que tout fonctionne dans le moteur (autoload, signaux, écrans de connexion, menu, sortie libre,
+/// Vérifie que tout fonctionne dans le moteur (autoload, signaux, écrans de connexion, menu, sortie libre et sa vue 3D,
 /// bilan et historique) sur le simulateur :
 ///   godot --headless --path . res://Tests/GodotSmokeTest.tscn
 /// La logique pure est testée plus finement par dotnet test (dossier UnitTests/).
@@ -125,6 +125,15 @@ public partial class GodotSmokeTest : Node
         Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 220, $"Sortie ERG : consigne envoyée ({sim.Model.TargetPowerW} W)");
         Check(rec.Ride.Samples.Count >= 3, $"Une mesure par seconde ({rec.Ride.Samples.Count})");
         Check(rec.SpeedKmh > 5 && rec.DistanceM > 1, $"Le vélo virtuel avance ({rec.SpeedKmh:0.0} km/h, {rec.DistanceM:0} m)");
+        var world = ride.Scene3D;
+        Check(world is { PropCount: > 500 } && world.Camera.Current, $"Vue 3D : circuit, décor ({world?.PropCount} éléments) et caméra");
+        Check(Godot.FileAccess.GetFileAsString(Velom3d.World.RideWorld.DefaultMapPath) is { Length: > 1000 } json
+              && Velom3d.World.CourseMap.FromJson(json).Id == world?.Map.Id, "Vue 3D : la map vient du fichier Maps/boucle-5km.json");
+        Check(world is not null && Mathf.Abs((float)(world.DistanceM - rec.DistanceM)) < 20 && world.Rider.CrankAngle > 0,
+            "Vue 3D : le cycliste avance et pédale");
+        ride.ShowAveragePower();
+        await Wait(0.1);
+        Check(ride.PowerTileTitle == "Puissance moyenne", "Toucher la puissance affiche la moyenne");
         ride.OnFinishPressed();
         await Wait(0.1);
         Check(rec.IsPaused && ride.PauseButtonText == "Reprendre", "Terminer : la sortie se met en pause, Pause devient Reprendre");
@@ -296,6 +305,7 @@ public partial class GodotSmokeTest : Node
         await Wait(1.5);
         Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 210, $"Bloc 1 : consigne ERG 210 W ({sim.Model.TargetPowerW} W)");
         Check(ride.UpcomingCount == 3, $"Les trois blocs suivants sont affichés ({ride.UpcomingCount})");
+        Check(ride.Scene3D is { PropCount: > 500 }, "Entraînement : le cycliste roule aussi en 3D");
         await Wait(2.5);
         Check(ride.Progress?.BlockIndex == 1, "Passage automatique au bloc 2 à la fin du bloc 1");
         Check(ride.UpcomingCount == 2, $"Le bloc passé n'est plus affiché ({ride.UpcomingCount})");

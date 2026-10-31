@@ -73,6 +73,20 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
   ½·ρ·CdA = 0,25 kg/m (CdA 0,40 m², mains aux cocottes) ; il durcit avec la vitesse.
   Dans les deux cas, la vitesse et la distance viennent du même modèle physique
   (`Rides/Core/BikePhysics.cs`), avec le poids du cycliste + 8 kg de vélo.
+- **Vue 3D** (`World/`) : pendant la sortie, un cycliste roule en fond d'écran sur un circuit
+  plat de 5 km qui tourne en rond (arbustes, arbres, deux bois, quatre hameaux, arche de départ),
+  caméra derrière lui comme dans Zwift. Mesures compactes en haut (puissance, cadence, cardio,
+  vitesse, distance) ; toucher la puissance affiche la puissance moyenne pendant 5 s. Il avance de la distance calculée par l'appli, pédale à la
+  cadence mesurée et s'arrête en pause. Tout est généré dans Godot en formes simples, sans fichier 3D.
+  La map (route, décor, repères) est un fichier JSON : `Maps/boucle-5km.json`, format décrit dans
+  `docs/format-des-maps.md`. Une map peut être générée (`ProceduralLoop`), importée d'une trace
+  GPX réelle (`GpxImport`) ou écrite à la main.
+  Lecture des maps et placement du décor dans `World/Core/` (C# pur, testé par `dotnet test`) ; le monde
+  (`RideWorld`) est un nœud à part, réutilisable par d'autres écrans de sortie : il suffit de
+  l'ajouter et de lui donner `Follow(distance, vitesse, cadence)` à chaque image.
+  Pour le téléphone : décor instancié par tronçons de 500 m (seuls les proches sont dessinés),
+  éclairage par sommet, une seule ombre (le cycliste), brouillard à 600 m, rendu 3D limité à
+  ~1280 px de large puis agrandi.
 - **Vitesses virtuelles** (*Réglages* depuis le menu, `Screens/Settings/`, calcul dans `Rides/Core/Gearing.cs`) :
   en simulation, on change de plateau et de pignon dans l'appli (boutons, ou flèches haut/bas
   au clavier). Préréglages : plateaux 53/39, 52/36, 50/34, 54/41, 50/37, 48/35, 46/33, 48/31,

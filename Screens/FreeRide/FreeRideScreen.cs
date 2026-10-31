@@ -2,6 +2,7 @@ using System;
 using Godot;
 using Velom3d.Rides;
 using Velom3d.Sensors;
+using Velom3d.World;
 
 namespace Velom3d.Screens;
 
@@ -13,6 +14,7 @@ namespace Velom3d.Screens;
 /// les paramètres de simulation : l'appli calcule la puissance que demandent la vitesse engagée
 /// et la cadence, et la donne au trainer en consigne, mise à jour en continu.
 /// La sortie est enregistrée sur l'appareil, et toutes les 30 s au cas où l'appli serait coupée.
+/// Pendant la sortie, le cycliste roule en 3D sur un circuit en boucle (<see cref="RideWorld"/>), en fond d'écran.
 /// Avec un <see cref="Workout"/>, le même écran déroule un entraînement structuré : la consigne
 /// suit les blocs (ERG fixe ou en rampe, simulation sur le plat pour les blocs libres), et la liste
 /// des blocs à venir s'affiche avec leur durée, leur puissance et leur cadence.
@@ -32,7 +34,7 @@ public partial class FreeRideScreen : Screen
     Label _settingsSummary = null!, _trainerHint = null!;
 
     Label _clock = null!, _modeLabel = null!, _power = null!, _powerTitle = null!, _cadence = null!, _hr = null!;
-    Label _speed = null!, _distance = null!, _avgPower = null!, _rideTarget = null!, _trainerStatus = null!;
+    Label _speed = null!, _distance = null!, _rideTarget = null!, _trainerStatus = null!;
     Control _ergControls = null!, _gearControls = null!;
     Label _gearLabel = null!;
     Button _frontButton = null!;
@@ -40,6 +42,9 @@ public partial class FreeRideScreen : Screen
     int _gearTargetW = -1;
     Button _pauseButton = null!, _finishButton = null!;
     double _sinceAutosave;
+    /// <summary>Temps restant (s) pendant lequel la tuile puissance montre la moyenne (touchée par le cycliste).</summary>
+    double _showAverageS;
+    const double ShowAverageForS = 5.0;
     /// <summary>« Terminer » touché une fois : sortie en pause, en attente de confirmation.</summary>
     bool _finishArmed;
 
@@ -47,6 +52,9 @@ public partial class FreeRideScreen : Screen
     internal RideRecorder? Recorder { get; private set; }
     /// <summary>Vitesses virtuelles de la sortie en cours (null si désactivées ou en ERG).</summary>
     internal Drivetrain? Gears { get; private set; }
+    /// <summary>Vue 3D de la sortie en cours (null avant le départ).</summary>
+    internal RideWorld? Scene3D { get; private set; }
+    CanvasItem _backdrop = null!;
 
     /// <summary>Entraînement structuré à dérouler, à renseigner avant l'ouverture (null = sortie libre).</summary>
     public Workout? Workout { get; set; }
@@ -81,6 +89,7 @@ public partial class FreeRideScreen : Screen
         _mode = _profile.LastMode;
         _target = Math.Clamp(_profile.LastTargetPowerW, 50, 1000);
         var root = Ui.BuildPage(this);
+        _backdrop = GetChild<CanvasItem>(0); // fond uni de la page, masqué pendant la sortie pour voir la 3D
         _setup = BuildSetup(root);
         _riding = BuildRiding(root);
         _riding.Visible = false;
@@ -180,44 +189,66 @@ public partial class FreeRideScreen : Screen
 
         var header = Ui.Row();
         page.AddChild(header);
-        _clock = Ui.Label("0:00", 52);
+        _clock = Ui.Label("0:00", 40);
         _clock.AutowrapMode = TextServer.AutowrapMode.Off;
+        Outline(_clock);
         header.AddChild(_clock);
-        _modeLabel = Ui.Label("", 20, Ui.Muted);
+        _modeLabel = Ui.Label("", 17, Ui.Muted);
         _modeLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _modeLabel.VerticalAlignment = VerticalAlignment.Center;
         _modeLabel.HorizontalAlignment = HorizontalAlignment.Right;
         header.AddChild(_modeLabel);
+        Outline(_modeLabel);
 
+        // Mesures sur une ligne en haut, commandes en bas : la route reste visible au milieu.
         var content = Ui.AddScroll(page, 14);
-        var row1 = Ui.Row(14);
+        content.SizeFlagsVertical = SizeFlags.ExpandFill;
+        // Tuiles compactes et centrées. La puissance moyenne n'a pas sa tuile : toucher la puissance l'affiche quelques secondes.
+        var row1 = Ui.Row(10);
+        row1.Alignment = BoxContainer.AlignmentMode.Center;
         content.AddChild(row1);
-        _power = Ui.Tile(row1, "Puissance", Ui.PowerColor, 52);
+        _power = Ui.Tile(row1, "Puissance", Ui.PowerColor, 32);
         _powerTitle = (Label)_power.GetParent().GetChild(0);
-        _cadence = Ui.Tile(row1, "Cadence", Ui.CadenceColor, 52);
+        _cadence = Ui.Tile(row1, "Cadence", Ui.CadenceColor, 32);
         _cadenceTitle = (Label)_cadence.GetParent().GetChild(0);
-        _hr = Ui.Tile(row1, "Fréquence cardiaque", Ui.HeartRateColor, 52);
+        _hr = Ui.Tile(row1, "Cardio", Ui.HeartRateColor, 32);
+        _speed = Ui.Tile(row1, "Vitesse", Ui.SpeedColor, 32);
+        _distance = Ui.Tile(row1, "Distance", Ui.Muted, 32);
+        foreach (var node in row1.GetChildren())
+        {
+            var tile = (PanelContainer)node;
+            tile.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
+            tile.CustomMinimumSize = new Vector2(190, 0);
+            tile.SelfModulate = new Color(1, 1, 1, 0.8f);
+            var style = (StyleBoxFlat)tile.GetThemeStylebox("panel");
+            style.ContentMarginTop = style.ContentMarginBottom = 8;
+            style.ContentMarginLeft = style.ContentMarginRight = 14;
+            ((Label)tile.GetChild(0).GetChild(0)).AddThemeFontSizeOverride("font_size", 15);
+        }
+        var powerTile = _power.GetParent().GetParent<Control>();
+        powerTile.CustomMinimumSize = new Vector2(240, 0);
+        powerTile.GuiInput += e =>
+        {
+            if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left }) ShowAveragePower();
+        };
         _workoutPanel = BuildWorkoutPanel(content);
         _workoutPanel.Visible = false;
-        var row2 = Ui.Row(14);
-        content.AddChild(row2);
-        _speed = Ui.Tile(row2, "Vitesse", Ui.SpeedColor);
-        _distance = Ui.Tile(row2, "Distance", Ui.Muted);
-        _avgPower = Ui.Tile(row2, "Puissance moyenne", Ui.PowerColor);
+        content.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass });
 
         var erg = Ui.Row();
         erg.Alignment = BoxContainer.AlignmentMode.Center;
         content.AddChild(erg);
-        foreach (var step in PowerSteps) erg.AddChild(Ui.Button($"−{step} W", () => ChangeTarget(-step), 150, 96, 28));
-        _rideTarget = Ui.Label("", 34);
-        _rideTarget.CustomMinimumSize = new Vector2(260, 0);
+        foreach (var step in PowerSteps) erg.AddChild(Ui.Button($"−{step} W", () => ChangeTarget(-step), 120, 68, 24));
+        _rideTarget = Ui.Label("", 28);
+        Outline(_rideTarget);
+        _rideTarget.CustomMinimumSize = new Vector2(220, 0);
         _rideTarget.HorizontalAlignment = HorizontalAlignment.Center;
         _rideTarget.VerticalAlignment = VerticalAlignment.Center;
         erg.AddChild(_rideTarget);
         for (int i = PowerSteps.Length - 1; i >= 0; i--)
         {
             int step = PowerSteps[i];
-            erg.AddChild(Ui.Button($"+{step} W", () => ChangeTarget(+step), 150, 96, 28));
+            erg.AddChild(Ui.Button($"+{step} W", () => ChangeTarget(+step), 120, 68, 24));
         }
         _ergControls = erg;
 
@@ -225,39 +256,52 @@ public partial class FreeRideScreen : Screen
         var gears = Ui.Row();
         gears.Alignment = BoxContainer.AlignmentMode.Center;
         content.AddChild(gears);
-        _frontButton = Ui.Button("Plateau", ShiftFront, 190, 96, 24);
+        _frontButton = Ui.Button("Plateau", ShiftFront, 160, 68, 22);
         gears.AddChild(_frontButton);
-        gears.AddChild(Ui.Button("− Plus souple", ShiftEasier, 230, 96, 26));
-        _gearLabel = Ui.Label("", 30);
-        _gearLabel.CustomMinimumSize = new Vector2(220, 0);
+        gears.AddChild(Ui.Button("− Plus souple", ShiftEasier, 190, 68, 22));
+        _gearLabel = Ui.Label("", 24);
+        Outline(_gearLabel);
+        _gearLabel.CustomMinimumSize = new Vector2(180, 0);
         _gearLabel.HorizontalAlignment = HorizontalAlignment.Center;
         _gearLabel.VerticalAlignment = VerticalAlignment.Center;
         gears.AddChild(_gearLabel);
-        gears.AddChild(Ui.Button("Plus dur +", ShiftHarder, 230, 96, 26));
+        gears.AddChild(Ui.Button("Plus dur +", ShiftHarder, 190, 68, 22));
         _gearControls = gears;
 
         _trainerStatus = Ui.Label("", 18, Ui.Warning);
+        Outline(_trainerStatus);
         _trainerStatus.Visible = false;
         content.AddChild(_trainerStatus);
 
         var actions = Ui.Row();
         page.AddChild(actions);
-        _pauseButton = Ui.Button("Pause", TogglePause);
+        _pauseButton = Ui.Button("Pause", TogglePause, 260, 60, 22);
         _pauseButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         actions.AddChild(_pauseButton);
-        _skipButton = Ui.Button("Bloc suivant", SkipBlock);
+        _skipButton = Ui.Button("Bloc suivant", SkipBlock, 260, 60, 22);
         _skipButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _skipButton.Visible = false;
         actions.AddChild(_skipButton);
-        _finishButton = Ui.Button("Terminer", OnFinishPressed);
+        _finishButton = Ui.Button("Terminer", OnFinishPressed, 260, 60, 22);
         _finishButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         actions.AddChild(_finishButton);
         return page;
     }
 
+    /// <summary>La tuile puissance montre la moyenne de la sortie pendant quelques secondes.</summary>
+    internal void ShowAveragePower() => _showAverageS = ShowAverageForS;
+
+    /// <summary>Contour sombre : texte lisible sur le ciel et la route.</summary>
+    static void Outline(Label label)
+    {
+        label.AddThemeConstantOverride("outline_size", 8);
+        label.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.6f));
+    }
+
     // --- Entraînement structuré ---
 
-    /// <summary>Bloc en cours (temps restant, consigne, profil) à gauche, blocs à venir à droite.</summary>
+    /// <summary>Bloc en cours (temps restant, consigne, profil) à gauche, blocs à venir à droite ;
+    /// le milieu reste libre pour voir le cycliste en 3D. Panneaux un peu transparents.</summary>
     Control BuildWorkoutPanel(Container content)
     {
         var page = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
@@ -267,29 +311,30 @@ public partial class FreeRideScreen : Screen
         page.AddChild(row);
 
         var current = Ui.Panel(Ui.Card, Ui.Accent);
-        current.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        current.SizeFlagsStretchRatio = 1.0f;
+        current.CustomMinimumSize = new Vector2(400, 0);
+        Overlay(current);
         row.AddChild(current);
+        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass });
         var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
         current.AddChild(box);
-        _blockTitle = Ui.Label("", 20, Ui.Accent);
+        _blockTitle = Ui.Label("", 16, Ui.Accent);
         box.AddChild(_blockTitle);
         // Temps restant à gauche ; consigne de puissance et de cadence à droite.
         var line = Ui.Row(20);
         box.AddChild(line);
-        _blockRemaining = Ui.Label("", 52);
+        _blockRemaining = Ui.Label("", 38);
         _blockRemaining.AutowrapMode = TextServer.AutowrapMode.Off;
         _blockRemaining.VerticalAlignment = VerticalAlignment.Center;
         line.AddChild(_blockRemaining);
         var targets = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass, SizeFlagsHorizontal = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center };
         line.AddChild(targets);
-        _blockPower = Ui.Label("", 26, Ui.PowerColor);
+        _blockPower = Ui.Label("", 21, Ui.PowerColor);
         targets.AddChild(_blockPower);
-        _blockCadence = Ui.Label("", 22, Ui.CadenceColor);
+        _blockCadence = Ui.Label("", 18, Ui.CadenceColor);
         targets.AddChild(_blockCadence);
         _blockBar = new ProgressBar
         {
-            MinValue = 0, MaxValue = 1, ShowPercentage = false, CustomMinimumSize = new Vector2(0, 14),
+            MinValue = 0, MaxValue = 1, ShowPercentage = false, CustomMinimumSize = new Vector2(0, 10),
             MouseFilter = MouseFilterEnum.Pass,
         };
         var fill = new StyleBoxFlat { BgColor = Ui.Accent };
@@ -310,22 +355,34 @@ public partial class FreeRideScreen : Screen
             freeErg.AddChild(Ui.Button(step < 0 ? $"−{-step}" : $"+{step}", () => ChangeFreeErg(step), 72, 64, 22));
         _freeErgRow = freeErg;
         // Profil de l'entraînement sous le bloc en cours : où on en est, ce qui reste.
-        _workoutChart = new WorkoutChart { CustomMinimumSize = new Vector2(0, 70), SizeFlagsVertical = SizeFlags.ExpandFill };
+        _workoutChart = new WorkoutChart { CustomMinimumSize = new Vector2(0, 46) };
         box.AddChild(_workoutChart);
 
         var next = Ui.Panel(Ui.Card);
-        next.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        next.SizeFlagsStretchRatio = 1.3f;
+        next.CustomMinimumSize = new Vector2(440, 0);
+        Overlay(next);
         row.AddChild(next);
         var nextBox = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        nextBox.AddThemeConstantOverride("separation", 6);
+        nextBox.AddThemeConstantOverride("separation", 4);
         next.AddChild(nextBox);
-        nextBox.AddChild(Ui.Label("À venir", 20, Ui.Muted));
+        nextBox.AddChild(Ui.Label("À venir", 16, Ui.Muted));
         _upcoming = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        _upcoming.AddThemeConstantOverride("separation", 4);
+        _upcoming.AddThemeConstantOverride("separation", 2);
         nextBox.AddChild(_upcoming);
         return page;
     }
+
+    /// <summary>Panneau posé sur la 3D : un peu transparent, marges réduites.</summary>
+    static void Overlay(PanelContainer panel)
+    {
+        panel.SelfModulate = new Color(1, 1, 1, 0.82f);
+        var style = (StyleBoxFlat)panel.GetThemeStylebox("panel");
+        style.ContentMarginTop = style.ContentMarginBottom = 8;
+        style.ContentMarginLeft = style.ContentMarginRight = 14;
+    }
+
+    /// <summary>Nombre de blocs à venir listés : au-delà, une ligne « + N autres blocs ».</summary>
+    const int UpcomingShown = 4;
 
     internal void StartWorkout(Workout workout)
     {
@@ -343,9 +400,7 @@ public partial class FreeRideScreen : Screen
         _gearControls.Visible = false;
         _workoutPanel.Visible = true;
         _skipButton.Visible = true;
-        _setup.Visible = false;
-        _riding.Visible = true;
-        DisplayServer.ScreenSetKeepOn(true);
+        ShowRiding();
     }
 
     /// <summary>ERG oui / non pendant les blocs libres ; démarre à la puissance du moment, arrondie à 5 W.</summary>
@@ -421,39 +476,49 @@ public partial class FreeRideScreen : Screen
         var w = Workout!;
         foreach (var child in _upcoming.GetChildren()) child.QueueFree();
         _upcomingStarts.Clear();
-        int rampRows = 0;
+        int shown = 0, hidden = 0;
+        bool rampNote = false;
         for (int i = current + 1; i < w.Blocks.Count; i++)
         {
             var b = w.Blocks[i];
-            // Test rampe : les 4 prochains paliers suffisent, la suite est « jusqu'à ne plus tenir ».
-            if (b.RampTest && ++rampRows > 4)
+            // Au-delà des premières lignes : « + N autres blocs ». Test rampe : la suite des paliers
+            // est « jusqu'à ne plus tenir ».
+            if (shown >= UpcomingShown)
             {
-                if (rampRows == 5) _upcoming.AddChild(Ui.Label("… +20 W chaque minute, jusqu'à ne plus tenir", 18, Ui.Muted));
+                if (!b.RampTest) hidden++;
+                else if (!rampNote)
+                {
+                    _upcoming.AddChild(Ui.Label("… +20 W chaque minute, jusqu'à ne plus tenir", 15, Ui.Muted));
+                    rampNote = true;
+                }
                 continue;
             }
+            shown++;
             var row = Ui.Row(12);
             _upcoming.AddChild(row);
-            var duration = Ui.Label(Ui.Duration(b.DurationS), 20);
-            duration.CustomMinimumSize = new Vector2(80, 0);
+            var duration = Ui.Label(Ui.Duration(b.DurationS), 17);
+            duration.CustomMinimumSize = new Vector2(62, 0);
             duration.AutowrapMode = TextServer.AutowrapMode.Off;
             row.AddChild(duration);
-            var power = Ui.Label(BlockPowerText(b), 20, Ui.PowerColor);
+            var power = Ui.Label(BlockPowerText(b), 17, Ui.PowerColor);
             power.AutowrapMode = TextServer.AutowrapMode.Off;
             power.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             row.AddChild(power);
-            var cadence = Ui.Label(CadenceText(b), 20, Ui.CadenceColor);
-            cadence.CustomMinimumSize = new Vector2(150, 0);
+            var cadence = Ui.Label(CadenceText(b), 17, Ui.CadenceColor);
+            cadence.CustomMinimumSize = new Vector2(120, 0);
             cadence.AutowrapMode = TextServer.AutowrapMode.Off;
             row.AddChild(cadence);
-            var start = Ui.Label("", 18, Ui.Muted);
-            start.CustomMinimumSize = new Vector2(110, 0);
+            var start = Ui.Label("", 15, Ui.Muted);
+            start.CustomMinimumSize = new Vector2(90, 0);
             start.HorizontalAlignment = HorizontalAlignment.Right;
             start.AutowrapMode = TextServer.AutowrapMode.Off;
             row.AddChild(start);
             _upcomingStarts.Add((start, w.StartOf(i)));
         }
+        if (hidden > 0)
+            _upcoming.AddChild(Ui.Label($"+ {hidden} autre{(hidden > 1 ? "s" : "")} bloc{(hidden > 1 ? "s" : "")}", 15, Ui.Muted));
         if (current + 1 >= w.Blocks.Count)
-            _upcoming.AddChild(Ui.Label(current >= w.Blocks.Count ? "Rien : entraînement terminé." : "Rien : c'est le dernier bloc.", 20, Ui.Muted));
+            _upcoming.AddChild(Ui.Label(current >= w.Blocks.Count ? "Rien : entraînement terminé." : "Rien : c'est le dernier bloc.", 15, Ui.Muted));
     }
 
     /// <summary>Nombre de blocs listés « à venir » (pour les tests).</summary>
@@ -526,8 +591,17 @@ public partial class FreeRideScreen : Screen
             : "Simulation réaliste · plat";
         _ergControls.Visible = mode == RideMode.TargetPower;
         _gearControls.Visible = Gears is not null;
+        ShowRiding();
+    }
+
+    /// <summary>Page de la sortie, avec le cycliste en 3D en fond (le fond uni de la page est masqué).</summary>
+    void ShowRiding()
+    {
         _setup.Visible = false;
         _riding.Visible = true;
+        Scene3D = new RideWorld();
+        AddChild(Scene3D);
+        _backdrop.Visible = false;
         DisplayServer.ScreenSetKeepOn(true);
     }
 
@@ -635,6 +709,7 @@ public partial class FreeRideScreen : Screen
 
     /// <summary>État affiché des boutons (pour les tests).</summary>
     internal string PauseButtonText => _pauseButton.Text;
+    internal string PowerTileTitle => _powerTitle.Text;
 
     internal void Finish()
     {
@@ -691,16 +766,27 @@ public partial class FreeRideScreen : Screen
                 SkipBlock();
             }
         }
+        bool moving = !Recorder.IsPaused;
+        Scene3D?.Follow(Recorder.DistanceM, moving ? Recorder.Physics.SpeedMps : 0, moving ? Hub.Cadence : 0);
         if (Gears is not null) UpdateGearResistance(delta);
 
         _sinceAutosave += delta;
         if (_sinceAutosave >= AutosaveEveryS) Autosave();
 
         _clock.Text = Ui.Duration(Recorder.ElapsedS);
-        _power.Text = $"{Hub.Power} W";
-        _powerTitle.Text = Progress is not null ? Recorder.TargetPowerW > 0 ? $"Puissance · cible {Recorder.TargetPowerW} W" : "Puissance · libre"
-            : Recorder.Ride.Info.Mode == RideMode.TargetPower ? $"Puissance · cible {Recorder.TargetPowerW} W"
-            : Gears is not null && _gearTargetW >= 0 ? $"Puissance · demandée {_gearTargetW} W" : "Puissance";
+        _showAverageS = Math.Max(0, _showAverageS - delta);
+        if (_showAverageS > 0)
+        {
+            _power.Text = Recorder.ElapsedS > 0 ? $"{Recorder.AveragePowerW:0} W" : "--";
+            _powerTitle.Text = "Puissance moyenne";
+        }
+        else
+        {
+            // En ERG, la cible est déjà affichée au-dessus des boutons ±.
+            _power.Text = $"{Hub.Power} W";
+            _powerTitle.Text = Progress is not null ? Recorder.TargetPowerW > 0 ? $"Puissance · cible {Recorder.TargetPowerW} W" : "Puissance · libre"
+                : Gears is not null && _gearTargetW >= 0 ? $"Puissance · demandée {_gearTargetW} W" : "Puissance";
+        }
         if (Gears is not null)
         {
             _gearLabel.Text = $"{Gears.GearLabel}\n{Gears.RearGearNumber}/{Gears.Cogs.Length}";
@@ -717,7 +803,6 @@ public partial class FreeRideScreen : Screen
         _hr.Text = Hub.HeartRate > 0 ? $"{Hub.HeartRate} bpm" : "--";
         _speed.Text = $"{Recorder.SpeedKmh:0.0} km/h";
         _distance.Text = Ui.Km(Recorder.DistanceM);
-        _avgPower.Text = Recorder.ElapsedS > 0 ? $"{Recorder.AveragePowerW:0} W" : "--";
         _rideTarget.Text = $"Cible {Recorder.TargetPowerW} W";
         _finishButton.Text = _finishArmed ? "Confirmer la fin" : "Terminer";
         _pauseButton.Text = Recorder.IsPaused ? "Reprendre" : "Pause";
