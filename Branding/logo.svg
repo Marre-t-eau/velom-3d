@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="roof" gradientUnits="userSpaceOnUse" x1="68" y1="70" x2="444" y2="214">
+      <stop offset="0" stop-color="#C4B5FD"/>
+      <stop offset="0.55" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#6D28D9"/>
+    </linearGradient>
+  </defs>
+  <!-- Toit de la maison, avec sa cheminée -->
+  <path d="M344 86h38v92l-38-29z" fill="url(#roof)"/>
+  <path d="M68 214 256 70l188 144" fill="none" stroke="url(#roof)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Roue : pneu, jante, rayons, moyeu -->
+  <circle cx="256" cy="322" r="146" fill="none" stroke="#F5F3FF" stroke-width="26"/>
+  <circle cx="256" cy="322" r="124" fill="none" stroke="#A78BFA" stroke-width="6"/>
+  <path d="M278.2 335.6L376.0 322.0M281.7 317.9L366.9 367.9M262.1 347.3L340.9 406.9M277.0 337.3L301.9 432.9M242.4 344.2L256.0 442.0M260.1 347.7L210.1 432.9M230.7 328.1L171.1 406.9M240.7 343.0L145.1 367.9M233.8 308.4L136.0 322.0M230.3 326.1L145.1 276.1M249.9 296.7L171.1 237.1M235.0 306.7L210.1 211.1M269.6 299.8L256.0 202.0M251.9 296.3L301.9 211.1M281.3 315.9L340.9 237.1M271.3 301.0L366.9 276.1" stroke="#DDD6FE" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="256" cy="322" r="26" fill="#8B5CF6"/>
+  <circle cx="256" cy="322" r="10" fill="#F5F3FF"/>
+</svg>

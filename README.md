@@ -109,10 +109,18 @@ il retrouve les nœuds par leur nom unique (`%Nom`, clic droit > *Accès comme n
 les signaux et met les valeurs à jour. Ce qui se répète selon les données a sa petite scène, créée
 par le code pour chaque élément : `DeviceRow.tscn` (appareil), `RideCard.tscn` (sortie),
 `WorkoutCard.tscn` (entraînement), `BlockCard.tscn` (bloc dans l'éditeur), `ConfirmPopup.tscn`
-(fenêtre Non / Oui). Les styles communs (cartes, boutons à bascule verts, textes grisés, contour
-lisible sur la 3D, taille de police par défaut) sont dans le thème `Screens/Common/Theme.tres`,
-appliqué à tout le projet (*Projet > Paramètres > GUI > Thème*) : on choisit une variante dans
-l'inspecteur, *Theme > Type Variation* (`MutedLabel`, `ChoiceButton`, `OverlayPanel`…).
+(fenêtre Non / Oui). Les styles communs (palette violette, cartes, boutons, boutons à bascule,
+textes grisés, contour lisible sur la 3D, taille de police par défaut) sont dans le thème
+`Screens/Common/Theme.tres`, appliqué à tout le projet (*Projet > Paramètres > GUI > Thème*) : on
+choisit une variante dans l'inspecteur, *Theme > Type Variation* (`PrimaryButton` pour l'action
+principale d'un écran, `TileButton` / `HeroTileButton` pour les tuiles du menu, `TitleLabel` pour
+les titres en gras, `MutedLabel`, `ChoiceButton`, `PillPanel`, `OverlayPanel`…). Le fond dégradé
+commun à tous les écrans est la scène `Screens/Common/Background.tscn`, et les pictogrammes du menu
+sont dans `Screens/Common/Icons/`.
+
+Logo : une roue de vélo sous un toit de maison, dans `Branding/` (`logo.svg` sans fond,
+`icon.svg` et `icon-512.png` / `icon-1024.png` avec le fond violet pour l'icône de l'appli ;
+`icon.svg` à la racine est celui que Godot utilise).
 
 Les sorties sont enregistrées sur l'appareil, dans `user://rides/`, deux fichiers par sortie
 (détail dans `docs/format-des-donnees.md`) :

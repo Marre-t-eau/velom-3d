@@ -1,0 +1,54 @@
+[gd_scene format=3]
+
+[sub_resource type="Gradient" id="base_gradient"]
+colors = PackedColorArray(0.11, 0.063, 0.22, 1, 0.047, 0.039, 0.09, 1)
+
+[sub_resource type="GradientTexture2D" id="base_texture"]
+gradient = SubResource("base_gradient")
+width = 64
+height = 64
+fill_from = Vector2(0, 0)
+fill_to = Vector2(0.7, 1)
+
+[sub_resource type="Gradient" id="glow_gradient"]
+colors = PackedColorArray(0.486, 0.227, 0.929, 0.3, 0.486, 0.227, 0.929, 0)
+
+[sub_resource type="GradientTexture2D" id="glow_texture"]
+gradient = SubResource("glow_gradient")
+width = 256
+height = 256
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[node name="Background" type="TextureRect"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("base_texture")
+expand_mode = 1
+
+[node name="GlowTopRight" type="TextureRect" parent="."]
+modulate = Color(1, 1, 1, 0.9)
+layout_mode = 1
+anchor_left = 0.45
+anchor_top = -0.6
+anchor_right = 1.35
+anchor_bottom = 0.7
+mouse_filter = 2
+texture = SubResource("glow_texture")
+expand_mode = 1
+
+[node name="GlowBottomLeft" type="TextureRect" parent="."]
+modulate = Color(1, 1, 1, 0.45)
+layout_mode = 1
+anchor_left = -0.3
+anchor_top = 0.55
+anchor_right = 0.4
+anchor_bottom = 1.5
+mouse_filter = 2
+texture = SubResource("glow_texture")
+expand_mode = 1

@@ -10,9 +10,10 @@ namespace Velom3d.Screens;
 /// </summary>
 public static class Ui
 {
-    public static readonly Color Card = new(0.13f, 0.15f, 0.18f);
-    public static readonly Color Muted = new(0.62f, 0.66f, 0.72f);
-    public static readonly Color Accent = new(0.22f, 0.78f, 0.47f);
+    // Palette violette, la même que Theme.tres.
+    public static readonly Color Card = new(0.102f, 0.078f, 0.188f);
+    public static readonly Color Muted = new(0.635f, 0.612f, 0.749f);
+    public static readonly Color Accent = new(0.655f, 0.545f, 0.98f);
     public static readonly Color Warning = new(1.0f, 0.72f, 0.30f);
     public static readonly Color Danger = new(0.95f, 0.38f, 0.36f);
 
@@ -64,7 +65,7 @@ public static class Ui
     {
         var chip = Button(text, onPressed, 120, 64, 22);
         chip.ToggleMode = true;
-        chip.ThemeTypeVariation = "ChoiceButton"; // vert bordé quand il est choisi (Theme.tres)
+        chip.ThemeTypeVariation = "ChoiceButton"; // violet bordé quand il est choisi (Theme.tres)
         parent.AddChild(chip);
         return chip;
     }

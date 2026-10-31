@@ -193,7 +193,7 @@ public partial class DeviceConnectionScreen : Control
         _empty = GetNode<Label>("%Empty");
     }
 
-    /// <summary>Carte verte bordée quand l'appareil est connecté (styles du thème).</summary>
+    /// <summary>Carte violette bordée quand l'appareil est connecté (styles du thème).</summary>
     static void SetConnected(PanelContainer panel, bool connected)
     {
         StringName variation = connected ? "ActivePanel" : "";
