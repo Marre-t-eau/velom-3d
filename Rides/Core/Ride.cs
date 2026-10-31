@@ -37,6 +37,9 @@ public sealed class RiderProfile
     public int[] Chainrings { get; set; } = Gearing.DefaultChainrings;
     public int[] Cogs { get; set; } = Gearing.DefaultCogs;
     public int WheelCircumferenceMm { get; set; } = 2105;
+    /// <summary>Dernier enregistrement (mis par <see cref="RideStore.SaveProfile"/>) : départage la
+    /// synchronisation quand deux appareils ont chacun leurs réglages.</summary>
+    public DateTimeOffset UpdatedAt { get; set; }
 
     /// <summary>Transmission réglée, ou celle par défaut si le fichier contient des dentures invalides.</summary>
     public Drivetrain CreateDrivetrain()

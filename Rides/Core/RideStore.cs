@@ -123,6 +123,7 @@ public sealed class RideStore
     public void SaveProfile(RiderProfile profile)
     {
         System.IO.Directory.CreateDirectory(Directory);
+        profile.UpdatedAt = DateTimeOffset.Now;
         WriteAtomic(ProfilePath, JsonSerializer.Serialize(profile, RideJson.Default.RiderProfile));
     }
 

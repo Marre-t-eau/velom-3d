@@ -302,3 +302,133 @@ theme_override_font_sizes/font_size = 20
 theme_type_variation = &"AccentLabel"
 text = ""
 autowrap_mode = 3
+
+[node name="SyncSection" type="Label" parent="Margin/Page/Scroll/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Synchronisation"
+autowrap_mode = 3
+custom_minimum_size = Vector2(0, 52)
+vertical_alignment = 2
+
+[node name="SyncToggle" type="CheckButton" parent="Margin/Page/Scroll/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+theme_override_font_sizes/font_size = 24
+text = "Synchroniser avec un serveur"
+
+[node name="SyncHint" type="Label" parent="Margin/Page/Scroll/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_type_variation = &"MutedLabel"
+text = "Facultatif. Vos sorties, entraînements et réglages restent sur cet appareil, qui fait foi : le serveur en garde une copie pour les retrouver sur vos autres appareils. Une modification faite ici l'emporte sur celle du serveur. Vous pouvez héberger votre propre serveur et mettre son adresse ci-dessous."
+autowrap_mode = 3
+
+[node name="SyncOptions" type="VBoxContainer" parent="Margin/Page/Scroll/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ServerTitle" type="Label" parent="Margin/Page/Scroll/Content/SyncOptions"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Adresse du serveur"
+autowrap_mode = 3
+
+[node name="ServerUrlEdit" type="LineEdit" parent="Margin/Page/Scroll/Content/SyncOptions"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 64)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+placeholder_text = "https://mon-serveur.fr"
+virtual_keyboard_type = 7
+
+[node name="SyncLoginForm" type="VBoxContainer" parent="Margin/Page/Scroll/Content/SyncOptions"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="UsernameEdit" type="LineEdit" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 64)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+placeholder_text = "Nom d'utilisateur"
+
+[node name="PasswordEdit" type="LineEdit" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 64)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+placeholder_text = "Mot de passe (8 caractères au moins)"
+secret = true
+virtual_keyboard_type = 6
+
+[node name="Buttons" type="HBoxContainer" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="LoginButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Se connecter"
+
+[node name="RegisterButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Créer un compte"
+
+[node name="SyncAccount" type="VBoxContainer" parent="Margin/Page/Scroll/Content/SyncOptions"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+visible = false
+
+[node name="SyncAccountLabel" type="Label" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = ""
+autowrap_mode = 3
+
+[node name="Buttons" type="HBoxContainer" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SyncNowButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Synchroniser maintenant"
+
+[node name="LogoutButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Se déconnecter"
+
+[node name="SyncStatus" type="Label" parent="Margin/Page/Scroll/Content/SyncOptions"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_type_variation = &"MutedLabel"
+text = ""
+autowrap_mode = 3

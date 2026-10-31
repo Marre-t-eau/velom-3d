@@ -3,13 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using Velom3d.Rides;
+using Velom3d.Sync;
 
 namespace Velom3d.Screens;
 
 /// <summary>
 /// Réglages du cycliste et du vélo : FTP, poids, roue, et vitesses virtuelles (plateaux et
 /// cassette, choisis parmi les transmissions courantes ou saisis à la main).
-/// Chaque changement est enregistré tout de suite. Mise en page : SettingsScreen.tscn.
+/// Chaque changement est enregistré tout de suite. Synchronisation facultative avec un serveur
+/// (adresse modifiable, compte). Mise en page : SettingsScreen.tscn.
 /// </summary>
 public partial class SettingsScreen : Screen
 {
@@ -20,6 +22,12 @@ public partial class SettingsScreen : Screen
     readonly List<(Button Chip, int Mm)> _wheelChips = new();
     readonly List<(Button Chip, int[] Teeth)> _chainringChips = new();
     readonly List<(Button Chip, int[] Teeth)> _cassetteChips = new();
+    CheckButton _syncToggle = null!;
+    Control _syncOptions = null!, _loginForm = null!, _account = null!;
+    LineEdit _serverUrl = null!, _username = null!, _password = null!;
+    Label _accountLabel = null!, _syncStatus = null!;
+    Button _login = null!, _register = null!, _syncNow = null!, _logout = null!;
+    bool _syncBusy;
 
     /// <summary>Profil en cours de modification (pour les tests).</summary>
     internal RiderProfile Profile => _profile;
@@ -63,8 +71,119 @@ public partial class SettingsScreen : Screen
             "5 à 14 pignons de 8 à 60 dents, séparés par des virgules.");
 
         _gearSummary = GetNode<Label>("%GearSummary");
+        ReadySync();
         Refresh();
     }
+
+    // ---- Synchronisation ----
+
+    void ReadySync()
+    {
+        _syncToggle = GetNode<CheckButton>("%SyncToggle");
+        _syncOptions = GetNode<Control>("%SyncOptions");
+        _serverUrl = GetNode<LineEdit>("%ServerUrlEdit");
+        _loginForm = GetNode<Control>("%SyncLoginForm");
+        _username = GetNode<LineEdit>("%UsernameEdit");
+        _password = GetNode<LineEdit>("%PasswordEdit");
+        _login = GetNode<Button>("%LoginButton");
+        _register = GetNode<Button>("%RegisterButton");
+        _account = GetNode<Control>("%SyncAccount");
+        _accountLabel = GetNode<Label>("%SyncAccountLabel");
+        _syncNow = GetNode<Button>("%SyncNowButton");
+        _logout = GetNode<Button>("%LogoutButton");
+        _syncStatus = GetNode<Label>("%SyncStatus");
+
+        var state = Sync.State;
+        _serverUrl.Text = state.ServerUrl;
+        _username.Text = state.Username;
+        _syncToggle.Toggled += on =>
+        {
+            Sync.State.Enabled = on;
+            Sync.SaveState();
+            RefreshSync();
+            if (on && Sync.State.LoggedIn) SyncNow();
+        };
+        _serverUrl.TextChanged += text => { Sync.State.ServerUrl = text.Trim(); Sync.SaveState(); };
+        _login.Pressed += () => SignIn(register: false);
+        _register.Pressed += () => SignIn(register: true);
+        _password.TextSubmitted += _ => SignIn(register: false);
+        _syncNow.Pressed += SyncNow;
+        _logout.Pressed += async () =>
+        {
+            await Busy("Déconnexion…", Sync.LogoutAsync);
+            if (IsInstanceValid(this)) _syncStatus.Text = "Déconnecté. Vos données restent sur cet appareil.";
+        };
+        RefreshSync();
+    }
+
+    async void SignIn(bool register)
+    {
+        if (_syncBusy) return;
+        string url = _serverUrl.Text, user = _username.Text, password = _password.Text;
+        bool ok = await Busy(register ? "Création du compte…" : "Connexion…",
+            () => register ? Sync.RegisterAsync(url, user, password) : Sync.LoginAsync(url, user, password));
+        if (!ok || !IsInstanceValid(this)) return;
+        _password.Text = "";
+        _serverUrl.Text = Sync.State.ServerUrl;
+        SyncNow();
+    }
+
+    async void SyncNow()
+    {
+        if (_syncBusy) return;
+        SyncReport? report = null;
+        bool ok = await Busy("Synchronisation…", async () => report = await Sync.SyncAsync());
+        if (!ok || !IsInstanceValid(this)) return;
+        // Les réglages ont pu arriver d'un autre appareil.
+        _profile = Store.LoadProfile();
+        Refresh();
+        _syncStatus.Text = Describe(report!) + " " + LastSync();
+    }
+
+    /// <summary>Fait une opération réseau en grisant les boutons ; false (et le message affiché) si elle échoue.</summary>
+    async System.Threading.Tasks.Task<bool> Busy(string message, Func<System.Threading.Tasks.Task> work)
+    {
+        _syncBusy = true;
+        RefreshSync();
+        _syncStatus.Text = message;
+        try
+        {
+            await work();
+            return true;
+        }
+        catch (SyncException e)
+        {
+            if (IsInstanceValid(this)) _syncStatus.Text = e.Message;
+            return false;
+        }
+        finally
+        {
+            _syncBusy = false;
+            if (IsInstanceValid(this)) RefreshSync();
+        }
+    }
+
+    void RefreshSync()
+    {
+        var state = Sync.State;
+        _syncToggle.SetPressedNoSignal(state.Enabled);
+        _syncOptions.Visible = state.Enabled;
+        _loginForm.Visible = !state.LoggedIn;
+        _account.Visible = state.LoggedIn;
+        _serverUrl.Editable = !state.LoggedIn && !_syncBusy;
+        _accountLabel.Text = $"Connecté : {state.Username}";
+        foreach (var b in new[] { _login, _register, _syncNow, _logout }) b.Disabled = _syncBusy;
+        if (!_syncBusy && _syncStatus.Text.Length == 0)
+            _syncStatus.Text = state.LastError.Length > 0 ? state.LastError : LastSync();
+    }
+
+    static string Describe(SyncReport r) =>
+        r.Sent + r.Received + r.Deleted == 0 ? "Tout est à jour."
+        : $"{r.Sent} envoyé(s), {r.Received} reçu(s)" + (r.Deleted > 0 ? $", {r.Deleted} supprimé(s)." : ".");
+
+    static string LastSync() => Sync.State.LastSyncAt is { } at
+        ? $"Dernière synchronisation : {at.ToLocalTime():dd/MM/yyyy HH:mm}."
+        : "";
 
     /// <summary>Branche les boutons − / + d'une ligne de réglage ; renvoie le label de la valeur.</summary>
     Label Stepper(string node, Action<int> change)

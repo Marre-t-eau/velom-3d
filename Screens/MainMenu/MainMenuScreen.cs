@@ -21,6 +21,8 @@ public partial class MainMenuScreen : Screen
         Choice(FreeRideButton, Navigator.FreeRide);
         Choice(GetNode<Button>("%HistoryButton"), Navigator.History);
         Choice(GetNode<Button>("%SensorsButton"), Navigator.Connection);
+        // Au retour au menu (lancement, fin de sortie…) : envoie les nouveautés si la synchro est activée.
+        SyncInBackground();
     }
 
     public override void _Process(double delta)

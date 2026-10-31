@@ -38,7 +38,7 @@ indisponible.
 ```
 Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements ─┬─ Modifier ──► Édition des blocs
                                             │                └─ Démarrer ──► Séance ──Terminer──► Bilan
-                                            ├─ Réglages (cycliste, vélo, vitesses virtuelles)
+                                            ├─ Réglages (cycliste, vélo, vitesses virtuelles, synchronisation)
                                             ├─ Sortie libre ──Terminer──► Bilan
                                             ├─ Mes sorties ──► Bilan d'une sortie
                                             └─ Capteurs (retour à la connexion)
@@ -131,6 +131,19 @@ format (une ligne par seconde) restent lisibles. `profile.json` garde les régla
 entraînements sont dans `user://workouts/{id}.json`. Pendant une sortie, enregistrement toutes les 30 s et à la mise en
 arrière-plan. Le calcul (`Rides/Core/`) ne dépend pas de Godot et est testé par `dotnet test`.
 
+## Synchronisation (facultative)
+
+*Réglages > Synchronisation* : activer, saisir l'adresse d'un serveur, puis créer un compte ou se
+connecter. Les réglages, les entraînements et les sorties sont alors copiés sur le serveur et
+retrouvés sur les autres appareils du compte ; l'appli synchronise à chaque retour au menu, en
+arrière-plan, ou avec *Synchroniser maintenant*. Sans serveur, rien ne change : tout reste sur
+l'appareil, et ces fichiers restent la référence. Une modification faite sur l'appareil l'emporte
+sur celle du serveur ; un fichier non modifié ici prend la version d'un autre appareil.
+
+Le serveur est dans `Server/` (ASP.NET Core, base SQLite), à héberger soi-même, avec Docker ou
+`dotnet run --project Server` : installation, réglages, règles et API dans `Server/README.md`.
+Côté appli : `Sync/Core/` (C# pur, sans Godot), état local dans `user://sync.json`.
+
 ## Export Android avec le Bluetooth natif
 
 1. Construire le plugin (JDK 17 et SDK Android requis) :
@@ -151,5 +164,6 @@ iOS : pas encore de plugin. Un plugin iOS (CoreBluetooth) qui expose le même si
 
 ```
 dotnet test UnitTests/Velom3d.Sensors.Tests
+dotnet test UnitTests/Velom3d.Server.Tests      # serveur de synchronisation, de bout en bout
 dotnet build Velom3d.csproj && godot --headless --import --path . && godot --headless --path . res://Tests/GodotSmokeTest.tscn
 ```

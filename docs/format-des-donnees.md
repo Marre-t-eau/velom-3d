@@ -1,6 +1,6 @@
 # Format des données enregistrées par Velom3d
 
-Tout est stocké sur le téléphone, dans le dossier privé de l'appli (`user://` pour Godot). Il n'y a ni serveur ni envoi en ligne. Les fichiers sont en texte : JSON pour les en-têtes et les réglages, CSV pour les données. Les CSV utilisent la virgule comme séparateur et le point comme décimale.
+Tout est stocké sur le téléphone, dans le dossier privé de l'appli (`user://` pour Godot). Rien n'est envoyé en ligne, sauf si le joueur active la synchronisation avec un serveur (section 5) : les fichiers du téléphone restent alors la référence. Les fichiers sont en texte : JSON pour les en-têtes et les réglages, CSV pour les données. Les CSV utilisent la virgule comme séparateur et le point comme décimale.
 
 ```
 user://
@@ -9,8 +9,9 @@ user://
 │   ├── 20261013-160000.json      en-tête d'une sortie : réglages, capteurs, bilan
 │   └── 20261013-160000.csv       données de la sortie : une ligne par valeur reçue
 └── workouts/
-    ├── ftp-test.json             un entraînement structuré par fichier
+    ├── exemple-sweet-spot.json   un entraînement structuré par fichier
     └── w20261012-091530123.json
+sync.json                         synchronisation facultative (section 5)
 ```
 
 L'identifiant d'une sortie est l'heure de départ en UTC, au format `aaaaMMjj-HHmmss`. Pendant la sortie, les nouvelles lignes sont ajoutées au CSV toutes les 30 s et à chaque passage en arrière-plan, et l'en-tête est réécrit (`.tmp` puis remplacement, jamais tronqué).
@@ -165,7 +166,8 @@ Le fichier contient :
 - `FtpW` et `FtpTestedAt` ;
 - `RiderMassKg`, `BikeMassKg` ;
 - `VirtualGears`, `Chainrings`, `Cogs`, `WheelCircumferenceMm` ;
-- `LastMode`, `LastTargetPowerW`.
+- `LastMode`, `LastTargetPowerW` ;
+- `UpdatedAt`, l'heure du dernier enregistrement (départage deux appareils lors d'une première synchronisation).
 
 ## 4. Entraînements structurés : `workouts/{id}.json`
 
@@ -181,3 +183,23 @@ Une sortie faite en suivant un entraînement porte son nom dans `WorkoutName`. L
 ## Anciennes sorties
 
 Les sorties enregistrées avant ce format ont un CSV avec une ligne par seconde (colonnes `time_s,power_w,cadence_rpm,…`). Elles restent lisibles, mais n'ont ni fiche capteur, ni valeurs brutes, ni pauses.
+
+## 5. Synchronisation facultative : `sync.json`
+
+Désactivée par défaut (*Réglages > Synchronisation*). Une fois activée et connectée à un compte,
+l'appli envoie au serveur une copie de `profile.json`, des entraînements et des sorties (en-tête et
+CSV compressé), et reçoit celles des autres appareils du compte. Les fichiers sont envoyés tels
+quels. Le serveur se trouve dans le dossier `Server/` du dépôt, auto-hébergeable ; ses règles et son
+API sont décrites dans `Server/README.md`.
+
+`user://sync.json` n'est jamais envoyé. Il contient :
+- `Enabled`, `ServerUrl`, `Username`, `Token` (jeton de connexion, vide si déconnecté) ;
+- `Account` (adresse + nom) et `Cursor` (dernier changement du serveur reçu) ;
+- `Known` : pour chaque fichier (`profile/profile`, `workout/{id}`, `ride/{id}`), son empreinte
+  SHA-256 à la dernière synchronisation (plus la taille du CSV pour une sortie). Un fichier dont
+  l'empreinte a changé a été modifié sur l'appareil, et sa version l'emporte sur celle du serveur ;
+- `Pending` : sorties reçues dont le CSV n'était pas encore sur le serveur, réessayées ensuite ;
+- `LastSyncAt`, `LastError`.
+
+Les deux exemples d'entraînement ont des ids fixes (`exemple-sweet-spot`, `exemple-pma`) et la date
+du 1er janvier 2026, pour ne pas être en double sur les appareils d'un même compte.

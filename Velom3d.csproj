@@ -9,5 +9,7 @@
     <!-- Tests xUnit (projet séparé) et plugin Android : hors de l'assembly du jeu. -->
     <Compile Remove="UnitTests/**" />
     <Compile Remove="android-plugin/**" />
+    <!-- Serveur de synchronisation : programme à part, voir Server/README.md. -->
+    <Compile Remove="Server/**" />
   </ItemGroup>
 </Project>

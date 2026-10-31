@@ -21,7 +21,7 @@ public sealed class WorkoutStore
         if (!System.IO.Directory.Exists(Directory))
         {
             System.IO.Directory.CreateDirectory(Directory);
-            foreach (var w in Workout.Examples(DateTimeOffset.Now)) Save(w);
+            foreach (var w in Workout.Examples(Workout.ExamplesDate)) Save(w);
         }
         var workouts = new List<Workout>();
         foreach (var path in System.IO.Directory.GetFiles(Directory, "*.json"))

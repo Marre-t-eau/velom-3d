@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using Velom3d.Rides;
+using Velom3d.Sync;
 
 namespace Velom3d.Screens;
 
@@ -23,6 +24,30 @@ public abstract partial class Screen : Control
         set => _workouts = value;
     }
     static WorkoutStore? _workouts;
+
+    /// <summary>Synchronisation facultative avec un serveur (Réglages), sur les mêmes dossiers que
+    /// <see cref="Store"/> et <see cref="Workouts"/>. Remplaçable par les tests.</summary>
+    public static SyncClient Sync
+    {
+        get
+        {
+            _sync ??= new SyncClient(ProjectSettings.GlobalizePath("user://sync.json"), Store.Directory, Workouts.Directory);
+            _sync.RidesDirectory = Store.Directory;
+            _sync.WorkoutsDirectory = Workouts.Directory;
+            return _sync;
+        }
+        set => _sync = value;
+    }
+    static SyncClient? _sync;
+
+    /// <summary>Synchronise en arrière-plan si le joueur l'a activée, sans jamais bloquer l'écran ;
+    /// une erreur (hors ligne…) est seulement notée et affichée dans les Réglages.</summary>
+    protected static void SyncInBackground()
+    {
+        var sync = Sync;
+        if (!sync.State.Enabled || !sync.State.LoggedIn || sync.IsRunning) return;
+        sync.SyncAsync().ContinueWith(t => _ = t.Exception, System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
+    }
 
     protected abstract void OnBack();
 
