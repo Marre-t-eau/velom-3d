@@ -196,6 +196,9 @@ public partial class GodotSmokeTest : Node
         Check(syncOptions.Visible && settings.GetNode<Control>("%SyncLoginForm").Visible
               && !settings.GetNode<Control>("%SyncAccount").Visible, "synchro activée : formulaire de connexion");
         settings.GetNode<CheckButton>("%SyncToggle").ButtonPressed = false;
+        Check(settings.GetNode<Control>("%FtpStepper").MouseFilter == Control.MouseFilterEnum.Pass
+              && settings.GetNode<Control>("%ServerUrlEdit").MouseFilter == Control.MouseFilterEnum.Pass,
+              "cartes et champs laissent défiler la page au doigt");
         Check(settings.GetNodeOrNull<KeyboardAvoider>("KeyboardAvoider") is not null, "écran décalé au-dessus du clavier pendant une saisie");
         settings.Profile.VirtualGears = true;
         settings.Profile.Chainrings = [52, 36];

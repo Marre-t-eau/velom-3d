@@ -89,7 +89,39 @@ public abstract partial class Screen : Control
         if (what == NotificationWMGoBackRequest) Back();
         // Chaque écran se décale au-dessus du clavier du téléphone pendant une saisie.
         else if (what == NotificationReady)
+        {
             Callable.From(() => AddChild(new KeyboardAvoider { Name = "KeyboardAvoider" })).CallDeferred();
+            // Glisser le doigt sur une carte, un champ ou un bouton doit faire défiler la page :
+            // tout ce qui est dans une liste déroulante laisse passer le geste à la liste.
+            LetScrollThrough(this);
+            GetTree().NodeAdded += OnNodeAdded;
+        }
+        else if (what == NotificationExitTree) GetTree().NodeAdded -= OnNodeAdded;
+    }
+
+    void OnNodeAdded(Node node)
+    {
+        if (node is Control c && IsAncestorOf(c)) LetScrollThrough(c);
+    }
+
+    /// <summary>Met en « Pass » (au lieu de « Stop », qui garde le geste pour lui) les éléments placés
+    /// dans un ScrollContainer : un PanelContainer ou un LineEdit arrêtait le défilement au doigt.</summary>
+    static void LetScrollThrough(Node node)
+    {
+        if (node is Control c && c is not (ScrollContainer or ScrollBar)
+            && c.MouseFilter == MouseFilterEnum.Stop && InScroll(c))
+            c.MouseFilter = MouseFilterEnum.Pass;
+        foreach (var child in node.GetChildren()) LetScrollThrough(child);
+    }
+
+    static bool InScroll(Node node)
+    {
+        for (var p = node.GetParent(); p is not null; p = p.GetParent())
+        {
+            if (p is ScrollContainer) return true;
+            if (p is Screen) return false;
+        }
+        return false;
     }
 
     public override void _UnhandledInput(InputEvent e)

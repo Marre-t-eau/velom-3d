@@ -15,11 +15,17 @@ public partial class KeyboardAvoider : Node
 
     Control _screen = null!;
     float _shift;
+    int _lastKeyboardPx;
 
     public override void _Ready() => _screen = GetParent<Control>();
 
     public override void _Process(double delta)
     {
+        int keyboardPx = DisplayServer.VirtualKeyboardGetHeight();
+        if (_lastKeyboardPx > 0 && keyboardPx <= 0
+            && GetViewport().GuiGetFocusOwner() is LineEdit or TextEdit && _screen.IsAncestorOf(GetViewport().GuiGetFocusOwner()))
+            GetViewport().GuiReleaseFocus(); // clavier fermé : le champ rend la main (pas de clavier qui revient en faisant défiler)
+        _lastKeyboardPx = keyboardPx;
         float target = Target();
         if (Math.Abs(target - _shift) < 0.5f) return;
         // Glissement rapide plutôt qu'un saut.
