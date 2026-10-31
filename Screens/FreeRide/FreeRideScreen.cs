@@ -18,12 +18,11 @@ namespace Velom3d.Screens;
 /// Avec un <see cref="Workout"/>, le même écran déroule un entraînement structuré : la consigne
 /// suit les blocs (ERG fixe ou en rampe, simulation sur le plat pour les blocs libres), et la liste
 /// des blocs à venir s'affiche avec leur durée, leur puissance et leur cadence.
+/// Mise en page des deux pages (réglages, sortie) : FreeRideScreen.tscn.
 /// </summary>
 public partial class FreeRideScreen : Screen
 {
     const double AutosaveEveryS = 30.0;
-    /// <summary>Boutons de réglage de la consigne ERG pendant la sortie.</summary>
-    static readonly int[] PowerSteps = [10, 5];
 
     RiderProfile _profile = null!;
     RideMode _mode;
@@ -88,11 +87,9 @@ public partial class FreeRideScreen : Screen
         _profile = Store.LoadProfile();
         _mode = _profile.LastMode;
         _target = Math.Clamp(_profile.LastTargetPowerW, 50, 1000);
-        var root = Ui.BuildPage(this);
-        _backdrop = GetChild<CanvasItem>(0); // fond uni de la page, masqué pendant la sortie pour voir la 3D
-        _setup = BuildSetup(root);
-        _riding = BuildRiding(root);
-        _riding.Visible = false;
+        _backdrop = GetNode<CanvasItem>("%Background"); // fond uni de la page, masqué pendant la sortie pour voir la 3D
+        FindSetup();
+        FindRiding();
         RefreshSetup();
         Hub.StatusMessage += ShowTrainerStatus;
         if (Workout is not null) StartWorkout(Workout);
@@ -114,56 +111,17 @@ public partial class FreeRideScreen : Screen
 
     // --- Réglages avant le départ ---
 
-    Control BuildSetup(Container root)
+    void FindSetup()
     {
-        var page = new VBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
-        page.AddThemeConstantOverride("separation", 18);
-        root.AddChild(page);
-        page.AddChild(Ui.Label("Sortie libre", 40));
-        page.AddChild(Ui.Label("Parcours plat. Choisissez comment le home trainer vous résiste.", 20, Ui.Muted));
-
-        var content = Ui.AddScroll(page);
-        var modes = Ui.Row();
-        content.AddChild(modes);
-        _ergChoice = ModeChoice(modes, "Puissance imposée",
-            "Le trainer impose les watts, quelle que soit la cadence (mode ERG). Réglables de 5 ou 10 W en roulant.", RideMode.TargetPower);
-        _simChoice = ModeChoice(modes, "Simulation réaliste",
-            "La résistance suit la vitesse : roulement des pneus et frottement de l'air, sur le plat.", RideMode.Simulation);
-
-        // Rappel en lecture seule : tout se règle dans Réglages, depuis le menu.
-        _settingsSummary = Ui.Label("", 19, Ui.Muted);
-        content.AddChild(_settingsSummary);
-
-        _trainerHint = Ui.Label("", 20, Ui.Warning);
-        content.AddChild(_trainerHint);
-
-        var actions = Ui.Row();
-        page.AddChild(actions);
-        actions.AddChild(Ui.Button("Retour", OnBack));
-        var start = Ui.Button("Démarrer", () => Start(_mode, _target));
-        start.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        actions.AddChild(start);
-        return page;
-    }
-
-    Button ModeChoice(Container parent, string title, string detail, RideMode mode)
-    {
-        var button = Ui.Button("", () => { _mode = mode; RefreshSetup(); }, 0, 150);
-        button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        Ui.MakeSelectable(button);
-        var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore, Alignment = BoxContainer.AlignmentMode.Center };
-        box.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        box.OffsetLeft = 20;
-        box.OffsetRight = -20;
-        var name = Ui.Label(title, 26);
-        name.MouseFilter = MouseFilterEnum.Ignore;
-        var hint = Ui.Label(detail, 17, Ui.Muted);
-        hint.MouseFilter = MouseFilterEnum.Ignore;
-        box.AddChild(name);
-        box.AddChild(hint);
-        button.AddChild(box);
-        parent.AddChild(button);
-        return button;
+        _setup = GetNode<Control>("%Setup");
+        _ergChoice = GetNode<Button>("%ErgChoice");
+        _ergChoice.Pressed += () => { _mode = RideMode.TargetPower; RefreshSetup(); };
+        _simChoice = GetNode<Button>("%SimChoice");
+        _simChoice.Pressed += () => { _mode = RideMode.Simulation; RefreshSetup(); };
+        _settingsSummary = GetNode<Label>("%SettingsSummary");
+        _trainerHint = GetNode<Label>("%TrainerHint");
+        GetNode<Button>("%BackButton").Pressed += OnBack;
+        GetNode<Button>("%StartButton").Pressed += () => Start(_mode, _target);
     }
 
     void RefreshSetup()
@@ -181,204 +139,78 @@ public partial class FreeRideScreen : Screen
 
     // --- Pendant la sortie ---
 
-    Control BuildRiding(Container root)
+    void FindRiding()
     {
-        var page = new VBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
-        page.AddThemeConstantOverride("separation", 16);
-        root.AddChild(page);
-
-        var header = Ui.Row();
-        page.AddChild(header);
-        _clock = Ui.Label("0:00", 40);
-        _clock.AutowrapMode = TextServer.AutowrapMode.Off;
-        Outline(_clock);
-        header.AddChild(_clock);
-        _modeLabel = Ui.Label("", 17, Ui.Muted);
-        _modeLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        _modeLabel.VerticalAlignment = VerticalAlignment.Center;
-        _modeLabel.HorizontalAlignment = HorizontalAlignment.Right;
-        header.AddChild(_modeLabel);
-        Outline(_modeLabel);
+        _riding = GetNode<Control>("%Riding");
+        _clock = GetNode<Label>("%Clock");
+        _modeLabel = GetNode<Label>("%ModeLabel");
 
         // Mesures sur une ligne en haut, commandes en bas : la route reste visible au milieu.
-        var content = Ui.AddScroll(page, 14);
-        content.SizeFlagsVertical = SizeFlags.ExpandFill;
-        // Tuiles compactes et centrées. La puissance moyenne n'a pas sa tuile : toucher la puissance l'affiche quelques secondes.
-        var row1 = Ui.Row(10);
-        row1.Alignment = BoxContainer.AlignmentMode.Center;
-        content.AddChild(row1);
-        _power = Ui.Tile(row1, "Puissance", Ui.PowerColor, 32);
-        _powerTitle = (Label)_power.GetParent().GetChild(0);
-        _cadence = Ui.Tile(row1, "Cadence", Ui.CadenceColor, 32);
-        _cadenceTitle = (Label)_cadence.GetParent().GetChild(0);
-        _hr = Ui.Tile(row1, "Cardio", Ui.HeartRateColor, 32);
-        _speed = Ui.Tile(row1, "Vitesse", Ui.SpeedColor, 32);
-        _distance = Ui.Tile(row1, "Distance", Ui.Muted, 32);
-        foreach (var node in row1.GetChildren())
-        {
-            var tile = (PanelContainer)node;
-            tile.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
-            tile.CustomMinimumSize = new Vector2(190, 0);
-            tile.SelfModulate = new Color(1, 1, 1, 0.8f);
-            var style = (StyleBoxFlat)tile.GetThemeStylebox("panel");
-            style.ContentMarginTop = style.ContentMarginBottom = 8;
-            style.ContentMarginLeft = style.ContentMarginRight = 14;
-            ((Label)tile.GetChild(0).GetChild(0)).AddThemeFontSizeOverride("font_size", 15);
-        }
-        var powerTile = _power.GetParent().GetParent<Control>();
-        powerTile.CustomMinimumSize = new Vector2(240, 0);
+        // La puissance moyenne n'a pas sa tuile : toucher la puissance l'affiche quelques secondes.
+        var powerTile = GetNode<Control>("%PowerTile");
+        _power = powerTile.GetNode<Label>("Box/Value");
+        _powerTitle = powerTile.GetNode<Label>("Box/Title");
         powerTile.GuiInput += e =>
         {
             if (e is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left }) ShowAveragePower();
         };
-        _workoutPanel = BuildWorkoutPanel(content);
-        _workoutPanel.Visible = false;
-        content.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass });
+        _cadence = GetNode<Label>("%CadenceTile/Box/Value");
+        _cadenceTitle = GetNode<Label>("%CadenceTile/Box/Title");
+        _hr = GetNode<Label>("%HeartRateTile/Box/Value");
+        _speed = GetNode<Label>("%SpeedTile/Box/Value");
+        _distance = GetNode<Label>("%DistanceTile/Box/Value");
+        FindWorkoutPanel();
 
-        var erg = Ui.Row();
-        erg.Alignment = BoxContainer.AlignmentMode.Center;
-        content.AddChild(erg);
-        foreach (var step in PowerSteps) erg.AddChild(Ui.Button($"−{step} W", () => ChangeTarget(-step), 120, 68, 24));
-        _rideTarget = Ui.Label("", 28);
-        Outline(_rideTarget);
-        _rideTarget.CustomMinimumSize = new Vector2(220, 0);
-        _rideTarget.HorizontalAlignment = HorizontalAlignment.Center;
-        _rideTarget.VerticalAlignment = VerticalAlignment.Center;
-        erg.AddChild(_rideTarget);
-        for (int i = PowerSteps.Length - 1; i >= 0; i--)
-        {
-            int step = PowerSteps[i];
-            erg.AddChild(Ui.Button($"+{step} W", () => ChangeTarget(+step), 120, 68, 24));
-        }
-        _ergControls = erg;
+        _ergControls = GetNode<Control>("%ErgControls");
+        GetNode<Button>("%Minus10").Pressed += () => ChangeTarget(-10);
+        GetNode<Button>("%Minus5").Pressed += () => ChangeTarget(-5);
+        GetNode<Button>("%Plus5").Pressed += () => ChangeTarget(+5);
+        GetNode<Button>("%Plus10").Pressed += () => ChangeTarget(+10);
+        _rideTarget = GetNode<Label>("%RideTarget");
 
         // Vitesses virtuelles : plateau, puis pignon plus souple / plus dur.
-        var gears = Ui.Row();
-        gears.Alignment = BoxContainer.AlignmentMode.Center;
-        content.AddChild(gears);
-        _frontButton = Ui.Button("Plateau", ShiftFront, 160, 68, 22);
-        gears.AddChild(_frontButton);
-        gears.AddChild(Ui.Button("− Plus souple", ShiftEasier, 190, 68, 22));
-        _gearLabel = Ui.Label("", 24);
-        Outline(_gearLabel);
-        _gearLabel.CustomMinimumSize = new Vector2(180, 0);
-        _gearLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        _gearLabel.VerticalAlignment = VerticalAlignment.Center;
-        gears.AddChild(_gearLabel);
-        gears.AddChild(Ui.Button("Plus dur +", ShiftHarder, 190, 68, 22));
-        _gearControls = gears;
+        _gearControls = GetNode<Control>("%GearControls");
+        _frontButton = GetNode<Button>("%FrontButton");
+        _frontButton.Pressed += ShiftFront;
+        GetNode<Button>("%EasierButton").Pressed += ShiftEasier;
+        GetNode<Button>("%HarderButton").Pressed += ShiftHarder;
+        _gearLabel = GetNode<Label>("%GearLabel");
+        _trainerStatus = GetNode<Label>("%TrainerStatus");
 
-        _trainerStatus = Ui.Label("", 18, Ui.Warning);
-        Outline(_trainerStatus);
-        _trainerStatus.Visible = false;
-        content.AddChild(_trainerStatus);
-
-        var actions = Ui.Row();
-        page.AddChild(actions);
-        _pauseButton = Ui.Button("Pause", TogglePause, 260, 60, 22);
-        _pauseButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        actions.AddChild(_pauseButton);
-        _skipButton = Ui.Button("Bloc suivant", SkipBlock, 260, 60, 22);
-        _skipButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        _skipButton.Visible = false;
-        actions.AddChild(_skipButton);
-        _finishButton = Ui.Button("Terminer", OnFinishPressed, 260, 60, 22);
-        _finishButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        actions.AddChild(_finishButton);
-        return page;
+        _pauseButton = GetNode<Button>("%PauseButton");
+        _pauseButton.Pressed += TogglePause;
+        _skipButton = GetNode<Button>("%SkipButton");
+        _skipButton.Pressed += SkipBlock;
+        _finishButton = GetNode<Button>("%FinishButton");
+        _finishButton.Pressed += OnFinishPressed;
     }
 
     /// <summary>La tuile puissance montre la moyenne de la sortie pendant quelques secondes.</summary>
     internal void ShowAveragePower() => _showAverageS = ShowAverageForS;
 
-    /// <summary>Contour sombre : texte lisible sur le ciel et la route.</summary>
-    static void Outline(Label label)
-    {
-        label.AddThemeConstantOverride("outline_size", 8);
-        label.AddThemeColorOverride("font_outline_color", new Color(0, 0, 0, 0.6f));
-    }
-
     // --- Entraînement structuré ---
 
     /// <summary>Bloc en cours (temps restant, consigne, profil) à gauche, blocs à venir à droite ;
-    /// le milieu reste libre pour voir le cycliste en 3D. Panneaux un peu transparents.</summary>
-    Control BuildWorkoutPanel(Container content)
+    /// le milieu reste libre pour voir le cycliste en 3D.</summary>
+    void FindWorkoutPanel()
     {
-        var page = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        page.AddThemeConstantOverride("separation", 14);
-        content.AddChild(page);
-        var row = Ui.Row(14);
-        page.AddChild(row);
-
-        var current = Ui.Panel(Ui.Card, Ui.Accent);
-        current.CustomMinimumSize = new Vector2(400, 0);
-        Overlay(current);
-        row.AddChild(current);
-        row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass });
-        var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        current.AddChild(box);
-        _blockTitle = Ui.Label("", 16, Ui.Accent);
-        box.AddChild(_blockTitle);
-        // Temps restant à gauche ; consigne de puissance et de cadence à droite.
-        var line = Ui.Row(20);
-        box.AddChild(line);
-        _blockRemaining = Ui.Label("", 38);
-        _blockRemaining.AutowrapMode = TextServer.AutowrapMode.Off;
-        _blockRemaining.VerticalAlignment = VerticalAlignment.Center;
-        line.AddChild(_blockRemaining);
-        var targets = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass, SizeFlagsHorizontal = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center };
-        line.AddChild(targets);
-        _blockPower = Ui.Label("", 21, Ui.PowerColor);
-        targets.AddChild(_blockPower);
-        _blockCadence = Ui.Label("", 18, Ui.CadenceColor);
-        targets.AddChild(_blockCadence);
-        _blockBar = new ProgressBar
-        {
-            MinValue = 0, MaxValue = 1, ShowPercentage = false, CustomMinimumSize = new Vector2(0, 10),
-            MouseFilter = MouseFilterEnum.Pass,
-        };
-        var fill = new StyleBoxFlat { BgColor = Ui.Accent };
-        fill.SetCornerRadiusAll(6);
-        var back = new StyleBoxFlat { BgColor = new Color(1, 1, 1, 0.08f) };
-        back.SetCornerRadiusAll(6);
-        _blockBar.AddThemeStyleboxOverride("fill", fill);
-        _blockBar.AddThemeStyleboxOverride("background", back);
-        box.AddChild(_blockBar);
+        _workoutPanel = GetNode<Control>("%WorkoutPanel");
+        _blockTitle = GetNode<Label>("%BlockTitle");
+        _blockRemaining = GetNode<Label>("%BlockRemaining");
+        _blockPower = GetNode<Label>("%BlockPower");
+        _blockCadence = GetNode<Label>("%BlockCadence");
+        _blockBar = GetNode<ProgressBar>("%BlockBar");
         // Bloc libre : le cycliste peut quand même faire imposer des watts par le trainer.
-        var freeErg = Ui.Row(10);
-        box.AddChild(freeErg);
-        _freeErgToggle = Ui.Button("", ToggleFreeErg, 190, 64, 20);
-        Ui.MakeSelectable(_freeErgToggle);
-        _freeErgToggle.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        freeErg.AddChild(_freeErgToggle);
-        foreach (var step in new[] { -10, -5, 5, 10 })
-            freeErg.AddChild(Ui.Button(step < 0 ? $"−{-step}" : $"+{step}", () => ChangeFreeErg(step), 72, 64, 22));
-        _freeErgRow = freeErg;
+        _freeErgRow = GetNode<Control>("%FreeErgRow");
+        _freeErgToggle = GetNode<Button>("%FreeErgToggle");
+        _freeErgToggle.Pressed += ToggleFreeErg;
+        GetNode<Button>("%FreeErgMinus10").Pressed += () => ChangeFreeErg(-10);
+        GetNode<Button>("%FreeErgMinus5").Pressed += () => ChangeFreeErg(-5);
+        GetNode<Button>("%FreeErgPlus5").Pressed += () => ChangeFreeErg(+5);
+        GetNode<Button>("%FreeErgPlus10").Pressed += () => ChangeFreeErg(+10);
         // Profil de l'entraînement sous le bloc en cours : où on en est, ce qui reste.
-        _workoutChart = new WorkoutChart { CustomMinimumSize = new Vector2(0, 46) };
-        box.AddChild(_workoutChart);
-
-        var next = Ui.Panel(Ui.Card);
-        next.CustomMinimumSize = new Vector2(440, 0);
-        Overlay(next);
-        row.AddChild(next);
-        var nextBox = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        nextBox.AddThemeConstantOverride("separation", 4);
-        next.AddChild(nextBox);
-        nextBox.AddChild(Ui.Label("À venir", 16, Ui.Muted));
-        _upcoming = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        _upcoming.AddThemeConstantOverride("separation", 2);
-        nextBox.AddChild(_upcoming);
-        return page;
-    }
-
-    /// <summary>Panneau posé sur la 3D : un peu transparent, marges réduites.</summary>
-    static void Overlay(PanelContainer panel)
-    {
-        panel.SelfModulate = new Color(1, 1, 1, 0.82f);
-        var style = (StyleBoxFlat)panel.GetThemeStylebox("panel");
-        style.ContentMarginTop = style.ContentMarginBottom = 8;
-        style.ContentMarginLeft = style.ContentMarginRight = 14;
+        _workoutChart = GetNode<WorkoutChart>("%WorkoutChart");
+        _upcoming = GetNode<VBoxContainer>("%Upcoming");
     }
 
     /// <summary>Nombre de blocs à venir listés : au-delà, une ligne « + N autres blocs ».</summary>

@@ -103,6 +103,17 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
   entraînement comme en sortie libre à puissance imposée.
 - **Mes sorties** (`Screens/RideHistory/`) : toutes les sorties, la plus récente en haut.
 
+Mise en page des écrans : chaque écran a sa scène (`.tscn`), à ouvrir et modifier dans l'éditeur
+Godot (boutons, textes, marges, tailles de police). Le script C# du même nom ne fait que la logique :
+il retrouve les nœuds par leur nom unique (`%Nom`, clic droit > *Accès comme nom unique*), branche
+les signaux et met les valeurs à jour. Ce qui se répète selon les données a sa petite scène, créée
+par le code pour chaque élément : `DeviceRow.tscn` (appareil), `RideCard.tscn` (sortie),
+`WorkoutCard.tscn` (entraînement), `BlockCard.tscn` (bloc dans l'éditeur), `ConfirmPopup.tscn`
+(fenêtre Non / Oui). Les styles communs (cartes, boutons à bascule verts, textes grisés, contour
+lisible sur la 3D, taille de police par défaut) sont dans le thème `Screens/Common/Theme.tres`,
+appliqué à tout le projet (*Projet > Paramètres > GUI > Thème*) : on choisit une variante dans
+l'inspecteur, *Theme > Type Variation* (`MutedLabel`, `ChoiceButton`, `OverlayPanel`…).
+
 Les sorties sont enregistrées sur l'appareil, dans `user://rides/`, deux fichiers par sortie
 (détail dans `docs/format-des-donnees.md`) :
 - `{id}.csv`, le fichier de données, sans aucun traitement : une ligne par valeur reçue,

@@ -34,6 +34,10 @@ project/assembly_name="Velom3d"
 
 enabled=PackedStringArray("res://addons/velom3d_ble/plugin.cfg")
 
+[gui]
+
+theme/custom="res://Screens/Common/Theme.tres"
+
 [physics]
 
 3d/physics_engine="Jolt Physics"

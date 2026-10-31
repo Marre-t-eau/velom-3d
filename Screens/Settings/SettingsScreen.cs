@@ -9,7 +9,7 @@ namespace Velom3d.Screens;
 /// <summary>
 /// Réglages du cycliste et du vélo : FTP, poids, roue, et vitesses virtuelles (plateaux et
 /// cassette, choisis parmi les transmissions courantes ou saisis à la main).
-/// Chaque changement est enregistré tout de suite.
+/// Chaque changement est enregistré tout de suite. Mise en page : SettingsScreen.tscn.
 /// </summary>
 public partial class SettingsScreen : Screen
 {
@@ -27,84 +27,59 @@ public partial class SettingsScreen : Screen
     public override void _Ready()
     {
         _profile = Store.LoadProfile();
-        var root = Ui.BuildPage(this);
-        var header = Ui.Row();
-        root.AddChild(header);
-        var title = Ui.Label("Réglages", 40);
-        title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        header.AddChild(title);
-        header.AddChild(Ui.Button("Retour", OnBack, 200, 72));
+        GetNode<Button>("%BackButton").Pressed += OnBack;
 
-        var content = Ui.AddScroll(root, 14);
+        _ftp = Stepper("%FtpStepper", d => _profile.FtpW = Math.Clamp(_profile.FtpW + d * 5, 50, 600));
+        _riderMass = Stepper("%RiderMassStepper", d => _profile.RiderMassKg = Math.Clamp(_profile.RiderMassKg + d, 30, 200));
+        _bikeMass = Stepper("%BikeMassStepper", d => _profile.BikeMassKg = Math.Clamp(_profile.BikeMassKg + d * 0.5, 4, 30));
 
-        Section(content, "Cycliste");
-        Ui.Stepper(content, "FTP", out _ftp, d => _profile.FtpW = Math.Clamp(_profile.FtpW + d * 5, 50, 600), Changed);
-        Ui.Stepper(content, "Poids du cycliste", out _riderMass, d => _profile.RiderMassKg = Math.Clamp(_profile.RiderMassKg + d, 30, 200), Changed);
-
-        Section(content, "Vélo");
-        Ui.Stepper(content, "Poids du vélo", out _bikeMass, d => _profile.BikeMassKg = Math.Clamp(_profile.BikeMassKg + d * 0.5, 4, 30), Changed);
-        content.AddChild(Ui.Label("Pneus (circonférence de roue)", 20, Ui.Muted));
-        var wheels = Ui.Flow(content);
+        // Les choix viennent des listes de Gearing : leurs boutons sont créés ici.
+        var wheels = GetNode<Container>("%Wheels");
         foreach (var (label, mm) in Gearing.Wheels)
             _wheelChips.Add((Ui.Chip(wheels, $"{label}  {mm} mm", () => { _profile.WheelCircumferenceMm = mm; Changed(); }), mm));
 
-        Section(content, "Vitesses virtuelles");
-        _gearsToggle = new CheckButton { Text = "Simuler plateaux et cassette en mode simulation", MouseFilter = MouseFilterEnum.Pass };
-        _gearsToggle.AddThemeFontSizeOverride("font_size", 24);
+        _gearsToggle = GetNode<CheckButton>("%GearsToggle");
         _gearsToggle.Toggled += on => { _profile.VirtualGears = on; Changed(); };
-        content.AddChild(_gearsToggle);
-        content.AddChild(Ui.Label("Vous changez de plateau et de pignon dans l'appli, comme sur la route : la résistance du "
-            + "trainer suit la vitesse engagée et votre cadence. Laissez la chaîne du vélo sur un pignon du milieu.", 18, Ui.Muted));
+        _gearOptions = GetNode<Control>("%GearOptions");
 
-        var options = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        options.AddThemeConstantOverride("separation", 12);
-        content.AddChild(options);
-        _gearOptions = options;
-
-        options.AddChild(Ui.Label("Plateaux", 22));
-        var rings = Ui.Flow(options);
+        var rings = GetNode<Container>("%Chainrings");
         foreach (var p in Gearing.Chainrings)
             _chainringChips.Add((Ui.Chip(rings, p.Label, () => SetChainrings(p.Teeth)), p.Teeth));
-        Custom(options, "Autres plateaux, ex. 53/42", Gearing.ParseChainrings, SetChainrings,
+        Custom("%ChainringsEdit", "%ChainringsError", Gearing.ParseChainrings, SetChainrings,
             "1 à 3 plateaux de 8 à 60 dents, séparés par « / ».");
 
-        options.AddChild(Ui.Label("Cassette", 22));
-        foreach (var (speeds, cassettes) in Gearing.Cassettes)
+        var cassettes = GetNode<Container>("%Cassettes");
+        foreach (var (speeds, list) in Gearing.Cassettes)
         {
-            var row = Ui.Flow(options);
+            var row = Ui.Flow(cassettes);
             var label = Ui.Label($"{speeds} v.", 20, Ui.Muted);
             label.CustomMinimumSize = new Vector2(70, 64);
             label.VerticalAlignment = VerticalAlignment.Center;
             row.AddChild(label);
-            foreach (var c in cassettes)
+            foreach (var c in list)
                 _cassetteChips.Add((Ui.Chip(row, c.Label, () => SetCassette(c.Teeth)), c.Teeth));
         }
-        Custom(options, "Autre cassette, ex. 11,12,13,14,16,18,20,22,25,28", Gearing.ParseCassette, SetCassette,
+        Custom("%CassetteEdit", "%CassetteError", Gearing.ParseCassette, SetCassette,
             "5 à 14 pignons de 8 à 60 dents, séparés par des virgules.");
 
-        _gearSummary = Ui.Label("", 20, Ui.Accent);
-        options.AddChild(_gearSummary);
-
+        _gearSummary = GetNode<Label>("%GearSummary");
         Refresh();
     }
 
-    static void Section(Container parent, string title)
+    /// <summary>Branche les boutons − / + d'une ligne de réglage ; renvoie le label de la valeur.</summary>
+    Label Stepper(string node, Action<int> change)
     {
-        var label = Ui.Label(title, 28);
-        label.CustomMinimumSize = new Vector2(0, 52);
-        label.VerticalAlignment = VerticalAlignment.Bottom;
-        parent.AddChild(label);
+        var row = GetNode<Control>(node + "/Row");
+        row.GetNode<Button>("Minus").Pressed += () => { change(-1); Changed(); };
+        row.GetNode<Button>("Plus").Pressed += () => { change(+1); Changed(); };
+        return row.GetNode<Label>("Value");
     }
 
     /// <summary>Saisie libre ; appliquée dès qu'elle est valable.</summary>
-    static void Custom(Container parent, string placeholder, Func<string, int[]?> parse, Action<int[]> apply, string rule)
+    void Custom(string editNode, string errorNode, Func<string, int[]?> parse, Action<int[]> apply, string rule)
     {
-        var edit = new LineEdit { PlaceholderText = placeholder, CustomMinimumSize = new Vector2(0, 64), SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        edit.AddThemeFontSizeOverride("font_size", 22);
-        parent.AddChild(edit);
-        var err = Ui.Label("", 17, Ui.Warning);
-        err.Visible = false;
-        parent.AddChild(err);
+        var edit = GetNode<LineEdit>(editNode);
+        var err = GetNode<Label>(errorNode);
         edit.TextChanged += text =>
         {
             var teeth = parse(text);

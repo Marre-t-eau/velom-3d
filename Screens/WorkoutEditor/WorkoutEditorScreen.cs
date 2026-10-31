@@ -9,11 +9,14 @@ namespace Velom3d.Screens;
 /// Édition d'un entraînement : nom, unité (watts ou % de FTP), et la liste des blocs. Chaque bloc
 /// a une durée, une puissance fixe, libre ou en rampe, et une cadence libre ou imposée.
 /// Les valeurs se règlent avec − / + ou se tapent directement. Tout est enregistré à chaque changement.
+/// Mise en page : WorkoutEditorScreen.tscn, et BlockCard.tscn pour chaque bloc.
 /// </summary>
 public partial class WorkoutEditorScreen : Screen
 {
     /// <summary>Entraînement à modifier, à renseigner avant l'ouverture.</summary>
     public string WorkoutId { get; set; } = "";
+    /// <summary>Carte d'un bloc (BlockCard.tscn).</summary>
+    [Export] public PackedScene BlockScene { get; set; } = null!;
 
     Workout _w = null!;
     int _ftpW;
@@ -21,6 +24,7 @@ public partial class WorkoutEditorScreen : Screen
     Label _summary = null!;
     Button _wattsChip = null!, _percentChip = null!, _deleteButton = null!;
     VBoxContainer _blocks = null!;
+    Label _empty = null!;
     ScrollContainer _scroll = null!;
 
     /// <summary>Entraînement en cours de modification (pour les tests).</summary>
@@ -35,51 +39,28 @@ public partial class WorkoutEditorScreen : Screen
         }
         _w = w;
         _ftpW = Store.LoadProfile().FtpW;
-        var root = Ui.BuildPage(this, 14);
 
-        var header = Ui.Row();
-        root.AddChild(header);
-        var name = new LineEdit
-        {
-            Text = _w.Name, PlaceholderText = "Nom de l'entraînement", SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            CustomMinimumSize = new Vector2(0, 72),
-        };
-        name.AddThemeFontSizeOverride("font_size", 28);
+        var name = GetNode<LineEdit>("%NameEdit");
+        name.Text = _w.Name;
         name.TextChanged += text => { _w.Name = text.Trim(); Save(); };
-        header.AddChild(name);
-        header.AddChild(Ui.Button("Retour", OnBack, 200, 72));
+        GetNode<Button>("%BackButton").Pressed += OnBack;
 
-        var units = Ui.Row(12);
-        root.AddChild(units);
-        var unitLabel = Ui.Label("Puissances en", 20, Ui.Muted);
-        unitLabel.VerticalAlignment = VerticalAlignment.Center;
-        unitLabel.AutowrapMode = TextServer.AutowrapMode.Off;
-        units.AddChild(unitLabel);
-        _wattsChip = Ui.Chip(units, "watts", () => SetUnit(PowerUnit.Watts));
-        _percentChip = Ui.Chip(units, "% de FTP", () => SetUnit(PowerUnit.PercentFtp));
-        _summary = Ui.Label("", 20, Ui.Muted);
-        _summary.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        _summary.HorizontalAlignment = HorizontalAlignment.Right;
-        _summary.VerticalAlignment = VerticalAlignment.Center;
-        units.AddChild(_summary);
+        _wattsChip = GetNode<Button>("%WattsChip");
+        _wattsChip.Pressed += () => SetUnit(PowerUnit.Watts);
+        _percentChip = GetNode<Button>("%PercentChip");
+        _percentChip.Pressed += () => SetUnit(PowerUnit.PercentFtp);
+        _summary = GetNode<Label>("%Summary");
 
-        _chart = new WorkoutChart { Workout = _w, FtpW = _ftpW };
-        root.AddChild(_chart);
+        _chart = GetNode<WorkoutChart>("%Chart");
+        _chart.Workout = _w;
+        _chart.FtpW = _ftpW;
 
-        var content = Ui.AddScroll(root, 14);
-        _scroll = (ScrollContainer)content.GetParent();
-        _blocks = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        _blocks.AddThemeConstantOverride("separation", 14);
-        content.AddChild(_blocks);
-
-        var actions = Ui.Row();
-        content.AddChild(actions);
-        var add = Ui.Button("Ajouter un bloc", AddBlock, 300, 80);
-        add.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        actions.AddChild(add);
-        _deleteButton = Ui.Button("Supprimer l'entraînement", OnDeletePressed, 360, 80, 20);
-        _deleteButton.Modulate = Ui.Danger;
-        actions.AddChild(_deleteButton);
+        _scroll = GetNode<ScrollContainer>("%Scroll");
+        _blocks = GetNode<VBoxContainer>("%Blocks");
+        _empty = GetNode<Label>("%Empty");
+        GetNode<Button>("%AddButton").Pressed += AddBlock;
+        _deleteButton = GetNode<Button>("%DeleteButton");
+        _deleteButton.Pressed += OnDeletePressed;
 
         RebuildBlocks();
     }
@@ -92,8 +73,7 @@ public partial class WorkoutEditorScreen : Screen
         int scroll = _scroll.ScrollVertical;
         foreach (var child in _blocks.GetChildren()) child.QueueFree();
         for (int i = 0; i < _w.Blocks.Count; i++) _blocks.AddChild(BlockCard(i));
-        if (_w.Blocks.Count == 0)
-            _blocks.AddChild(Ui.Label("Pas encore de bloc : touchez « Ajouter un bloc ».", 22, Ui.Muted));
+        _empty.Visible = _w.Blocks.Count == 0;
         Callable.From(() => _scroll.ScrollVertical = scroll).CallDeferred();
         Refresh();
     }
@@ -101,54 +81,50 @@ public partial class WorkoutEditorScreen : Screen
     Control BlockCard(int index)
     {
         var b = _w.Blocks[index];
-        var panel = Ui.Panel(Ui.Card);
-        var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        box.AddThemeConstantOverride("separation", 10);
-        panel.AddChild(box);
-
-        var top = Ui.Row(10);
-        box.AddChild(top);
-        var title = Ui.Label($"Bloc {index + 1}", 26);
-        title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        title.VerticalAlignment = VerticalAlignment.Center;
-        top.AddChild(title);
-        var up = Ui.Button("Monter", () => Move(index, -1), 140, 64, 20);
+        var card = BlockScene.Instantiate<PanelContainer>();
+        card.GetNode<Label>("%Title").Text = $"Bloc {index + 1}";
+        var up = card.GetNode<Button>("%UpButton");
         up.Disabled = index == 0;
-        top.AddChild(up);
-        var down = Ui.Button("Descendre", () => Move(index, +1), 160, 64, 20);
+        up.Pressed += () => Move(index, -1);
+        var down = card.GetNode<Button>("%DownButton");
         down.Disabled = index == _w.Blocks.Count - 1;
-        top.AddChild(down);
-        top.AddChild(Ui.Button("Dupliquer", () => DuplicateBlock(index), 160, 64, 20));
-        var remove = Ui.Button("Supprimer", () => Remove(index), 160, 64, 20);
-        remove.Modulate = Ui.Danger;
-        top.AddChild(remove);
+        down.Pressed += () => Move(index, +1);
+        card.GetNode<Button>("%DuplicateButton").Pressed += () => DuplicateBlock(index);
+        card.GetNode<Button>("%RemoveButton").Pressed += () => Remove(index);
 
-        var kinds = Ui.Flow(box);
-        AddLabel(kinds, "Puissance");
-        foreach (var (kind, text) in new[] { (BlockPower.Fixed, "Fixe"), (BlockPower.Free, "Libre"), (BlockPower.Ramp, "Rampe") })
-            Ui.Chip(kinds, text, () => SetKind(b, kind)).SetPressedNoSignal(b.Kind == kind);
-        AddLabel(kinds, "   Cadence");
-        Ui.Chip(kinds, "Libre", () => { b.CadenceRpm = 0; Save(); RebuildBlocks(); }).SetPressedNoSignal(b.FreeCadence);
-        Ui.Chip(kinds, "Imposée", () => { if (b.FreeCadence) b.CadenceRpm = 90; Save(); RebuildBlocks(); })
-            .SetPressedNoSignal(!b.FreeCadence);
+        foreach (var (kind, node) in new[] { (BlockPower.Fixed, "%FixedChip"), (BlockPower.Free, "%FreeChip"), (BlockPower.Ramp, "%RampChip") })
+        {
+            var chip = card.GetNode<Button>(node);
+            chip.SetPressedNoSignal(b.Kind == kind);
+            chip.Pressed += () => SetKind(b, kind);
+        }
+        var freeCadence = card.GetNode<Button>("%FreeCadenceChip");
+        freeCadence.SetPressedNoSignal(b.FreeCadence);
+        freeCadence.Pressed += () => { b.CadenceRpm = 0; Save(); RebuildBlocks(); };
+        var fixedCadence = card.GetNode<Button>("%FixedCadenceChip");
+        fixedCadence.SetPressedNoSignal(!b.FreeCadence);
+        fixedCadence.Pressed += () => { if (b.FreeCadence) b.CadenceRpm = 90; Save(); RebuildBlocks(); };
 
-        Field(box, "Durée", () => b.DurationS, v => b.DurationS = v, 15, 60,
+        Field(card.GetNode<Control>("%DurationField"), null, () => b.DurationS, v => b.DurationS = v, 15, 60,
             WorkoutBlock.MinDurationS, WorkoutBlock.MaxDurationS, v => Ui.Duration(v), "", ParseDuration);
         var (min, max, step, big) = _w.PowerRange;
         string unit = _w.Unit == PowerUnit.Watts ? "W" : "% FTP";
-        if (b.Kind == BlockPower.Fixed)
-            Field(box, "Puissance", () => b.Power, v => b.Power = v, step, big, min, max, Int, unit, ParseInt);
-        else if (b.Kind == BlockPower.Ramp)
-        {
-            Field(box, "Puissance au début", () => b.Power, v => b.Power = v, step, big, min, max, Int, unit, ParseInt);
-            Field(box, "Puissance à la fin", () => b.PowerEnd, v => b.PowerEnd = v, step, big, min, max, Int, unit, ParseInt);
-        }
-        else
-            box.AddChild(Ui.Label("Pas de consigne : le trainer passe en simulation sur le plat, vous roulez comme vous voulez.", 18, Ui.Muted));
+        var power = card.GetNode<Control>("%PowerField");
+        var powerEnd = card.GetNode<Control>("%PowerEndField");
+        power.Visible = b.Kind != BlockPower.Free;
+        powerEnd.Visible = b.Kind == BlockPower.Ramp;
+        card.GetNode<Control>("%FreeNote").Visible = b.Kind == BlockPower.Free;
+        if (b.Kind != BlockPower.Free)
+            Field(power, b.Kind == BlockPower.Ramp ? "Puissance au début" : "Puissance", () => b.Power, v => b.Power = v,
+                step, big, min, max, Int, unit, ParseInt);
+        if (b.Kind == BlockPower.Ramp)
+            Field(powerEnd, null, () => b.PowerEnd, v => b.PowerEnd = v, step, big, min, max, Int, unit, ParseInt);
+        var cadence = card.GetNode<Control>("%CadenceField");
+        cadence.Visible = !b.FreeCadence;
         if (!b.FreeCadence)
-            Field(box, "Cadence", () => b.CadenceRpm, v => b.CadenceRpm = v, 5, 0,
+            Field(cadence, null, () => b.CadenceRpm, v => b.CadenceRpm = v, 5, 0,
                 WorkoutBlock.MinCadenceRpm, WorkoutBlock.MaxCadenceRpm, Int, "tr/min", ParseInt);
-        return panel;
+        return card;
     }
 
     void SetKind(WorkoutBlock b, BlockPower kind)
@@ -161,47 +137,34 @@ public partial class WorkoutEditorScreen : Screen
         RebuildBlocks();
     }
 
-    static void AddLabel(Container parent, string text)
-    {
-        var label = Ui.Label(text, 20, Ui.Muted);
-        label.CustomMinimumSize = new Vector2(0, 64);
-        label.VerticalAlignment = VerticalAlignment.Center;
-        label.AutowrapMode = TextServer.AutowrapMode.Off;
-        parent.AddChild(label);
-    }
-
     static string Int(int v) => v.ToString(CultureInfo.InvariantCulture);
 
-    /// <summary>Ligne « libellé  [−−] [−] saisie [+] [++]  unité » ; la saisie est appliquée à la validation ou en quittant le champ.</summary>
-    void Field(Container parent, string title, Func<int> get, Action<int> set, int step, int bigStep, int min, int max,
+    /// <summary>Branche une ligne « libellé  [−−] [−] saisie [+] [++]  unité » de la carte (sans grand pas : pas de [−−] [++]) ;
+    /// la saisie est appliquée à la validation ou en quittant le champ. <paramref name="title"/> null garde le libellé de la scène.</summary>
+    void Field(Control row, string? title, Func<int> get, Action<int> set, int step, int bigStep, int min, int max,
         Func<int, string> format, string unit, Func<string, int?> parse)
     {
-        var row = Ui.Row(10);
-        parent.AddChild(row);
-        var label = Ui.Label(title, 22);
-        label.CustomMinimumSize = new Vector2(250, 0);
-        label.VerticalAlignment = VerticalAlignment.Center;
-        row.AddChild(label);
-        var edit = new LineEdit { CustomMinimumSize = new Vector2(150, 64), Alignment = HorizontalAlignment.Center, SelectAllOnFocus = true };
-        edit.AddThemeFontSizeOverride("font_size", 26);
+        if (title is not null) row.GetNode<Label>("Title").Text = title;
+        var edit = row.GetNode<LineEdit>("Edit");
         void Apply(int v)
         {
             set(Math.Clamp(v, min, max));
             edit.Text = format(get());
             Save();
         }
-        if (bigStep > 0) row.AddChild(Ui.Button($"−{BigLabel(bigStep, unit)}", () => Apply(get() - bigStep), 110, 64, 20));
-        row.AddChild(Ui.Button("−", () => Apply(get() - step), 80, 64, 28));
+        var bigMinus = row.GetNode<Button>("BigMinus");
+        var bigPlus = row.GetNode<Button>("BigPlus");
+        bigMinus.Visible = bigPlus.Visible = bigStep > 0;
+        bigMinus.Text = $"−{BigLabel(bigStep, unit)}";
+        bigPlus.Text = $"+{BigLabel(bigStep, unit)}";
+        bigMinus.Pressed += () => Apply(get() - bigStep);
+        bigPlus.Pressed += () => Apply(get() + bigStep);
+        row.GetNode<Button>("Minus").Pressed += () => Apply(get() - step);
+        row.GetNode<Button>("Plus").Pressed += () => Apply(get() + step);
         edit.Text = format(get());
         edit.TextSubmitted += text => Apply(parse(text) ?? get());
         edit.FocusExited += () => Apply(parse(edit.Text) ?? get());
-        row.AddChild(edit);
-        row.AddChild(Ui.Button("+", () => Apply(get() + step), 80, 64, 28));
-        if (bigStep > 0) row.AddChild(Ui.Button($"+{BigLabel(bigStep, unit)}", () => Apply(get() + bigStep), 110, 64, 20));
-        var unitLabel = Ui.Label(unit, 20, Ui.Muted);
-        unitLabel.VerticalAlignment = VerticalAlignment.Center;
-        unitLabel.AutowrapMode = TextServer.AutowrapMode.Off;
-        row.AddChild(unitLabel);
+        row.GetNode<Label>("Unit").Text = unit;
     }
 
     /// <summary>Libellé du grand pas : « 25 », ou « 1 min » pour une durée (sans unité affichée).</summary>

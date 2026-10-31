@@ -10,7 +10,8 @@ namespace Velom3d.Screens;
 /// <summary>
 /// Bilan d'une sortie, juste après l'arrivée ou depuis l'historique : chiffres clés (TSS, IF,
 /// puissance normalisée, calories…), temps passé dans chaque zone de puissance, et courbes de
-/// puissance, cadence, vitesse avec la pente, et fréquence cardiaque.
+/// puissance, cadence, vitesse avec la pente, et fréquence cardiaque. Mise en page : RideSummaryScreen.tscn ;
+/// les barres de zones et les courbes dépendent des données et sont ajoutées ici.
 /// </summary>
 public partial class RideSummaryScreen : Screen
 {
@@ -27,62 +28,52 @@ public partial class RideSummaryScreen : Screen
     /// <summary>Graphiques avec une cible tracée (pour les tests).</summary>
     internal int TargetCount { get; private set; }
 
-    Button _deleteButton = null!;
-
     public override void _Ready()
     {
         var info = Ride.Info;
         var s = Ride.Summarize();
-        var root = Ui.BuildPage(this, 14);
 
-        var header = Ui.Row();
-        root.AddChild(header);
-        var titles = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        titles.AddChild(Ui.Label(JustFinished ? "Bravo, sortie enregistrée !" : "Bilan de la sortie", 36));
-        titles.AddChild(Ui.Label($"{Ui.Date(info.StartedAt)}  ·  {RideHistoryScreen.ModeName(info)}  ·  FTP {info.FtpW} W"
-                                 + (info.FtpTestW > 0 ? $"  ·  nouvelle FTP {info.FtpTestW} W" : ""), 19, Ui.Muted));
-        header.AddChild(titles);
-        header.AddChild(Ui.Button(JustFinished ? "Menu" : "Retour", OnBack, 200, 72));
+        GetNode<Label>("%Title").Text = JustFinished ? "Bravo, sortie enregistrée !" : "Bilan de la sortie";
+        GetNode<Label>("%Subtitle").Text = $"{Ui.Date(info.StartedAt)}  ·  {RideHistoryScreen.ModeName(info)}  ·  FTP {info.FtpW} W"
+                                           + (info.FtpTestW > 0 ? $"  ·  nouvelle FTP {info.FtpTestW} W" : "");
+        var back = GetNode<Button>("%BackButton");
+        back.Text = JustFinished ? "Menu" : "Retour";
+        back.Pressed += OnBack;
 
-        var content = Ui.AddScroll(root, 14);
+        Stat("Duration", Ui.Duration(s.DurationS));
+        Stat("Distance", Ui.Km(s.DistanceM));
+        Stat("Tss", $"{s.Tss:0}");
+        Stat("Intensity", $"{s.IntensityFactor:0.00}");
+        Stat("AvgPower", $"{s.AvgPowerW:0} W");
+        Stat("NormPower", $"{s.NormalizedPowerW:0} W");
+        Stat("MaxPower", $"{s.MaxPowerW} W");
+        Stat("Kcal", $"{s.Kcal:0} kcal");
+        Stat("AvgCadence", s.AvgCadenceRpm > 0 ? $"{s.AvgCadenceRpm:0} tr/min" : "--");
+        Stat("AvgSpeed", $"{s.AvgSpeedKmh:0.0} km/h");
+        Stat("AvgHeartRate", s.AvgHeartRateBpm > 0 ? $"{s.AvgHeartRateBpm:0} bpm" : "--");
+        Stat("MaxHeartRate", s.MaxHeartRateBpm > 0 ? $"{s.MaxHeartRateBpm} bpm" : "--");
+        // Rapport poids/puissance avec le poids du cycliste ce jour-là ; sans poids, ces tuiles sont masquées.
+        bool mass = info.RiderMassKg > 0;
+        Stat("AvgPerKg", mass ? $"{Ride.PerKg(s.AvgPowerW, info):0.00}" : null);
+        Stat("NormPerKg", mass ? $"{Ride.PerKg(s.NormalizedPowerW, info):0.00}" : null);
+        Stat("MaxPerKg", mass ? $"{Ride.PerKg(s.MaxPowerW, info):0.00}" : null);
+        Stat("Mass", mass ? $"{info.RiderMassKg:0.#} + {info.BikeMassKg:0.#} kg" : null);
+        GetNode<Label>("%WorkNote").Text = $"Travail : {s.WorkKj:0} kJ. Calories estimées avec un rendement musculaire de 24 %.";
 
-        var grid = new GridContainer { Columns = 4, SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Pass };
-        grid.AddThemeConstantOverride("h_separation", 12);
-        grid.AddThemeConstantOverride("v_separation", 12);
-        content.AddChild(grid);
-        Stat(grid, "Durée", Ui.Duration(s.DurationS), Ui.Muted);
-        Stat(grid, "Distance", Ui.Km(s.DistanceM), Ui.Muted);
-        Stat(grid, "TSS", $"{s.Tss:0}", Ui.Accent);
-        Stat(grid, "Facteur d'intensité", $"{s.IntensityFactor:0.00}", Ui.Accent);
-        Stat(grid, "Puissance moyenne", $"{s.AvgPowerW:0} W", Ui.PowerColor);
-        Stat(grid, "Puissance normalisée", $"{s.NormalizedPowerW:0} W", Ui.PowerColor);
-        Stat(grid, "Puissance max", $"{s.MaxPowerW} W", Ui.PowerColor);
-        Stat(grid, "Calories", $"{s.Kcal:0} kcal", Ui.Warning);
-        Stat(grid, "Cadence moyenne", s.AvgCadenceRpm > 0 ? $"{s.AvgCadenceRpm:0} tr/min" : "--", Ui.CadenceColor);
-        Stat(grid, "Vitesse moyenne", $"{s.AvgSpeedKmh:0.0} km/h", Ui.SpeedColor);
-        Stat(grid, "FC moyenne", s.AvgHeartRateBpm > 0 ? $"{s.AvgHeartRateBpm:0} bpm" : "--", Ui.HeartRateColor);
-        Stat(grid, "FC max", s.MaxHeartRateBpm > 0 ? $"{s.MaxHeartRateBpm} bpm" : "--", Ui.HeartRateColor);
-        if (info.RiderMassKg > 0)
-        {
-            // Rapport poids/puissance avec le poids du cycliste ce jour-là.
-            Stat(grid, "W/kg moyen", $"{Ride.PerKg(s.AvgPowerW, info):0.00}", Ui.PowerColor);
-            Stat(grid, "W/kg normalisé", $"{Ride.PerKg(s.NormalizedPowerW, info):0.00}", Ui.PowerColor);
-            Stat(grid, "W/kg max", $"{Ride.PerKg(s.MaxPowerW, info):0.00}", Ui.PowerColor);
-            Stat(grid, "Poids", $"{info.RiderMassKg:0.#} + {info.BikeMassKg:0.#} kg", Ui.Muted);
-        }
-        content.AddChild(Ui.Label($"Travail : {s.WorkKj:0} kJ. Calories estimées avec un rendement musculaire de 24 %.", 16, Ui.Muted));
+        Timeline(Ride);
+        var zones = GetNode<Control>("%Zones");
+        zones.Visible = s.DurationS > 0;
+        if (zones.Visible) Zones(s, info.FtpW);
 
-        content.AddChild(Timeline(Ride));
-        if (s.DurationS > 0) content.AddChild(Zones(s, info.FtpW));
-
+        var charts = GetNode<Container>("%Charts");
         var t = Ride.Samples.Select(x => x.TimeS).ToArray();
         // Cible enregistrée (consigne ERG, cadence demandée) : tracée par-dessus la mesure.
-        var power = AddChart(content, "Puissance", "W", Ui.PowerColor, t, Ride.Samples.Select(x => (double)x.PowerW).ToArray(), s.AvgPowerW);
+        var power = AddChart(charts, "Puissance", "W", Ui.PowerColor, t, Ride.Samples.Select(x => (double)x.PowerW).ToArray(), s.AvgPowerW);
         if (power is not null && Ride.Samples.Any(x => x.TargetPowerW > 0)) {
             power.Target = Ride.Samples.Select(x => (double)x.TargetPowerW).ToArray();
             power.Title += " · cible en blanc";
         }
-        var cadence = AddChart(content, "Cadence", "tr/min", Ui.CadenceColor, t, Ride.Samples.Select(x => x.CadenceRpm).ToArray(), s.AvgCadenceRpm);
+        var cadence = AddChart(charts, "Cadence", "tr/min", Ui.CadenceColor, t, Ride.Samples.Select(x => x.CadenceRpm).ToArray(), s.AvgCadenceRpm);
         if (cadence is not null && Ride.Samples.Any(x => x.TargetCadenceRpm > 0)) {
             cadence.Target = Ride.Samples.Select(x => (double)x.TargetCadenceRpm).ToArray();
             cadence.Title += " · cible en blanc";
@@ -91,21 +82,16 @@ public partial class RideSummaryScreen : Screen
         // La pente n'est tracée que si elle varie ; sur le plat, le titre le dit.
         var grades = Ride.Samples.Select(x => x.GradePct).ToArray();
         bool flat = grades.All(g => Math.Abs(g - grades.FirstOrDefault()) < 0.05);
-        var speed = AddChart(content, flat ? $"Vitesse · pente {grades.FirstOrDefault():0.#} % tout du long" : "Vitesse et pente",
+        var speed = AddChart(charts, flat ? $"Vitesse · pente {grades.FirstOrDefault():0.#} % tout du long" : "Vitesse et pente",
             "km/h", Ui.SpeedColor, t, Ride.Samples.Select(x => x.SpeedKmh).ToArray(), s.AvgSpeedKmh);
         if (speed is not null && !flat)
         {
             speed.Secondary = grades;
             speed.SecondaryLabel = "pente (%)";
         }
-        AddChart(content, "Fréquence cardiaque", "bpm", Ui.HeartRateColor, t, Ride.Samples.Select(x => (double)x.HeartRateBpm).ToArray(), s.AvgHeartRateBpm);
+        AddChart(charts, "Fréquence cardiaque", "bpm", Ui.HeartRateColor, t, Ride.Samples.Select(x => (double)x.HeartRateBpm).ToArray(), s.AvgHeartRateBpm);
 
-        var actions = Ui.Row();
-        actions.Alignment = BoxContainer.AlignmentMode.End;
-        content.AddChild(actions);
-        _deleteButton = Ui.Button("Supprimer cette sortie", OnDeletePressed, 320, 72, 20);
-        _deleteButton.Modulate = Ui.Danger;
-        actions.AddChild(_deleteButton);
+        GetNode<Button>("%DeleteButton").Pressed += OnDeletePressed;
 
         if (JustFinished && info.FtpTestW > 0)
         {
@@ -116,10 +102,12 @@ public partial class RideSummaryScreen : Screen
         }
     }
 
-    static void Stat(GridContainer grid, string title, string value, Color accent)
+    /// <summary>Valeur d'une tuile de la grille ; null masque la tuile.</summary>
+    void Stat(string tile, string? value)
     {
-        var label = Ui.Tile(grid, title, accent, 30);
-        label.Text = value;
+        var node = GetNode<Control>($"%{tile}Tile");
+        node.Visible = value is not null;
+        node.GetNode<Label>("Box/Value").Text = value ?? "";
     }
 
     LineChart? AddChart(Container parent, string title, string unit, Color color, double[] times, double[] values, double average)
@@ -133,26 +121,25 @@ public partial class RideSummaryScreen : Screen
     }
 
     /// <summary>Heures de départ et de fin, et chaque pause avec sa durée.</summary>
-    static Control Timeline(Ride ride)
+    void Timeline(Ride ride)
     {
         var info = ride.Info;
-        var panel = Ui.Panel(Ui.Card);
-        var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        box.AddThemeConstantOverride("separation", 4);
-        panel.AddChild(box);
         string end = info.EndedAt is { } e ? $"  ·  fin {Clock(e)}" : "";
-        box.AddChild(Ui.Label($"Départ {Clock(info.StartedAt)}{end}", 20));
+        GetNode<Label>("%Times").Text = $"Départ {Clock(info.StartedAt)}{end}";
         PausesText = ride.Pauses.Count == 0 ? "Aucune pause."
             : string.Join("\n", ride.Pauses.Select((p, i) => p.ResumedAt is { } r
                 ? $"Pause {i + 1} : {Clock(p.PausedAt)} → {Clock(r)} ({Ui.Duration(p.DurationS)}), après {Ui.Duration(p.AtElapsedS)} de sortie"
                 : $"Pause {i + 1} : {Clock(p.PausedAt)}, après {Ui.Duration(p.AtElapsedS)} de sortie, jusqu'à la fin"));
-        box.AddChild(Ui.Label(PausesText, 17, Ui.Muted));
+        GetNode<Label>("%Pauses").Text = PausesText;
+        var physics = GetNode<Label>("%Physics");
+        physics.Visible = info.Crr > 0;
         if (info.Crr > 0)
-            box.AddChild(Ui.Label(string.Create(System.Globalization.CultureInfo.GetCultureInfo("fr-FR"),
-                $"Résistance des pneus Crr {info.Crr:0.0000}  ·  aéro CdA {info.CdA:0.00} m²  ·  roue {info.WheelCircumferenceMm} mm"), 17, Ui.Muted));
+            physics.Text = string.Create(System.Globalization.CultureInfo.GetCultureInfo("fr-FR"),
+                $"Résistance des pneus Crr {info.Crr:0.0000}  ·  aéro CdA {info.CdA:0.00} m²  ·  roue {info.WheelCircumferenceMm} mm");
         SensorsText = string.Join("\n", info.Sensors.Select(SensorLine));
-        if (SensorsText != "") box.AddChild(Ui.Label("Capteurs\n" + SensorsText, 17, Ui.Muted));
-        return panel;
+        var sensors = GetNode<Label>("%Sensors");
+        sensors.Visible = SensorsText != "";
+        sensors.Text = "Capteurs\n" + SensorsText;
     }
 
     /// <summary>« 1. KICKR CORE · Home trainer · Wahoo KICKR CORE · 0 à 2000 W ».</summary>
@@ -178,13 +165,10 @@ public partial class RideSummaryScreen : Screen
     static string Clock(DateTimeOffset at) => at.ToLocalTime().ToString("HH:mm:ss");
 
     /// <summary>Barres horizontales : part du temps dans chaque zone de puissance.</summary>
-    static Control Zones(RideSummary s, int ftpW)
+    void Zones(RideSummary s, int ftpW)
     {
-        var panel = Ui.Panel(Ui.Card);
-        var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Pass };
-        box.AddThemeConstantOverride("separation", 6);
-        panel.AddChild(box);
-        box.AddChild(Ui.Label($"Temps par zone de puissance (FTP {ftpW} W)", 20, Ui.PowerColor));
+        var box = GetNode<Container>("%ZoneRows");
+        GetNode<Label>("%ZonesTitle").Text = $"Temps par zone de puissance (FTP {ftpW} W)";
         double total = s.PowerZonesS.Sum();
         for (int z = 0; z < RideMetrics.ZoneCount; z++)
         {
@@ -200,12 +184,10 @@ public partial class RideSummaryScreen : Screen
                 SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter,
                 CustomMinimumSize = new Vector2(0, 18), MouseFilter = MouseFilterEnum.Pass,
             };
+            // Fond du thème, remplissage à la couleur de la zone.
             var fill = new StyleBoxFlat { BgColor = Ui.ZoneColor(z) };
             fill.SetCornerRadiusAll(6);
-            var back = new StyleBoxFlat { BgColor = new Color(1, 1, 1, 0.06f) };
-            back.SetCornerRadiusAll(6);
             bar.AddThemeStyleboxOverride("fill", fill);
-            bar.AddThemeStyleboxOverride("background", back);
             row.AddChild(bar);
             var time = Ui.Label($"{Ui.Duration(s.PowerZonesS[z])}  {share * 100:0} %", 17, Ui.Muted);
             time.CustomMinimumSize = new Vector2(150, 0);
@@ -214,7 +196,6 @@ public partial class RideSummaryScreen : Screen
             row.AddChild(time);
             box.AddChild(row);
         }
-        return panel;
     }
 
     internal void OnDeletePressed() => Confirm("Supprimer cette sortie ?", "Ses mesures et son bilan seront effacés de l'appareil.", "Oui, supprimer", () =>

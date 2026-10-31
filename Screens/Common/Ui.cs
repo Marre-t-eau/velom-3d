@@ -3,12 +3,14 @@ using Godot;
 
 namespace Velom3d.Screens;
 
-/// <summary>Couleurs et briques d'interface communes aux écrans, pensées pour le tactile.</summary>
+/// <summary>
+/// Couleurs et petites briques pour ce que les écrans créent eux-mêmes parce que ça dépend des données
+/// (lignes de liste, boutons de choix). La mise en page fixe est dans les scènes (.tscn), et les styles
+/// communs dans le thème Screens/Common/Theme.tres (fond des cartes, boutons à bascule, libellés grisés…).
+/// </summary>
 public static class Ui
 {
-    public static readonly Color Background = new(0.07f, 0.08f, 0.10f);
     public static readonly Color Card = new(0.13f, 0.15f, 0.18f);
-    public static readonly Color CardActive = new(0.10f, 0.24f, 0.17f);
     public static readonly Color Muted = new(0.62f, 0.66f, 0.72f);
     public static readonly Color Accent = new(0.22f, 0.78f, 0.47f);
     public static readonly Color Warning = new(1.0f, 0.72f, 0.30f);
@@ -33,42 +35,6 @@ public static class Ui
         _ => new Color(0.75f, 0.35f, 0.85f),
     };
 
-    /// <summary>Fond plein écran et colonne principale avec marges.</summary>
-    public static VBoxContainer BuildPage(Control screen, int separation = 18)
-    {
-        screen.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        var bg = new ColorRect { Color = Background };
-        bg.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        screen.AddChild(bg);
-
-        var margin = new MarginContainer();
-        margin.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        foreach (var side in new[] { "left", "right", "top", "bottom" })
-            margin.AddThemeConstantOverride("margin_" + side, 32);
-        screen.AddChild(margin);
-
-        var root = new VBoxContainer();
-        root.AddThemeConstantOverride("separation", separation);
-        margin.AddChild(root);
-        return root;
-    }
-
-    /// <summary>Zone qui défile au doigt, verticalement.</summary>
-    public static VBoxContainer AddScroll(Container parent, int separation = 16)
-    {
-        var scroll = new ScrollContainer
-        {
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
-            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
-            ScrollDeadzone = 12,
-        };
-        parent.AddChild(scroll);
-        var content = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Pass };
-        content.AddThemeConstantOverride("separation", separation);
-        scroll.AddChild(content);
-        return content;
-    }
-
     public static Label Label(string text, int size, Color? color = null)
     {
         var label = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart, MouseFilter = Control.MouseFilterEnum.Pass };
@@ -86,24 +52,6 @@ public static class Ui
         return button;
     }
 
-    /// <summary>Bouton à bascule bien visible : vert bordé quand il est choisi.</summary>
-    public static void MakeSelectable(Button button)
-    {
-        button.ToggleMode = true;
-        StyleBoxFlat Style(Color bg, Color? border, float lighten = 0f)
-        {
-            var s = new StyleBoxFlat { BgColor = bg.Lightened(lighten) };
-            s.SetCornerRadiusAll(14);
-            if (border is { } b) { s.BorderColor = b; s.SetBorderWidthAll(3); }
-            return s;
-        }
-        button.AddThemeStyleboxOverride("normal", Style(Card, null));
-        button.AddThemeStyleboxOverride("hover", Style(Card, null, 0.05f));
-        button.AddThemeStyleboxOverride("pressed", Style(CardActive, Accent));
-        button.AddThemeStyleboxOverride("hover_pressed", Style(CardActive, Accent, 0.05f));
-        button.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
-    }
-
     public static HBoxContainer Row(int separation = 16)
     {
         var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
@@ -111,47 +59,12 @@ public static class Ui
         return row;
     }
 
-    public static PanelContainer Panel(Color color, Color? border = null)
-    {
-        var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Pass };
-        SetPanelColor(panel, color, border);
-        return panel;
-    }
-
-    public static void SetPanelColor(PanelContainer panel, Color color, Color? border = null)
-    {
-        var style = new StyleBoxFlat { BgColor = color, ContentMarginLeft = 20, ContentMarginRight = 20, ContentMarginTop = 14, ContentMarginBottom = 14 };
-        style.SetCornerRadiusAll(14);
-        if (border is { } b) { style.BorderColor = b; style.SetBorderWidthAll(2); }
-        panel.AddThemeStyleboxOverride("panel", style);
-    }
-
-    /// <summary>Ligne « libellé  [−]  valeur  [+] » ; <paramref name="after"/> rafraîchit l'écran.</summary>
-    public static Control Stepper(Container parent, string title, out Label value, Action<int> change, Action after)
-    {
-        var panel = Panel(Card);
-        var row = Row();
-        panel.AddChild(row);
-        var label = Label(title, 24);
-        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        label.VerticalAlignment = VerticalAlignment.Center;
-        row.AddChild(label);
-        row.AddChild(Button("−", () => { change(-1); after(); }, 96, 72, 32));
-        value = Label("", 30);
-        value.CustomMinimumSize = new Vector2(150, 0);
-        value.HorizontalAlignment = HorizontalAlignment.Center;
-        value.VerticalAlignment = VerticalAlignment.Center;
-        row.AddChild(value);
-        row.AddChild(Button("+", () => { change(+1); after(); }, 96, 72, 32));
-        parent.AddChild(panel);
-        return panel;
-    }
-
     /// <summary>Petit bouton à bascule pour choisir parmi des préréglages.</summary>
     public static Button Chip(Container parent, string text, Action onPressed)
     {
         var chip = Button(text, onPressed, 120, 64, 22);
-        MakeSelectable(chip);
+        chip.ToggleMode = true;
+        chip.ThemeTypeVariation = "ChoiceButton"; // vert bordé quand il est choisi (Theme.tres)
         parent.AddChild(chip);
         return chip;
     }
@@ -164,21 +77,6 @@ public static class Ui
         flow.AddThemeConstantOverride("v_separation", 12);
         parent.AddChild(flow);
         return flow;
-    }
-
-    /// <summary>Tuile « titre / grande valeur » ; renvoie le label de valeur à mettre à jour.</summary>
-    public static Label Tile(Container parent, string title, Color accent, int valueSize = 36)
-    {
-        var panel = Panel(Card);
-        panel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        var box = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
-        panel.AddChild(box);
-        box.AddChild(Label(title, 18, accent));
-        var value = Label("--", valueSize);
-        value.AutowrapMode = TextServer.AutowrapMode.Off;
-        box.AddChild(value);
-        parent.AddChild(panel);
-        return value;
     }
 
     public static string Duration(double seconds)

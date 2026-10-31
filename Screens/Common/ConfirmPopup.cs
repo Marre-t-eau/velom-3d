@@ -4,52 +4,34 @@ using Godot;
 namespace Velom3d.Screens;
 
 /// <summary>
-/// Fenêtre de confirmation plein écran : fond assombri qui bloque l'écran derrière, question,
-/// précision, et deux grands boutons Non / Oui. Toucher le fond revient à Non.
+/// Fenêtre de confirmation plein écran (ConfirmPopup.tscn) : fond assombri qui bloque l'écran derrière,
+/// question, précision, et deux grands boutons Non / Oui. Toucher le fond revient à Non.
 /// Sans <c>onNo</c>, c'est une simple information avec un seul bouton.
 /// </summary>
 public partial class ConfirmPopup : Control
 {
-    internal Button YesButton { get; } = null!;
-    internal Button NoButton { get; } = null!;
+    public const string ScenePath = "res://Screens/Common/ConfirmPopup.tscn";
 
-    public ConfirmPopup() { }
+    internal Button YesButton => GetNode<Button>("%YesButton");
+    internal Button NoButton => GetNode<Button>("%NoButton");
 
-    public ConfirmPopup(string question, string detail, string yes, Action onYes, Action? onNo)
+    /// <summary>Remplit la fenêtre ; à appeler avant de l'ajouter à l'écran.</summary>
+    public void Setup(string question, string detail, string yes, Action onYes, Action? onNo)
     {
         bool info = onNo is null;
         onNo ??= onYes;
-        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        MouseFilter = MouseFilterEnum.Stop;
-        var shade = new ColorRect { Color = new Color(0, 0, 0, 0.6f), MouseFilter = MouseFilterEnum.Stop };
-        shade.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        shade.GuiInput += e => { if (e is InputEventMouseButton { Pressed: true }) onNo(); };
-        AddChild(shade);
-
-        var center = new CenterContainer { MouseFilter = MouseFilterEnum.Ignore };
-        center.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        AddChild(center);
-        var panel = Ui.Panel(Ui.Card, info ? Ui.Accent : Ui.Danger);
-        panel.MouseFilter = MouseFilterEnum.Stop;
-        panel.CustomMinimumSize = new Vector2(620, 0);
-        center.AddChild(panel);
-        var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 22);
-        panel.AddChild(box);
-        box.AddChild(Ui.Label(question, 32));
-        if (detail.Length > 0) box.AddChild(Ui.Label(detail, 20, Ui.Muted));
-        var buttons = Ui.Row();
-        box.AddChild(buttons);
-        NoButton = Ui.Button("Non", onNo, 0, 88, 26);
-        NoButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        GetNode<ColorRect>("%Shade").GuiInput += e => { if (e is InputEventMouseButton { Pressed: true }) onNo(); };
+        GetNode<PanelContainer>("%Panel").ThemeTypeVariation = info ? "AccentPanel" : "DangerPanel";
+        GetNode<Label>("%Question").Text = question;
+        var details = GetNode<Label>("%Detail");
+        details.Text = detail;
+        details.Visible = detail.Length > 0;
+        NoButton.Pressed += onNo;
         NoButton.Visible = !info;
-        buttons.AddChild(NoButton);
-        YesButton = Ui.Button(yes, onYes, 0, 88, 26);
-        YesButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        YesButton.Text = yes;
+        YesButton.Pressed += onYes;
         var color = info ? Ui.Accent : Ui.Danger;
-        YesButton.AddThemeColorOverride("font_color", color);
-        YesButton.AddThemeColorOverride("font_hover_color", color);
-        YesButton.AddThemeColorOverride("font_pressed_color", color);
-        buttons.AddChild(YesButton);
+        foreach (var name in new[] { "font_color", "font_hover_color", "font_pressed_color" })
+            YesButton.AddThemeColorOverride(name, color);
     }
 }

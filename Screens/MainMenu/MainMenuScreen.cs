@@ -3,7 +3,7 @@ using Velom3d.Sensors;
 
 namespace Velom3d.Screens;
 
-/// <summary>Menu principal, après la connexion des capteurs.</summary>
+/// <summary>Menu principal, après la connexion des capteurs (mise en page : MainMenuScreen.tscn).</summary>
 public partial class MainMenuScreen : Screen
 {
     /// <summary>Boutons exposés aux tests.</summary>
@@ -13,29 +13,14 @@ public partial class MainMenuScreen : Screen
 
     public override void _Ready()
     {
-        var root = Ui.BuildPage(this, 22);
-        var header = Ui.Row();
-        root.AddChild(header);
-        var title = Ui.Label("Velom3d", 44);
-        title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        header.AddChild(title);
-        header.AddChild(Ui.Button("Réglages", () => Navigator.GoTo(this, Navigator.Settings), 220, 72));
-        _sensors = Ui.Label("", 20, Ui.Muted);
-        root.AddChild(_sensors);
-
-        // Grille 2 × 2 : les quatre choix tiennent sur un téléphone à l'horizontale.
-        var content = new GridContainer { Columns = 2, SizeFlagsVertical = SizeFlags.ExpandFill };
-        content.AddThemeConstantOverride("h_separation", 18);
-        content.AddThemeConstantOverride("v_separation", 18);
-        root.AddChild(content);
-        StructuredButton = Choice(content, "Entraînement structuré", "Vos séances par blocs : puissance fixe, libre ou en rampe, cadence imposée.",
-            () => Navigator.GoTo(this, Navigator.Workouts));
-        FreeRideButton = Choice(content, "Sortie libre", "Roulez sur le plat, à puissance imposée ou en simulation réaliste.",
-            () => Navigator.GoTo(this, Navigator.FreeRide));
-        Choice(content, "Mes sorties", "Historique, graphiques, TSS, IF et calories de chaque sortie.",
-            () => Navigator.GoTo(this, Navigator.History));
-        Choice(content, "Capteurs", "Connecter ou changer de home trainer, capteur de puissance, ceinture cardio.",
-            () => Navigator.GoTo(this, Navigator.Connection));
+        StructuredButton = GetNode<Button>("%StructuredButton");
+        FreeRideButton = GetNode<Button>("%FreeRideButton");
+        _sensors = GetNode<Label>("%Sensors");
+        GetNode<Button>("%SettingsButton").Pressed += () => Navigator.GoTo(this, Navigator.Settings);
+        Choice(StructuredButton, Navigator.Workouts);
+        Choice(FreeRideButton, Navigator.FreeRide);
+        Choice(GetNode<Button>("%HistoryButton"), Navigator.History);
+        Choice(GetNode<Button>("%SensorsButton"), Navigator.Connection);
     }
 
     public override void _Process(double delta)
@@ -50,26 +35,11 @@ public partial class MainMenuScreen : Screen
 
     protected override void OnBack() => GetTree().Quit();
 
-    static Button Choice(Container parent, string title, string detail, System.Action onPressed)
+    void Choice(Button button, string screen)
     {
-        var button = Ui.Button("", onPressed, 0, 150);
-        button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        button.SizeFlagsVertical = SizeFlags.ExpandFill;
-        var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
-        box.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        box.OffsetLeft = 28;
-        box.OffsetRight = -28;
-        box.Alignment = BoxContainer.AlignmentMode.Center;
-        var name = Ui.Label(title, 30);
-        name.MouseFilter = MouseFilterEnum.Ignore;
-        var hint = Ui.Label(detail, 18, Ui.Muted);
-        hint.MouseFilter = MouseFilterEnum.Ignore;
-        box.AddChild(name);
-        box.AddChild(hint);
-        button.AddChild(box);
+        button.Pressed += () => Navigator.GoTo(this, screen);
         // Grisé : le texte aussi.
-        button.Draw += () => box.Modulate = button.Disabled ? new Color(1, 1, 1, 0.4f) : Colors.White;
-        parent.AddChild(button);
-        return button;
+        var content = button.GetNode<Control>("Content");
+        button.Draw += () => content.Modulate = button.Disabled ? new Color(1, 1, 1, 0.4f) : Colors.White;
     }
 }

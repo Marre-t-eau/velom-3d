@@ -1,0 +1,37 @@
+[gd_scene format=3]
+
+[node name="RideCard" type="Button"]
+custom_minimum_size = Vector2(0, 116)
+offset_right = 1000.0
+offset_bottom = 116.0
+size_flags_horizontal = 3
+mouse_filter = 1
+
+[node name="Content" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+offset_left = 24.0
+offset_right = -24.0
+mouse_filter = 2
+alignment = 1
+
+[node name="Date" type="Label" parent="Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "sam. 10 oct. 2026 · 12:05  ·  Simulation réaliste"
+autowrap_mode = 3
+mouse_filter = 2
+
+[node name="Stats" type="Label" parent="Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+theme_type_variation = &"MutedLabel"
+text = "1:00:00   30.00 km   200 W moy.   70 TSS   IF 0.80   800 kcal"
+autowrap_mode = 3
+mouse_filter = 2
