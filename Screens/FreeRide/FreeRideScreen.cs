@@ -47,8 +47,6 @@ public partial class FreeRideScreen : Screen
     /// <summary>Temps restant (s) pendant lequel la tuile puissance montre la moyenne (touchée par le cycliste).</summary>
     double _showAverageS;
     const double ShowAverageForS = 5.0;
-    /// <summary>« Terminer » touché une fois : sortie en pause, en attente de confirmation.</summary>
-    bool _finishArmed;
 
     /// <summary>Enregistrement en cours (null avant le départ), exposé aux tests.</summary>
     internal RideRecorder? Recorder { get; private set; }
@@ -206,11 +204,7 @@ public partial class FreeRideScreen : Screen
         _menuSkip = GetNode<Button>("%MenuSkip");
         _menuSkip.Pressed += () => { CloseMenu(); SkipBlock(); };
         GetNode<Button>("%MenuSensors").Pressed += OpenSensors;
-        GetNode<Button>("%MenuFinish").Pressed += () =>
-        {
-            CloseMenu();
-            Confirm("Terminer la sortie ?", "Elle est enregistrée et son bilan s'ouvre.", "Terminer", Finish);
-        };
+        GetNode<Button>("%MenuFinish").Pressed += OnFinishPressed;
     }
 
     internal bool MenuOpen => _rideMenu.Visible;
@@ -237,7 +231,6 @@ public partial class FreeRideScreen : Screen
         CloseMenu();
         _resumeAfterSensors = !Recorder.IsPaused;
         if (_resumeAfterSensors) Recorder.Pause();
-        _finishArmed = false;
         SensorsPage = Navigator.Create<DeviceConnectionScreen>(Navigator.Connection);
         SensorsPage.ReturnToRide = CloseSensors;
         _riding.Visible = false;
@@ -597,26 +590,23 @@ public partial class FreeRideScreen : Screen
         if (Hub.TrainerAddress != "") Hub.SetTargetPower(Recorder.TargetPowerW);
     }
 
-    /// <summary>Pause / Reprendre. Reprendre annule aussi une fin demandée.</summary>
+    /// <summary>Pause / Reprendre.</summary>
     void TogglePause()
     {
         if (Recorder is null) return;
         if (Recorder.IsPaused) Recorder.Resume(); else Recorder.Pause();
-        _finishArmed = false;
     }
 
-    /// <summary>Premier appui : la sortie se met en pause et attend confirmation (Reprendre pour
-    /// continuer). Second appui : fin. Un doigt qui glisse ne coupe donc pas une sortie.</summary>
+    /// <summary>« Terminer » (barre du bas ou menu) : la sortie se met en pause et une fenêtre demande
+    /// confirmation. Non la fait reprendre si elle roulait : un doigt qui glisse ne coupe donc pas une sortie.</summary>
     internal void OnFinishPressed()
     {
         if (Recorder is null) return;
-        if (_finishArmed)
-        {
-            Finish();
-            return;
-        }
-        _finishArmed = true;
+        CloseMenu();
+        bool wasRunning = !Recorder.IsPaused;
         Recorder.Pause();
+        Confirm("Terminer la sortie ?", "Elle est enregistrée et son bilan s'ouvre.", "Terminer", Finish,
+            () => { if (wasRunning) Recorder?.Resume(); });
     }
 
     /// <summary>État affiché des boutons (pour les tests).</summary>
@@ -717,7 +707,6 @@ public partial class FreeRideScreen : Screen
         _speed.Text = $"{Recorder.SpeedKmh:0.0} km/h";
         _distance.Text = Ui.Km(Recorder.DistanceM);
         _rideTarget.Text = $"Cible {Recorder.TargetPowerW} W";
-        _finishButton.Text = _finishArmed ? "Confirmer la fin" : "Terminer";
         // Entraînement : « Terminer » n'apparaît qu'une fois la séance finie (sinon, dans le menu).
         _finishButton.Visible = Progress is null || Progress.IsFinished;
         _pauseButton.Text = Recorder.IsPaused ? "Reprendre" : "Pause";

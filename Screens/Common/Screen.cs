@@ -54,14 +54,19 @@ public abstract partial class Screen : Control
     /// <summary>Fenêtre de confirmation ouverte (pour les tests).</summary>
     internal ConfirmPopup? Popup { get; private set; }
 
-    /// <summary>Fenêtre « question ? Non / Oui » par-dessus l'écran ; <paramref name="onYes"/> n'est appelé que sur Oui.</summary>
-    protected void Confirm(string question, string detail, string yes, Action onYes)
+    /// <summary>Fenêtre « question ? Non / Oui » par-dessus l'écran ; <paramref name="onYes"/> n'est appelé que sur Oui,
+    /// <paramref name="onNo"/> sur Non, en touchant le fond ou avec Retour.</summary>
+    protected void Confirm(string question, string detail, string yes, Action onYes, Action? onNo = null)
     {
         Popup?.QueueFree();
         Popup = Navigator.Create<ConfirmPopup>(ConfirmPopup.ScenePath);
-        Popup.Setup(question, detail, yes, () => { ClosePopup(); onYes(); }, ClosePopup);
+        _popupNo = () => { ClosePopup(); onNo?.Invoke(); };
+        Popup.Setup(question, detail, yes, () => { ClosePopup(); onYes(); }, _popupNo);
         AddChild(Popup);
     }
+
+    /// <summary>Réponse « Non » de la fenêtre ouverte (aussi pour Retour).</summary>
+    Action? _popupNo;
 
     /// <summary>Fenêtre d'information avec un seul bouton.</summary>
     protected void Inform(string title, string detail, string ok = "OK")
@@ -76,11 +81,12 @@ public abstract partial class Screen : Control
     {
         Popup?.QueueFree();
         Popup = null;
+        _popupNo = null;
     }
 
     void Back()
     {
-        if (Popup is not null) ClosePopup();
+        if (Popup is not null) (_popupNo ?? ClosePopup)();
         else OnBack();
     }
 

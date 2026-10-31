@@ -144,8 +144,13 @@ public partial class GodotSmokeTest : Node
         ride.CloseMenu();
         ride.OnFinishPressed();
         await Wait(0.1);
-        Check(rec.IsPaused && ride.PauseButtonText == "Reprendre", "Terminer : la sortie se met en pause, Pause devient Reprendre");
+        Check(rec.IsPaused && ride.PauseButtonText == "Reprendre" && ride.Popup is not null,
+            "Terminer : fenêtre de confirmation, la sortie se met en pause");
+        ride.Popup?.NoButton.EmitSignal(BaseButton.SignalName.Pressed);
+        await Wait(0.1);
+        Check(ride.Popup is null && !rec.IsPaused && ride.Recorder == rec, "Non : la fenêtre se ferme, la sortie reprend");
         ride.OnFinishPressed();
+        ride.Popup?.YesButton.EmitSignal(BaseButton.SignalName.Pressed);
         await Wait(0.3);
         Check(!sim.Model.ErgMode, "Fin de sortie : le trainer n'impose plus de puissance");
         Check(next is RideSummaryScreen, "Fin de sortie : ouverture du bilan");
@@ -160,7 +165,7 @@ public partial class GodotSmokeTest : Node
             Check(summary.Ride.Info.Summary.Tss > 0 && summary.Ride.Info.Summary.Kcal > 0, "Bilan : TSS et calories calculés");
             var info = summary.Ride.Info;
             var r = summary.Ride;
-            Check(info.RiderMassKg > 0 && info.EndedAt is not null && r.Pauses.Count == 1 && RideSummaryScreen.PausesText.StartsWith("Pause 1"),
+            Check(info.RiderMassKg > 0 && info.EndedAt is not null && r.Pauses.Count == 2 && RideSummaryScreen.PausesText.StartsWith("Pause 1"),
                 $"Bilan : poids, heure de fin et pause ({r.Pauses.Count} pause)");
             var trainer = info.Sensors.FirstOrDefault(x => x.Kind == DeviceKind.Trainer);
             Check(trainer is { Specs.PowerMaxW: 2000, Specs.Model: "Home trainer démo" } && info.Sensors.Count == 3
