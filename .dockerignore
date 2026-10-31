@@ -1,0 +1,6 @@
+**/bin/
+**/obj/
+.godot/
+android/
+android-plugin/build/
+Server/data/

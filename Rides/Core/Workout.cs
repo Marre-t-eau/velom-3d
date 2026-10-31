@@ -229,12 +229,16 @@ public sealed class Workout
         return w;
     }
 
+    /// <summary>Date des exemples : fixe, comme leurs ids, pour qu'ils soient les mêmes sur tous les
+    /// appareils d'un compte synchronisé (pas de doublons, et une version modifiée l'emporte).</summary>
+    public static readonly DateTimeOffset ExamplesDate = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
     /// <summary>Exemples proposés au premier lancement.</summary>
     public static List<Workout> Examples(DateTimeOffset at)
     {
         var sweetSpot = new Workout
         {
-            Id = NewId(at), Name = "Sweet spot 3 × 10 min", Unit = PowerUnit.PercentFtp, UpdatedAt = at,
+            Id = "exemple-sweet-spot", Name = "Sweet spot 3 × 10 min", Unit = PowerUnit.PercentFtp, UpdatedAt = at,
             Blocks = [new() { DurationS = 600, Kind = BlockPower.Ramp, Power = 50, PowerEnd = 75 }],
         };
         for (int i = 0; i < 3; i++)
@@ -246,7 +250,7 @@ public sealed class Workout
 
         var vo2 = new Workout
         {
-            Id = NewId(at.AddMilliseconds(1)), Name = "PMA 5 × 3 min", Unit = PowerUnit.PercentFtp, UpdatedAt = at,
+            Id = "exemple-pma", Name = "PMA 5 × 3 min", Unit = PowerUnit.PercentFtp, UpdatedAt = at,
             Blocks = [new() { DurationS = 600, Kind = BlockPower.Ramp, Power = 50, PowerEnd = 80 }],
         };
         for (int i = 0; i < 5; i++)

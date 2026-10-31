@@ -27,7 +27,7 @@ public partial class WorkoutListScreen : Screen
         FtpLabel = GetNode<Label>("%FtpLabel");
         FtpLabel.Text = $"FTP {_ftpW} W";
         GetNode<Label>("%FtpDetail").Text = (profile.FtpTestedAt is { } at ? $"testée le {Ui.Date(at)}" : "pas encore testée")
-                                           + " · les pourcentages se calculent dessus · modifiable dans Réglages";
+                                           + " · modifiable dans Réglages";
 
         var list = GetNode<VBoxContainer>("%List");
         list.AddChild(Card(Workout.FtpTestWorkout(), "Test FTP : 20 min à fond, la FTP vaut 95 % de la moyenne."));

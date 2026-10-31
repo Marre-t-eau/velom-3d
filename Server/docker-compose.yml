@@ -1,0 +1,18 @@
+# Serveur de synchronisation Velom3d : docker compose -f Server/docker-compose.yml up -d
+# La base est dans le volume « velom3d-data ». Mettez un proxy HTTPS devant (voir README.md).
+services:
+  velom3d:
+    build:
+      context: ..
+      dockerfile: Server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      Velom3d__AllowRegistration: "true"
+      Velom3d__TrustProxy: "false"
+    volumes:
+      - velom3d-data:/data
+
+volumes:
+  velom3d-data:

@@ -102,6 +102,7 @@ public partial class GodotSmokeTest : Node
         var dir = ProjectSettings.GlobalizePath("user://test-rides-" + Time.GetTicksMsec());
         Screen.Store = new RideStore(dir);
         Screen.Workouts = new WorkoutStore(Path.Combine(dir, "workouts"));
+        Screen.Sync = new Velom3d.Sync.SyncClient(Path.Combine(dir, "sync.json"), dir, Path.Combine(dir, "workouts"));
         Node? next = null;
         Navigator.Override = n => next = n;
 
@@ -110,6 +111,7 @@ public partial class GodotSmokeTest : Node
         await Wait(0.1);
         Check(!menu.StructuredButton.Disabled && !menu.FreeRideButton.Disabled,
             "Menu : entraînement structuré et sortie libre disponibles");
+        Check(!menu.GetNode<Label>("%Account").Visible, "pas de compte : pas de pseudo dans le menu");
         menu.FreeRideButton.EmitSignal(BaseButton.SignalName.Pressed);
         await Wait(0.1);
         Check(next is FreeRideScreen, "Le menu ouvre la sortie libre");
@@ -187,6 +189,17 @@ public partial class GodotSmokeTest : Node
         var settings = Navigator.Create<SettingsScreen>(Navigator.Settings);
         AddChild(settings);
         await Wait(0.1);
+        // Synchronisation : désactivée par défaut ; activée sans compte, le formulaire de connexion s'affiche.
+        var syncOptions = settings.GetNode<Control>("%SyncOptions");
+        Check(!syncOptions.Visible, "synchro désactivée par défaut");
+        settings.GetNode<CheckButton>("%SyncToggle").ButtonPressed = true;
+        Check(syncOptions.Visible && settings.GetNode<Control>("%SyncLoginForm").Visible
+              && !settings.GetNode<Control>("%SyncAccount").Visible, "synchro activée : formulaire de connexion");
+        settings.GetNode<CheckButton>("%SyncToggle").ButtonPressed = false;
+        Check(settings.GetNode<Control>("%FtpStepper").MouseFilter == Control.MouseFilterEnum.Pass
+              && settings.GetNode<Control>("%ServerUrlEdit").MouseFilter == Control.MouseFilterEnum.Pass,
+              "cartes et champs laissent défiler la page au doigt");
+        Check(settings.GetNodeOrNull<KeyboardAvoider>("KeyboardAvoider") is not null, "écran décalé au-dessus du clavier pendant une saisie");
         settings.Profile.VirtualGears = true;
         settings.Profile.Chainrings = [52, 36];
         settings.Profile.Cogs = [11, 12, 13, 14, 15, 16, 17, 19, 21, 24, 27, 30];

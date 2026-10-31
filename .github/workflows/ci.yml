@@ -24,6 +24,19 @@ jobs:
       - name: Build du jeu
         run: dotnet build Velom3d.csproj -warnaserror
 
+  server:
+    name: Serveur de synchronisation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Tests (serveur en mémoire, plusieurs appareils)
+        run: dotnet test UnitTests/Velom3d.Server.Tests
+      - name: Image Docker
+        run: docker build -f Server/Dockerfile -t velom3d-server .
+
   godot:
     name: Godot (test dans le moteur, sans écran)
     runs-on: ubuntu-latest

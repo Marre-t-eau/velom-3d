@@ -107,6 +107,15 @@ theme_type_variation = &"MutedLabel"
 text = "Choisissez votre séance du jour."
 autowrap_mode = 3
 
+[node name="Account" type="Label" parent="Margin/Page/Greeting"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_type_variation = &"AccentLabel"
+text = "Connecté en tant que …"
+autowrap_mode = 3
+
 [node name="Choices" type="VBoxContainer" parent="Margin/Page"]
 layout_mode = 2
 size_flags_vertical = 3

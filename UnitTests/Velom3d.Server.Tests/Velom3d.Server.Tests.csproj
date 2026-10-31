@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Serveur + synchronisation de l'appli, de bout en bout : dotnet test UnitTests/Velom3d.Server.Tests -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>12</LangVersion>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Côté appli : fichiers et synchronisation (le protocole vient du serveur). -->
+    <Compile Include="../../Sensors/Core/*.cs" Link="Sensors/%(Filename)%(Extension)" />
+    <Compile Include="../../Rides/Core/*.cs" Link="Rides/%(Filename)%(Extension)" />
+    <Compile Include="../../Sync/Core/SyncClient.cs" Link="Sync/SyncClient.cs" />
+    <Compile Include="../../Sync/Core/SyncState.cs" Link="Sync/SyncState.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Server/Velom3d.Server.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.11" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+</Project>
