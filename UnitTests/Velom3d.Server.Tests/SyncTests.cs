@@ -334,6 +334,11 @@ public sealed class SyncTests : IDisposable
         Assert.Null(SyncClient.NormalizeUrl("  "));
         Assert.Equal("https://exemple.fr", SyncClient.NormalizeUrl("exemple.fr/"));
         Assert.Equal("http://192.168.1.10:8080", SyncClient.NormalizeUrl("http://192.168.1.10:8080"));
+        // Réseau local sans « http:// » : http, pas https (le serveur local n'a pas de certificat).
+        Assert.Equal("http://192.168.1.10:8080", SyncClient.NormalizeUrl("192.168.1.10:8080"));
+        Assert.Equal("http://mon-pc.local:8080", SyncClient.NormalizeUrl("mon-pc.local:8080"));
+        Assert.Equal("http://localhost:8080", SyncClient.NormalizeUrl("localhost:8080"));
+        Assert.Equal("https://192.168.1.10:8443", SyncClient.NormalizeUrl("https://192.168.1.10:8443"));
         var e = await Assert.ThrowsAsync<SyncException>(() => a.Sync.LoginAsync(Url + "/autre-chose", "black", "motdepasse"));
         Assert.Contains("pas un serveur Velom3d", e.Message);
     }

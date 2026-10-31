@@ -18,6 +18,11 @@ bool allowRegistration = config.GetValue("AllowRegistration", true);
 int authPerMinute = config.GetValue("AuthRequestsPerMinute", 20);
 bool trustProxy = config.GetValue("TrustProxy", false);
 
+// Sans adresse précisée (--urls, ASPNETCORE_URLS…) : port 8080 sur toutes les interfaces, pour que
+// les téléphones du réseau local le trouvent (par défaut ASP.NET n'écoute que localhost).
+bool defaultUrls = string.IsNullOrEmpty(builder.Configuration["urls"]) && string.IsNullOrEmpty(builder.Configuration["http_ports"]);
+if (defaultUrls) builder.WebHost.UseUrls("http://0.0.0.0:8080");
+
 builder.Services.AddSingleton(new Database(dbPath));
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, SyncJson.Default));
 builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 64 * 1024 * 1024);
@@ -40,6 +45,17 @@ if (trustProxy)
     app.UseForwardedHeaders(fwd);
 }
 app.UseRateLimiter();
+if (defaultUrls)
+    app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        // Adresses à saisir dans l'appli (Réglages > Synchronisation) depuis le réseau local.
+        foreach (var ip in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                     .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+                     .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+                     .Select(a => a.Address)
+                     .Where(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !System.Net.IPAddress.IsLoopback(a)))
+            app.Logger.LogInformation("Adresse pour l'appli : http://{Ip}:8080", ip);
+    });
 
 var usernamePattern = new Regex("^[A-Za-z0-9._-]{3,32}$", RegexOptions.CultureInvariant);
 

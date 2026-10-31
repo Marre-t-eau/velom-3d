@@ -20,8 +20,12 @@ docker compose -f Server/docker-compose.yml up -d
 Sans Docker (SDK .NET 8) :
 
 ```
-dotnet run --project Server --urls http://0.0.0.0:8080
+dotnet run --project Server
 ```
+
+Il écoute alors sur le port 8080 de toutes les interfaces et affiche au démarrage l'adresse à
+saisir dans l'appli (`Adresse pour l'appli : http://192.168.1.10:8080`). Sans `http://`, l'appli
+prend `http://` pour une IP du réseau local et `https://` pour un nom de domaine.
 
 Le serveur écoute en HTTP. Pour un serveur accessible depuis Internet, mettez un proxy HTTPS devant,
 par exemple [Caddy](https://caddyserver.com) (certificat automatique) :
@@ -34,6 +38,23 @@ velom3d.mon-domaine.fr {
 
 et réglez `Velom3d__TrustProxy=true` pour que le serveur voie la vraie adresse des clients. Sur un
 réseau local, `http://192.168.1.10:8080` marche aussi (les mots de passe passent alors en clair sur le réseau).
+
+## L'appli ne trouve pas le serveur
+
+Dans l'ordre :
+1. **Depuis le navigateur du téléphone**, ouvrez `http://<IP du PC>:8080/api/info`. Il doit afficher
+   `{"name":"velom3d",…}`. Sinon, c'est le réseau, pas l'appli :
+   - le téléphone et le PC sont sur le même Wi-Fi (pas le réseau invité ni la 4G, et sans
+     « isolation des clients » sur la box) ;
+   - le pare-feu du PC laisse entrer le port 8080. Sous Windows, le réseau Wi-Fi doit être
+     « Privé », et il faut autoriser le port (PowerShell administrateur) :
+     `New-NetFirewallRule -DisplayName "Velom3d" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow` ;
+   - le serveur écoute bien sur toutes les interfaces : `Now listening on: http://0.0.0.0:8080`
+     dans son journal (pas `localhost`).
+2. **Si le navigateur y arrive mais pas l'appli** : l'export Android doit avoir la permission
+   Internet. Elle est déclarée par le plugin Bluetooth (AAR reconstruit après cette version), ou
+   cochez *Permissions > Internet* dans le préréglage d'export Android. L'appli affiche la cause
+   exacte sous le bouton (« Connection refused », délai dépassé…).
 
 ## Réglages
 

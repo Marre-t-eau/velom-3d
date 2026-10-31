@@ -14,6 +14,11 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
 
+    <!-- Synchronisation avec un serveur (facultative). Godot ne l'ajoute que si « Permissions >
+         Internet » est coché dans le préréglage d'export : sans elle, aucun serveur n'est joignable. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
     <application>

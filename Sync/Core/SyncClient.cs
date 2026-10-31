@@ -74,15 +74,22 @@ public sealed class SyncClient : IDisposable
         lock (State) State.Save(_statePath);
     }
 
-    /// <summary>Adresse nettoyée (https:// ajouté s'il manque, sans « / » final), ou null si invalide.</summary>
+    /// <summary>Adresse nettoyée, sans « / » final, ou null si invalide. Sans « http:// » ni
+    /// « https:// », on ajoute http:// pour une adresse du réseau local (IP, localhost, *.local),
+    /// où le serveur est en général lancé sans HTTPS, et https:// sinon.</summary>
     public static string? NormalizeUrl(string url)
     {
         url = url.Trim().TrimEnd('/');
         if (url.Length == 0) return null;
-        if (!url.Contains("://")) url = "https://" + url;
+        if (!url.Contains("://"))
+            url = (Uri.TryCreate("http://" + url, UriKind.Absolute, out var guess) && IsLocal(guess) ? "http://" : "https://") + url;
         return Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.Scheme == "https" || u.Scheme == "http") && u.Host.Length > 0
             ? url : null;
     }
+
+    static bool IsLocal(Uri u) =>
+        u.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6 || u.IsLoopback
+        || u.Host.EndsWith(".local", StringComparison.OrdinalIgnoreCase) || !u.Host.Contains('.');
 
     // ---- Compte ----
 
@@ -453,7 +460,9 @@ public sealed class SyncClient : IDisposable
         }
         catch (HttpRequestException e)
         {
-            throw new SyncException($"Serveur injoignable ({baseUrl}). Vérifiez l'adresse et la connexion.", e);
+            // La cause précise (refusé, délai, certificat…) aide à trouver le problème.
+            var cause = e.InnerException?.Message ?? e.Message;
+            throw new SyncException($"Serveur injoignable ({baseUrl}) : {cause}", e);
         }
         catch (TaskCanceledException e)
         {
