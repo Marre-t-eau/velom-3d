@@ -17,6 +17,8 @@ namespace Velom3d.Tests;
 public partial class GodotSmokeTest : Node
 {
     int _failures;
+    /// <summary>Échecs repris à la fin : les avertissements du moteur peuvent noyer le début du journal.</summary>
+    readonly System.Collections.Generic.List<string> _failed = new();
     int _powerSignals;
     int _okResponses;
 
@@ -91,7 +93,7 @@ public partial class GodotSmokeTest : Node
         Check(hub.TrainerAddress == "" && hub.Devices.Get(SimulatedBackend.Trainer)?.State == LinkState.Available,
             "Déconnexion du trainer");
 
-        GD.Print(_failures == 0 ? "\nTOUS LES TESTS PASSENT" : $"\n{_failures} ÉCHEC(S)");
+        GD.Print(_failures == 0 ? "\nTOUS LES TESTS PASSENT" : $"\n{_failures} ÉCHEC(S) :\n  " + string.Join("\n  ", _failed));
         GetTree().Quit(_failures == 0 ? 0 : 1);
     }
 
@@ -449,6 +451,6 @@ public partial class GodotSmokeTest : Node
     void Check(bool ok, string label)
     {
         GD.Print((ok ? "  ok   " : "  FAIL ") + label);
-        if (!ok) _failures++;
+        if (!ok) { _failures++; _failed.Add(label); }
     }
 }
