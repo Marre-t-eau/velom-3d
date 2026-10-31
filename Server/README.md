@@ -50,7 +50,11 @@ Dans l'ordre :
      « Privé », et il faut autoriser le port (PowerShell administrateur) :
      `New-NetFirewallRule -DisplayName "Velom3d" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow` ;
    - le serveur écoute bien sur toutes les interfaces : `Now listening on: http://0.0.0.0:8080`
-     dans son journal (pas `localhost`).
+     dans son journal (pas `localhost`). Lancé depuis Visual Studio ou Rider, il prend le profil de
+     `Server/Properties/launchSettings.json` (port 8080 sur toutes les interfaces) ; un port au
+     hasard (`localhost:49189`…) veut dire que l'IDE a créé son propre profil ou passe par IIS
+     Express : choisissez le profil « Velom3d.Server ». Le serveur prévient au démarrage s'il
+     n'écoute que le PC.
 2. **Si le navigateur y arrive mais pas l'appli** : l'export Android doit avoir la permission
    Internet. Elle est déclarée par le plugin Bluetooth (AAR reconstruit après cette version), ou
    cochez *Permissions > Internet* dans le préréglage d'export Android. L'appli affiche la cause

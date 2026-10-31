@@ -45,17 +45,27 @@ if (trustProxy)
     app.UseForwardedHeaders(fwd);
 }
 app.UseRateLimiter();
-if (defaultUrls)
-    app.Lifetime.ApplicationStarted.Register(() =>
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    // Adresses à saisir dans l'appli (Réglages > Synchronisation) depuis le réseau local.
+    var listening = app.Services.GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
+        .Features.Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>()?.Addresses ?? [];
+    var lan = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+        .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+        .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+        .Select(a => a.Address)
+        .Where(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !System.Net.IPAddress.IsLoopback(a))
+        .ToList();
+    foreach (var address in listening)
     {
-        // Adresses à saisir dans l'appli (Réglages > Synchronisation) depuis le réseau local.
-        foreach (var ip in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
-                     .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
-                     .SelectMany(n => n.GetIPProperties().UnicastAddresses)
-                     .Select(a => a.Address)
-                     .Where(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !System.Net.IPAddress.IsLoopback(a)))
-            app.Logger.LogInformation("Adresse pour l'appli : http://{Ip}:8080", ip);
-    });
+        if (!Uri.TryCreate(address.Replace("://+", "://0.0.0.0").Replace("://*", "://0.0.0.0"), UriKind.Absolute, out var u)) continue;
+        if (u.IsLoopback || u.Host == "localhost")
+            app.Logger.LogWarning("Le serveur n'écoute que ce PC ({Address}) : les téléphones ne le verront pas. Lancez-le avec --urls http://0.0.0.0:8080.", address);
+        else if (u.Host is "0.0.0.0" or "[::]")
+            foreach (var ip in lan)
+                app.Logger.LogInformation("Adresse pour l'appli : {Scheme}://{Ip}:{Port}", u.Scheme, ip, u.Port);
+    }
+});
 
 var usernamePattern = new Regex("^[A-Za-z0-9._-]{3,32}$", RegexOptions.CultureInvariant);
 
