@@ -156,6 +156,73 @@ custom_minimum_size = Vector2(320, 72)
 text = "Continuer"
 size_flags_horizontal = 3
 
+[node name="RelayModeButton" type="Button" parent="Margin/Page/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(260, 72)
+text = "Relais pour PC"
+visible = false
+
+[node name="RelayPanel" type="PanelContainer" parent="Margin/Page"]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+
+[node name="Box" type="VBoxContainer" parent="Margin/Page/RelayPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Source" type="Label" parent="Margin/Page/RelayPanel/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+theme_type_variation = &"TitleLabel"
+text = "Capteurs via : Bluetooth de ce PC"
+autowrap_mode = 3
+
+[node name="RelayHint" type="Label" parent="Margin/Page/RelayPanel/Box"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_type_variation = &"MutedLabel"
+text = "Pas de Bluetooth sur ce PC ? Ouvrez Velom3d sur le téléphone, branché sur le même Wi-Fi, et touchez « Relais pour PC » : le téléphone apparaît ici."
+autowrap_mode = 3
+
+[node name="RelayActions" type="HBoxContainer" parent="Margin/Page/RelayPanel/Box"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="FindPhonesButton" type="Button" parent="Margin/Page/RelayPanel/Box/RelayActions"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(260, 52)
+text = "Chercher les téléphones"
+
+[node name="RelayAddress" type="LineEdit" parent="Margin/Page/RelayPanel/Box/RelayActions"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(220, 52)
+placeholder_text = "ou adresse du téléphone (192.168.1.20)"
+
+[node name="RelayConnectButton" type="Button" parent="Margin/Page/RelayPanel/Box/RelayActions"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(160, 52)
+text = "Se connecter"
+
+[node name="LocalBleButton" type="Button" parent="Margin/Page/RelayPanel/Box/RelayActions"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(240, 52)
+text = "Bluetooth de ce PC"
+visible = false
+
+[node name="Phones" type="HFlowContainer" parent="Margin/Page/RelayPanel/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
+
 [node name="Status" type="Label" parent="Margin/Page"]
 unique_name_in_owner = true
 layout_mode = 2

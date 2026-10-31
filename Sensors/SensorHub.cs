@@ -71,6 +71,8 @@ public partial class SensorHub : Node
         Devices.Changed += () => EmitSignal(SignalName.DevicesChanged);
     }
 
+    public override void _ExitTree() => WindowsBle.Stop();
+
     /// <summary>Change de transport : les appareils de l'ancien sont déconnectés et oubliés.</summary>
     public void UseBackend(SensorBackend backend)
     {

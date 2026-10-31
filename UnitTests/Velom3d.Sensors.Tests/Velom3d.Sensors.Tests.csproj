@@ -11,6 +11,7 @@
     <Compile Include="../../Sensors/Core/*.cs" Link="Core/%(Filename)%(Extension)" />
     <Compile Include="../../Rides/Core/*.cs" Link="Rides/%(Filename)%(Extension)" />
     <Compile Include="../../World/Core/*.cs" Link="World/%(Filename)%(Extension)" />
+    <Compile Include="../../Relay/Core/*.cs" Link="Relay/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
