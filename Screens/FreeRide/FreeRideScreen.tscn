@@ -213,7 +213,7 @@ theme_override_constants/separation = -4
 unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"OverlayLabel"
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 45
 text = "0:00"
 
 [node name="ModeLabel" type="Label" parent="RidingMargin/Riding/TopBar/Left"]
@@ -222,7 +222,7 @@ layout_mode = 2
 theme_type_variation = &"OverlayLabel"
 theme_override_colors/font_color = Color(0.85, 0.88, 0.92, 1)
 theme_override_constants/outline_size = 6
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 20
 text = ""
 text_overrun_behavior = 3
 
@@ -233,7 +233,7 @@ theme_override_constants/separation = 6
 
 [node name="PowerTile" type="PanelContainer" parent="RidingMargin/Riding/TopBar/Tiles"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 0)
+custom_minimum_size = Vector2(225, 0)
 layout_mode = 2
 theme_type_variation = &"OverlayPanel"
 
@@ -245,17 +245,17 @@ theme_override_constants/separation = -2
 [node name="Title" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/PowerTile/Box"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.98, 0.62, 0.2, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 18
 text = "Puissance"
 
 [node name="Value" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/PowerTile/Box"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 39
 text = "--"
 
 [node name="CadenceTile" type="PanelContainer" parent="RidingMargin/Riding/TopBar/Tiles"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(118, 0)
+custom_minimum_size = Vector2(177, 0)
 layout_mode = 2
 theme_type_variation = &"OverlayPanel"
 
@@ -267,18 +267,18 @@ theme_override_constants/separation = -2
 [node name="Title" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/CadenceTile/Box"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.35, 0.7, 0.98, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 18
 text = "Cadence"
 
 [node name="Value" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/CadenceTile/Box"]
 layout_mode = 2
 size_flags_vertical = 10
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "--"
 
 [node name="HeartRateTile" type="PanelContainer" parent="RidingMargin/Riding/TopBar/Tiles"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(96, 0)
+custom_minimum_size = Vector2(144, 0)
 layout_mode = 2
 theme_type_variation = &"OverlayPanel"
 
@@ -290,18 +290,18 @@ theme_override_constants/separation = -2
 [node name="Title" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/HeartRateTile/Box"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.36, 0.45, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 18
 text = "Cardio"
 
 [node name="Value" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/HeartRateTile/Box"]
 layout_mode = 2
 size_flags_vertical = 10
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "--"
 
 [node name="SpeedTile" type="PanelContainer" parent="RidingMargin/Riding/TopBar/Tiles"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(112, 0)
+custom_minimum_size = Vector2(168, 0)
 layout_mode = 2
 theme_type_variation = &"OverlayPanel"
 
@@ -313,18 +313,18 @@ theme_override_constants/separation = -2
 [node name="Title" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/SpeedTile/Box"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.3, 0.85, 0.55, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 18
 text = "Vitesse"
 
 [node name="Value" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/SpeedTile/Box"]
 layout_mode = 2
 size_flags_vertical = 10
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "--"
 
 [node name="DistanceTile" type="PanelContainer" parent="RidingMargin/Riding/TopBar/Tiles"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(100, 0)
+custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
 theme_type_variation = &"OverlayPanel"
 
@@ -336,13 +336,13 @@ theme_override_constants/separation = -2
 [node name="Title" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/DistanceTile/Box"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.62, 0.66, 0.72, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 18
 text = "Distance"
 
 [node name="Value" type="Label" parent="RidingMargin/Riding/TopBar/Tiles/DistanceTile/Box"]
 layout_mode = 2
 size_flags_vertical = 10
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 33
 text = "--"
 
 [node name="Right" type="Control" parent="RidingMargin/Riding/TopBar"]
@@ -358,7 +358,7 @@ mouse_filter = 2
 theme_override_constants/separation = 10
 
 [node name="Current" type="PanelContainer" parent="RidingMargin/Riding/WorkoutPanel"]
-custom_minimum_size = Vector2(300, 0)
+custom_minimum_size = Vector2(450, 0)
 layout_mode = 2
 size_flags_vertical = 0
 theme_type_variation = &"OverlayAccentPanel"
@@ -371,7 +371,7 @@ theme_override_constants/separation = 4
 unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"AccentLabel"
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 20
 text = "Bloc 1 / 5 · reste"
 autowrap_mode = 3
 
@@ -382,7 +382,7 @@ theme_override_constants/separation = 14
 [node name="BlockRemaining" type="Label" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/Line"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 45
 text = "5:00"
 vertical_alignment = 1
 
@@ -396,7 +396,7 @@ alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.98, 0.62, 0.2, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 24
 text = "200 W"
 autowrap_mode = 3
 
@@ -404,7 +404,7 @@ autowrap_mode = 3
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.35, 0.7, 0.98, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 21
 text = "Cadence libre"
 autowrap_mode = 3
 
@@ -423,45 +423,45 @@ theme_override_constants/separation = 6
 
 [node name="FreeErgToggle" type="Button" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/FreeErgRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(100, 44)
+custom_minimum_size = Vector2(150, 56)
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 1
 theme_type_variation = &"ChoiceButton"
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 22
 toggle_mode = true
 text = "ERG : non"
 
 [node name="FreeErgMinus10" type="Button" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/FreeErgRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(46, 44)
+custom_minimum_size = Vector2(69, 56)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 22
 text = "−10"
 
 [node name="FreeErgMinus5" type="Button" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/FreeErgRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(46, 44)
+custom_minimum_size = Vector2(69, 56)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 22
 text = "−5"
 
 [node name="FreeErgPlus5" type="Button" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/FreeErgRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(46, 44)
+custom_minimum_size = Vector2(69, 56)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 22
 text = "+5"
 
 [node name="FreeErgPlus10" type="Button" parent="RidingMargin/Riding/WorkoutPanel/Current/Box/FreeErgRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(46, 44)
+custom_minimum_size = Vector2(69, 56)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 22
 text = "+10"
 
 [node name="WorkoutChart" type="Control" parent="RidingMargin/Riding/WorkoutPanel/Current/Box"]
@@ -478,7 +478,7 @@ size_flags_horizontal = 3
 mouse_filter = 2
 
 [node name="Next" type="PanelContainer" parent="RidingMargin/Riding/WorkoutPanel"]
-custom_minimum_size = Vector2(300, 0)
+custom_minimum_size = Vector2(450, 0)
 layout_mode = 2
 size_flags_vertical = 0
 theme_type_variation = &"OverlayPanel"
@@ -490,7 +490,7 @@ theme_override_constants/separation = 2
 [node name="Title" type="Label" parent="RidingMargin/Riding/WorkoutPanel/Next/Box"]
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 18
 text = "À venir"
 
 [node name="Upcoming" type="VBoxContainer" parent="RidingMargin/Riding/WorkoutPanel/Next/Box"]
@@ -509,7 +509,7 @@ visible = false
 layout_mode = 2
 theme_type_variation = &"OverlayLabel"
 theme_override_colors/font_color = Color(1, 0.72, 0.3, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 21
 text = ""
 horizontal_alignment = 1
 autowrap_mode = 3
@@ -531,44 +531,44 @@ theme_override_constants/separation = 6
 
 [node name="Minus10" type="Button" parent="RidingMargin/Riding/BottomBar/ErgControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(76, 48)
+custom_minimum_size = Vector2(96, 60)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 26
 text = "−10 W"
 
 [node name="Minus5" type="Button" parent="RidingMargin/Riding/BottomBar/ErgControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(76, 48)
+custom_minimum_size = Vector2(96, 60)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 26
 text = "−5 W"
 
 [node name="RideTarget" type="Label" parent="RidingMargin/Riding/BottomBar/ErgControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(130, 0)
+custom_minimum_size = Vector2(170, 0)
 layout_mode = 2
 theme_type_variation = &"OverlayLabel"
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 30
 text = "Cible 200 W"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="Plus5" type="Button" parent="RidingMargin/Riding/BottomBar/ErgControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(76, 48)
+custom_minimum_size = Vector2(96, 60)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 26
 text = "+5 W"
 
 [node name="Plus10" type="Button" parent="RidingMargin/Riding/BottomBar/ErgControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(76, 48)
+custom_minimum_size = Vector2(96, 60)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 26
 text = "+10 W"
 
 [node name="GearControls" type="HBoxContainer" parent="RidingMargin/Riding/BottomBar"]
@@ -578,27 +578,27 @@ theme_override_constants/separation = 6
 
 [node name="FrontButton" type="Button" parent="RidingMargin/Riding/BottomBar/GearControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(110, 48)
+custom_minimum_size = Vector2(140, 60)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 24
 text = "Plateau"
 
 [node name="EasierButton" type="Button" parent="RidingMargin/Riding/BottomBar/GearControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 48)
+custom_minimum_size = Vector2(165, 60)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 24
 text = "− Plus souple"
 
 [node name="GearLabel" type="Label" parent="RidingMargin/Riding/BottomBar/GearControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(90, 0)
+custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_type_variation = &"OverlayLabel"
 theme_override_constants/line_spacing = -4
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 26
 text = "52×17
 7/12"
 horizontal_alignment = 1
@@ -606,10 +606,10 @@ vertical_alignment = 1
 
 [node name="HarderButton" type="Button" parent="RidingMargin/Riding/BottomBar/GearControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 48)
+custom_minimum_size = Vector2(165, 60)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 24
 text = "Plus dur +"
 
 [node name="Actions" type="HBoxContainer" parent="RidingMargin/Riding/BottomBar"]
@@ -621,25 +621,112 @@ alignment = 2
 
 [node name="PauseButton" type="Button" parent="RidingMargin/Riding/BottomBar/Actions"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(104, 48)
+custom_minimum_size = Vector2(130, 60)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 24
 text = "Pause"
-
-[node name="SkipButton" type="Button" parent="RidingMargin/Riding/BottomBar/Actions"]
-unique_name_in_owner = true
-visible = false
-custom_minimum_size = Vector2(120, 48)
-layout_mode = 2
-mouse_filter = 1
-theme_override_font_sizes/font_size = 16
-text = "Bloc suivant"
 
 [node name="FinishButton" type="Button" parent="RidingMargin/Riding/BottomBar/Actions"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(104, 48)
+custom_minimum_size = Vector2(130, 60)
 layout_mode = 2
 mouse_filter = 1
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 24
 text = "Terminer"
+
+[node name="MenuButton" type="Button" parent="RidingMargin/Riding/BottomBar/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 60)
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"PrimaryButton"
+theme_override_font_sizes/font_size = 24
+text = "Menu"
+
+[node name="RideMenu" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Shade" type="ColorRect" parent="RideMenu"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.55)
+
+[node name="Center" type="CenterContainer" parent="RideMenu"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="RideMenu/Center"]
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+theme_type_variation = &"AccentPanel"
+
+[node name="Box" type="VBoxContainer" parent="RideMenu/Center/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="RideMenu/Center/Panel/Box"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Menu"
+
+[node name="MenuState" type="Label" parent="RideMenu/Center/Panel/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 20
+text = ""
+autowrap_mode = 3
+
+[node name="MenuResume" type="Button" parent="RideMenu/Center/Panel/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"PrimaryButton"
+theme_override_font_sizes/font_size = 24
+text = "Revenir à la sortie"
+
+[node name="MenuSkip" type="Button" parent="RideMenu/Center/Panel/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+mouse_filter = 1
+theme_override_font_sizes/font_size = 24
+text = "Passer au bloc suivant"
+
+[node name="MenuSensors" type="Button" parent="RideMenu/Center/Panel/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+mouse_filter = 1
+theme_override_font_sizes/font_size = 24
+text = "Capteurs : reconnecter, ajouter"
+
+[node name="MenuFinish" type="Button" parent="RideMenu/Center/Panel/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+mouse_filter = 1
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(0.95, 0.38, 0.36, 1)
+theme_override_colors/font_hover_color = Color(0.95, 0.38, 0.36, 1)
+theme_override_colors/font_pressed_color = Color(0.95, 0.38, 0.36, 1)
+text = "Terminer la sortie"

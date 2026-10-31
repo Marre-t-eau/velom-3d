@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -10,6 +11,8 @@ namespace Velom3d.Screens;
 /// ceinture cardio, par le Bluetooth du téléphone. Pensé pour le tactile (grandes cibles,
 /// liste qui défile au doigt). Sans plugin Bluetooth natif (éditeur, ordinateur), l'écran
 /// l'indique et ne cherche rien, sauf en mode debug (capteurs simulés, voir SensorBackends). « Continuer » mène au menu principal.
+/// Ouvert depuis le menu d'une sortie (<see cref="ReturnToRide"/>), il se pose par-dessus la sortie,
+/// qui reste en mémoire : le bouton principal devient « Revenir à la sortie ».
 /// </summary>
 public partial class DeviceConnectionScreen : Control
 {
@@ -32,6 +35,13 @@ public partial class DeviceConnectionScreen : Control
     Label _empty = null!;
 
     SensorHub Sensors => SensorHub.Instance;
+
+    /// <summary>Ouvert pendant une sortie : appelé par « Revenir à la sortie » (null = premier écran, vers le menu).
+    /// À renseigner avant l'ajout à l'arbre.</summary>
+    public Action? ReturnToRide { get; set; }
+
+    /// <summary>Bouton principal (pour les tests).</summary>
+    internal Button ContinueButton => _continueButton;
 
     /// <summary>Ligne affichée pour un appareil (pour les tests).</summary>
     internal Control? RowFor(string address) => _rows.GetValueOrDefault(address)?.Panel;
@@ -67,12 +77,14 @@ public partial class DeviceConnectionScreen : Control
 
     public override void _Notification(int what)
     {
-        if (what == NotificationWMGoBackRequest) GetTree().Quit();
+        // Pendant une sortie, Retour est géré par l'écran de sortie (retour à la sortie).
+        if (what == NotificationWMGoBackRequest && ReturnToRide is null) GetTree().Quit();
     }
 
     public override void _Process(double delta)
     {
-        _continueButton.Text = Sensors.Devices.Sorted.Any(d => d.State == LinkState.Connected) ? "Continuer" : "Continuer sans capteur";
+        _continueButton.Text = ReturnToRide is not null ? "Revenir à la sortie"
+            : Sensors.Devices.Sorted.Any(d => d.State == LinkState.Connected) ? "Continuer" : "Continuer sans capteur";
         foreach (var (kind, _) in Slots)
         {
             var (panel, name, value) = _slots[kind];
@@ -186,7 +198,8 @@ public partial class DeviceConnectionScreen : Control
         _continueButton.Pressed += () =>
         {
             Sensors.StopScan();
-            Navigator.GoTo(this, Navigator.Menu);
+            if (ReturnToRide is { } back) back();
+            else Navigator.GoTo(this, Navigator.Menu);
         };
         _status = GetNode<Label>("%Status");
         _list = GetNode<VBoxContainer>("%List");

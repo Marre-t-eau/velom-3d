@@ -136,6 +136,19 @@ public partial class GodotSmokeTest : Node
         ride.ShowAveragePower();
         await Wait(0.1);
         Check(ride.PowerTileTitle == "Puissance moyenne", "Toucher la puissance affiche la moyenne");
+        Check(ride.FinishButtonShown, "Sortie libre : Terminer reste dans la barre du bas");
+        ride.OpenMenu();
+        Check(ride.MenuOpen && !ride.MenuSkipButton.Visible, "Menu : ouvert, pas de bloc suivant en sortie libre");
+        ride.OpenSensors();
+        await Wait(0.2);
+        Check(!ride.MenuOpen && ride.SensorsPage is { } page && page.ContinueButton.Text == "Revenir à la sortie" && rec.IsPaused,
+            "Menu > Capteurs : page des capteurs par-dessus la sortie, mise en pause");
+        int sentBefore = rec.Ride.Events.Count(e => e.Type == "set_power");
+        ride.SensorsPage?.ContinueButton.EmitSignal(BaseButton.SignalName.Pressed);
+        await Wait(0.3);
+        Check(ride.SensorsPage is null && ride.Recorder == rec && !rec.IsPaused && sim.Model.ErgMode && sim.Model.TargetPowerW == 220
+              && rec.Ride.Events.Count(e => e.Type == "set_power") > sentBefore,
+            $"Retour à la sortie : la même sortie reprend, consigne renvoyée ({sim.Model.TargetPowerW} W)");
         ride.OnFinishPressed();
         await Wait(0.1);
         Check(rec.IsPaused && ride.PauseButtonText == "Reprendre", "Terminer : la sortie se met en pause, Pause devient Reprendre");
@@ -318,6 +331,10 @@ public partial class GodotSmokeTest : Node
         await Wait(1.5);
         Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 210, $"Bloc 1 : consigne ERG 210 W ({sim.Model.TargetPowerW} W)");
         Check(ride.UpcomingCount == 3, $"Les trois blocs suivants sont affichés ({ride.UpcomingCount})");
+        Check(!ride.FinishButtonShown, "Entraînement en cours : pas de Terminer dans la barre du bas");
+        ride.OpenMenu();
+        Check(ride.MenuOpen && ride.MenuSkipButton.Visible, "Entraînement : le menu propose le bloc suivant");
+        ride.CloseMenu();
         Check(ride.Scene3D is { PropCount: > 500 }, "Entraînement : le cycliste roule aussi en 3D");
         await Wait(2.5);
         Check(ride.Progress?.BlockIndex == 1, "Passage automatique au bloc 2 à la fin du bloc 1");
@@ -341,6 +358,8 @@ public partial class GodotSmokeTest : Node
         ride.SkipBlock();
         await Wait(1.0);
         Check(ride.Progress?.IsFinished == true && !sim.Model.ErgMode, "Fin de l'entraînement : puissance libre");
+        await Wait(0.1);
+        Check(ride.FinishButtonShown, "Entraînement fini : Terminer réapparaît");
         var samples = ride.Recorder!.Ride.Samples;
         Check(samples.Any(x => x.TargetPowerW == 210 && x.TargetCadenceRpm == 90) && samples.Any(x => x.TargetPowerW == 0),
             "Les cibles sont enregistrées à chaque seconde");
