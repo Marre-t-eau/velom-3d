@@ -23,6 +23,10 @@ public abstract partial class SensorBackend : Node
     public event Action<string>? DeviceDisconnected;
     public event Action<string>? Error;
 
+    /// <summary>Vrai si des appareils peuvent arriver déjà connectés sans qu'on l'ait demandé
+    /// (relais : le téléphone a pu les connecter lui-même) : le hub les adopte au lieu de les refermer.</summary>
+    public virtual bool AdoptsConnections => false;
+
     public abstract void StartScan(double timeoutS = 10.0);
     public abstract void StopScan();
     public abstract void ConnectDevice(string address);

@@ -23,6 +23,13 @@ jobs:
         run: dotnet test UnitTests/Velom3d.Sensors.Tests
       - name: Build du jeu
         run: dotnet build Velom3d.csproj -warnaserror
+      - name: Programme d'aide Bluetooth de Windows
+        run: dotnet publish Desktop/BleHelper -c Release -p:DebugType=none -o helper
+      - uses: actions/upload-artifact@v4
+        with:
+          name: velom3d-ble-helper-windows
+          path: helper/Velom3dBleHelper.exe
+          if-no-files-found: error
 
   server:
     name: Serveur de synchronisation
@@ -58,7 +65,7 @@ jobs:
         run: |
           dotnet build Velom3d.csproj
           "$GODOT" --headless --import --path . || true
-      - name: Test de l'écran de connexion et du simulateur
+      - name: Test de l'écran de connexion, du simulateur et du relais
         run: timeout 120 "$GODOT" --headless --path . res://Tests/GodotSmokeTest.tscn
 
   android-plugin:

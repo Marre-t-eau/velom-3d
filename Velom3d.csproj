@@ -11,5 +11,7 @@
     <Compile Remove="android-plugin/**" />
     <!-- Serveur de synchronisation : programme à part, voir Server/README.md. -->
     <Compile Remove="Server/**" />
+    <!-- Programme d'aide Bluetooth de Windows : programme à part, voir Desktop/BleHelper/README.md. -->
+    <Compile Remove="Desktop/**" />
   </ItemGroup>
 </Project>
