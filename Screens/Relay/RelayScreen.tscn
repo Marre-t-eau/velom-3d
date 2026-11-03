@@ -43,9 +43,22 @@ text = "Relais pour PC"
 autowrap_mode = 3
 size_flags_horizontal = 3
 
-[node name="StopButton" type="Button" parent="Margin/Page/Header"]
+[node name="Actions" type="HBoxContainer" parent="Margin/Page"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="SensorsButton" type="Button" parent="Margin/Page/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(260, 72)
+theme_type_variation = &"PrimaryButton"
+text = "Connecter des capteurs"
+
+[node name="StopButton" type="Button" parent="Margin/Page/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
 custom_minimum_size = Vector2(240, 72)
 text = "Arrêter le relais"
 
@@ -53,7 +66,7 @@ text = "Arrêter le relais"
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 theme_type_variation = &"MutedLabel"
-text = "Le téléphone prête son Bluetooth au PC : lancez Velom3d sur le PC, branché sur le même réseau Wi-Fi, puis dans « Connexion des capteurs », choisissez ce téléphone. Le PC recherche et connecte lui-même les capteurs. Gardez l'appli ouverte au premier plan pendant la sortie (l'écran reste allumé)."
+text = "Le téléphone prête son Bluetooth au PC : lancez Velom3d sur le PC, branché sur le même réseau Wi-Fi, puis dans « Connexion des capteurs », choisissez ce téléphone. Les capteurs se connectent ici ou depuis le PC, le relais continue pendant que vous changez de page. Gardez l'appli ouverte au premier plan pendant la sortie (l'écran reste allumé)."
 autowrap_mode = 3
 
 [node name="StatePanel" type="PanelContainer" parent="Margin/Page"]

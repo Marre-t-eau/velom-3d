@@ -18,7 +18,10 @@ namespace Velom3d.Screens;
 /// Avec un <see cref="Workout"/>, le même écran déroule un entraînement structuré : la consigne
 /// suit les blocs (ERG fixe ou en rampe, simulation sur le plat pour les blocs libres), et la liste
 /// des blocs à venir s'affiche avec leur durée, leur puissance et leur cadence.
-/// Mise en page des deux pages (réglages, sortie) : FreeRideScreen.tscn.
+/// Le bouton Menu de la sortie ouvre une fenêtre : revenir à la sortie, passer au bloc suivant,
+/// ouvrir la page des capteurs (par-dessus la sortie, mise en pause le temps d'y être) ou terminer.
+/// Pendant un entraînement, « Terminer » n'est dans la barre du bas qu'une fois la séance finie.
+/// Mise en page des deux pages (réglages, sortie) et du menu : FreeRideScreen.tscn.
 /// </summary>
 public partial class FreeRideScreen : Screen
 {
@@ -44,8 +47,6 @@ public partial class FreeRideScreen : Screen
     /// <summary>Temps restant (s) pendant lequel la tuile puissance montre la moyenne (touchée par le cycliste).</summary>
     double _showAverageS;
     const double ShowAverageForS = 5.0;
-    /// <summary>« Terminer » touché une fois : sortie en pause, en attente de confirmation.</summary>
-    bool _finishArmed;
 
     /// <summary>Enregistrement en cours (null avant le départ), exposé aux tests.</summary>
     internal RideRecorder? Recorder { get; private set; }
@@ -65,7 +66,13 @@ public partial class FreeRideScreen : Screen
     ProgressBar _blockBar = null!;
     VBoxContainer _upcoming = null!;
     readonly System.Collections.Generic.List<(Label Label, int StartS)> _upcomingStarts = new();
-    Button _skipButton = null!;
+    Control _rideMenu = null!;
+    Label _menuState = null!;
+    Button _menuSkip = null!;
+    /// <summary>Page des capteurs ouverte par-dessus la sortie (null sinon).</summary>
+    internal DeviceConnectionScreen? SensorsPage { get; private set; }
+    /// <summary>La sortie roulait avant d'ouvrir la page des capteurs : elle reprend au retour.</summary>
+    bool _resumeAfterSensors;
     /// <summary>Test rampe : temps passé sous 40 tr/min (le cycliste ne tient plus le palier).</summary>
     double _rampStallS;
     const double RampStallLimitS = 5.0;
@@ -180,10 +187,68 @@ public partial class FreeRideScreen : Screen
 
         _pauseButton = GetNode<Button>("%PauseButton");
         _pauseButton.Pressed += TogglePause;
-        _skipButton = GetNode<Button>("%SkipButton");
-        _skipButton.Pressed += SkipBlock;
         _finishButton = GetNode<Button>("%FinishButton");
         _finishButton.Pressed += OnFinishPressed;
+        GetNode<Button>("%MenuButton").Pressed += OpenMenu;
+        FindMenu();
+    }
+
+    // --- Menu pendant la sortie ---
+
+    void FindMenu()
+    {
+        _rideMenu = GetNode<Control>("%RideMenu");
+        _menuState = GetNode<Label>("%MenuState");
+        GetNode<ColorRect>("%Shade").GuiInput += e => { if (e is InputEventMouseButton { Pressed: true }) CloseMenu(); };
+        GetNode<Button>("%MenuResume").Pressed += CloseMenu;
+        _menuSkip = GetNode<Button>("%MenuSkip");
+        _menuSkip.Pressed += () => { CloseMenu(); SkipBlock(); };
+        GetNode<Button>("%MenuSensors").Pressed += OpenSensors;
+        GetNode<Button>("%MenuFinish").Pressed += OnFinishPressed;
+    }
+
+    internal bool MenuOpen => _rideMenu.Visible;
+    /// <summary>Bouton « bloc suivant » du menu (pour les tests).</summary>
+    internal Button MenuSkipButton => _menuSkip;
+
+    internal void OpenMenu()
+    {
+        if (Recorder is null) return;
+        bool workout = Progress is { IsFinished: false };
+        _menuSkip.Visible = workout;
+        _menuSkip.Text = Progress?.Current is { RampTest: true } ? "J'arrête le test" : "Passer au bloc suivant";
+        _menuState.Text = (Recorder.IsPaused ? "Sortie en pause · " : "La sortie continue · ") + Ui.Duration(Recorder.ElapsedS);
+        _rideMenu.Visible = true;
+    }
+
+    internal void CloseMenu() => _rideMenu.Visible = false;
+
+    /// <summary>Page des capteurs par-dessus la sortie : la sortie se met en pause (rien n'est perdu),
+    /// et reprend au retour si elle roulait.</summary>
+    internal void OpenSensors()
+    {
+        if (Recorder is null || SensorsPage is not null) return;
+        CloseMenu();
+        _resumeAfterSensors = !Recorder.IsPaused;
+        if (_resumeAfterSensors) Recorder.Pause();
+        SensorsPage = Navigator.Create<DeviceConnectionScreen>(Navigator.Connection);
+        SensorsPage.ReturnToRide = CloseSensors;
+        _riding.Visible = false;
+        AddChild(SensorsPage);
+    }
+
+    /// <summary>Retour à la sortie : le trainer (peut-être reconnecté ou nouveau) reçoit de nouveau sa consigne.</summary>
+    internal void CloseSensors()
+    {
+        if (SensorsPage is null) return;
+        Hub.StopScan();
+        SensorsPage.QueueFree();
+        SensorsPage = null;
+        _riding.Visible = true;
+        if (Recorder is null) return;
+        if (_resumeAfterSensors && Recorder.IsPaused) Recorder.Resume();
+        _resumeAfterSensors = false;
+        ApplyTrainerMode();
     }
 
     /// <summary>La tuile puissance montre la moyenne de la sortie pendant quelques secondes.</summary>
@@ -232,7 +297,6 @@ public partial class FreeRideScreen : Screen
         _ergControls.Visible = false;
         _gearControls.Visible = false;
         _workoutPanel.Visible = true;
-        _skipButton.Visible = true;
         ShowRiding();
     }
 
@@ -321,7 +385,7 @@ public partial class FreeRideScreen : Screen
                 if (!b.RampTest) hidden++;
                 else if (!rampNote)
                 {
-                    _upcoming.AddChild(Ui.Label("… +20 W chaque minute, jusqu'à ne plus tenir", 12, Ui.Muted));
+                    _upcoming.AddChild(Ui.Label("… +20 W chaque minute, jusqu'à ne plus tenir", 18, Ui.Muted));
                     rampNote = true;
                 }
                 continue;
@@ -329,29 +393,29 @@ public partial class FreeRideScreen : Screen
             shown++;
             var row = Ui.Row(8);
             _upcoming.AddChild(row);
-            var duration = Ui.Label(Ui.Duration(b.DurationS), 14);
-            duration.CustomMinimumSize = new Vector2(44, 0);
+            var duration = Ui.Label(Ui.Duration(b.DurationS), 21);
+            duration.CustomMinimumSize = new Vector2(66, 0);
             duration.AutowrapMode = TextServer.AutowrapMode.Off;
             row.AddChild(duration);
-            var power = Ui.Label(BlockPowerText(b), 14, Ui.PowerColor);
+            var power = Ui.Label(BlockPowerText(b), 21, Ui.PowerColor);
             power.AutowrapMode = TextServer.AutowrapMode.Off;
             power.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             row.AddChild(power);
-            var cadence = Ui.Label(CadenceText(b), 14, Ui.CadenceColor);
-            cadence.CustomMinimumSize = new Vector2(92, 0);
+            var cadence = Ui.Label(CadenceText(b), 21, Ui.CadenceColor);
+            cadence.CustomMinimumSize = new Vector2(138, 0);
             cadence.AutowrapMode = TextServer.AutowrapMode.Off;
             row.AddChild(cadence);
-            var start = Ui.Label("", 12, Ui.Muted);
-            start.CustomMinimumSize = new Vector2(66, 0);
+            var start = Ui.Label("", 18, Ui.Muted);
+            start.CustomMinimumSize = new Vector2(99, 0);
             start.HorizontalAlignment = HorizontalAlignment.Right;
             start.AutowrapMode = TextServer.AutowrapMode.Off;
             row.AddChild(start);
             _upcomingStarts.Add((start, w.StartOf(i)));
         }
         if (hidden > 0)
-            _upcoming.AddChild(Ui.Label($"+ {hidden} autre{(hidden > 1 ? "s" : "")} bloc{(hidden > 1 ? "s" : "")}", 12, Ui.Muted));
+            _upcoming.AddChild(Ui.Label($"+ {hidden} autre{(hidden > 1 ? "s" : "")} bloc{(hidden > 1 ? "s" : "")}", 18, Ui.Muted));
         if (current + 1 >= w.Blocks.Count)
-            _upcoming.AddChild(Ui.Label(current >= w.Blocks.Count ? "Rien : entraînement terminé." : "Rien : c'est le dernier bloc.", 12, Ui.Muted));
+            _upcoming.AddChild(Ui.Label(current >= w.Blocks.Count ? "Rien : entraînement terminé." : "Rien : c'est le dernier bloc.", 18, Ui.Muted));
     }
 
     /// <summary>Nombre de blocs listés « à venir » (pour les tests).</summary>
@@ -382,10 +446,8 @@ public partial class FreeRideScreen : Screen
                 : b.Kind == BlockPower.Free ? "Puissance libre" : BlockPowerText(b);
             _blockCadence.Text = b.RampTest ? progress.RampBestMinuteW > 0 ? $"Meilleure minute {progress.RampBestMinuteW:0} W" : "Tenez le palier"
                 : b.FreeCadence ? "Cadence libre" : $"Cadence {b.CadenceRpm} tr/min";
-            _skipButton.Text = b.RampTest ? "J'arrête le test" : "Bloc suivant";
             _blockBar.Value = 1.0 - progress.BlockRemainingS / Math.Max(1, b.DurationS);
             _freeErgRow.Visible = b.Kind == BlockPower.Free;
-            _skipButton.Disabled = false;
         }
         else
         {
@@ -396,7 +458,6 @@ public partial class FreeRideScreen : Screen
                 : "Touchez Terminer pour enregistrer.";
             _blockBar.Value = 1;
             _freeErgRow.Visible = true;
-            _skipButton.Disabled = true;
         }
     }
 
@@ -412,19 +473,30 @@ public partial class FreeRideScreen : Screen
         Gears = mode == RideMode.Simulation && _profile.VirtualGears ? _profile.CreateDrivetrain() : null;
         StartDataLog();
         _smoothCadence = Hub.Cadence;
-        if (Hub.TrainerAddress != "")
-        {
-            if (mode == RideMode.TargetPower) Hub.EnterErg(targetW);
-            else if (Gears is not null) Hub.EnterErg(GearTargetW());
-            else ApplySimulation();
-            _gearTargetW = Gears is null ? -1 : GearTargetW();
-        }
+        ApplyTrainerMode();
         _modeLabel.Text = mode == RideMode.TargetPower ? "Puissance imposée · plat"
             : Gears is not null ? $"Simulation réaliste · plat · {Gears.Describe()}"
             : "Simulation réaliste · plat";
         _ergControls.Visible = mode == RideMode.TargetPower;
         _gearControls.Visible = Gears is not null;
         ShowRiding();
+    }
+
+    /// <summary>Envoie au trainer le mode de la sortie (au départ, et au retour de la page des capteurs).</summary>
+    void ApplyTrainerMode()
+    {
+        if (Recorder is null || Hub.TrainerAddress == "") return;
+        if (Progress is not null)
+        {
+            // Entraînement : la prochaine mise à jour renvoie la consigne du bloc en cours.
+            _workoutErg = null;
+            _sentTargetW = -1;
+            return;
+        }
+        if (_mode == RideMode.TargetPower) Hub.EnterErg(Recorder.TargetPowerW);
+        else if (Gears is not null) Hub.EnterErg(GearTargetW());
+        else ApplySimulation();
+        _gearTargetW = Gears is null ? -1 : GearTargetW();
     }
 
     /// <summary>Page de la sortie, avec le cycliste en 3D en fond (le fond uni de la page est masqué).</summary>
@@ -518,31 +590,29 @@ public partial class FreeRideScreen : Screen
         if (Hub.TrainerAddress != "") Hub.SetTargetPower(Recorder.TargetPowerW);
     }
 
-    /// <summary>Pause / Reprendre. Reprendre annule aussi une fin demandée.</summary>
+    /// <summary>Pause / Reprendre.</summary>
     void TogglePause()
     {
         if (Recorder is null) return;
         if (Recorder.IsPaused) Recorder.Resume(); else Recorder.Pause();
-        _finishArmed = false;
     }
 
-    /// <summary>Premier appui : la sortie se met en pause et attend confirmation (Reprendre pour
-    /// continuer). Second appui : fin. Un doigt qui glisse ne coupe donc pas une sortie.</summary>
+    /// <summary>« Terminer » (barre du bas ou menu) : la sortie se met en pause et une fenêtre demande
+    /// confirmation. Non la fait reprendre si elle roulait : un doigt qui glisse ne coupe donc pas une sortie.</summary>
     internal void OnFinishPressed()
     {
         if (Recorder is null) return;
-        if (_finishArmed)
-        {
-            Finish();
-            return;
-        }
-        _finishArmed = true;
+        CloseMenu();
+        bool wasRunning = !Recorder.IsPaused;
         Recorder.Pause();
+        Confirm("Terminer la sortie ?", "Elle est enregistrée et son bilan s'ouvre.", "Terminer", Finish,
+            () => { if (wasRunning) Recorder?.Resume(); });
     }
 
     /// <summary>État affiché des boutons (pour les tests).</summary>
     internal string PauseButtonText => _pauseButton.Text;
     internal string PowerTileTitle => _powerTitle.Text;
+    internal bool FinishButtonShown => _finishButton.Visible;
 
     internal void Finish()
     {
@@ -637,7 +707,8 @@ public partial class FreeRideScreen : Screen
         _speed.Text = $"{Recorder.SpeedKmh:0.0} km/h";
         _distance.Text = Ui.Km(Recorder.DistanceM);
         _rideTarget.Text = $"Cible {Recorder.TargetPowerW} W";
-        _finishButton.Text = _finishArmed ? "Confirmer la fin" : "Terminer";
+        // Entraînement : « Terminer » n'apparaît qu'une fois la séance finie (sinon, dans le menu).
+        _finishButton.Visible = Progress is null || Progress.IsFinished;
         _pauseButton.Text = Recorder.IsPaused ? "Reprendre" : "Pause";
     }
 
@@ -659,6 +730,7 @@ public partial class FreeRideScreen : Screen
     /// <summary>Au clavier (ordinateur, mode debug) : flèches haut/bas pour changer de pignon.</summary>
     public override void _UnhandledInput(InputEvent e)
     {
+        if (SensorsPage is not null) { base._UnhandledInput(e); return; }
         if (Gears is not null && e.IsActionPressed("ui_up")) { ShiftHarder(); GetViewport().SetInputAsHandled(); return; }
         if (Gears is not null && e.IsActionPressed("ui_down")) { ShiftEasier(); GetViewport().SetInputAsHandled(); return; }
         base._UnhandledInput(e);
@@ -666,7 +738,9 @@ public partial class FreeRideScreen : Screen
 
     protected override void OnBack()
     {
-        if (Recorder is null) Navigator.GoTo(this, Workout is null ? Navigator.Menu : Navigator.Workouts);
+        if (SensorsPage is not null) CloseSensors();
+        else if (MenuOpen) CloseMenu();
+        else if (Recorder is null) Navigator.GoTo(this, Workout is null ? Navigator.Menu : Navigator.Workouts);
         else if (!Recorder.IsPaused) TogglePause(); // pendant la sortie, Retour met en pause sans rien perdre
     }
 }

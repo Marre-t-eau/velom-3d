@@ -181,6 +181,7 @@ text = "Capteurs via : Bluetooth de ce PC"
 autowrap_mode = 3
 
 [node name="RelayHint" type="Label" parent="Margin/Page/RelayPanel/Box"]
+unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 theme_type_variation = &"MutedLabel"
@@ -197,25 +198,31 @@ layout_mode = 2
 custom_minimum_size = Vector2(260, 52)
 text = "Chercher les téléphones"
 
-[node name="RelayAddress" type="LineEdit" parent="Margin/Page/RelayPanel/Box/RelayActions"]
+[node name="LocalBleButton" type="Button" parent="Margin/Page/RelayPanel/Box/RelayActions"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(300, 52)
+text = "Revenir au Bluetooth du PC"
+visible = false
+
+[node name="ManualRow" type="HBoxContainer" parent="Margin/Page/RelayPanel/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+visible = false
+
+[node name="RelayAddress" type="LineEdit" parent="Margin/Page/RelayPanel/Box/ManualRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(220, 52)
-placeholder_text = "ou adresse du téléphone (192.168.1.20)"
+placeholder_text = "adresse affichée sur le téléphone (192.168.1.20)"
 
-[node name="RelayConnectButton" type="Button" parent="Margin/Page/RelayPanel/Box/RelayActions"]
+[node name="RelayConnectButton" type="Button" parent="Margin/Page/RelayPanel/Box/ManualRow"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(160, 52)
 text = "Se connecter"
-
-[node name="LocalBleButton" type="Button" parent="Margin/Page/RelayPanel/Box/RelayActions"]
-unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(240, 52)
-text = "Bluetooth de ce PC"
-visible = false
 
 [node name="Phones" type="HFlowContainer" parent="Margin/Page/RelayPanel/Box"]
 unique_name_in_owner = true

@@ -154,14 +154,16 @@ sur les deux avec le même compte. Seuls les capteurs changent, au choix dans *C
   n'est ouvert sur le réseau). Le jeu le lance tout seul et il s'arrête avec lui. Si le PC n'a pas
   de Bluetooth, ou s'il est coupé, l'écran le dit.
 - **Téléphone relais**, si le PC n'a pas de Bluetooth. Sur le téléphone : *Connexion des capteurs >
-  Relais pour PC*. Le téléphone capte les capteurs et transmet les mesures en direct au PC sur le
-  réseau local, sans aucun serveur. Sur le PC, le téléphone apparaît tout seul (bouton
-  *Chercher les téléphones*, fait aussi à l'ouverture de l'écran quand le PC n'a pas de Bluetooth) ;
-  sinon, saisir l'adresse affichée sur le téléphone. Le PC recherche, connecte et pilote ensuite
-  les capteurs comme s'ils étaient à lui (ERG, pente, vitesses virtuelles). Le dernier téléphone
-  utilisé est repris automatiquement. Garder l'appli du téléphone ouverte au premier plan : l'écran
-  reste allumé pendant le relais. Si le PC part (ou le Wi-Fi coupe plus de 8 s), le téléphone
-  déconnecte les capteurs, pour ne pas laisser le trainer en ERG.
+  Relais pour PC*. Le téléphone transmet les mesures en direct au PC sur le réseau local, sans aucun
+  serveur. Les capteurs se connectent sur le téléphone, comme d'habitude (*Connecter des capteurs*
+  ramène à la page de connexion, le relais continue), ou depuis le PC ; activer ou arrêter le relais
+  ne déconnecte rien. Sur le PC, sans Bluetooth, l'écran cherche les téléphones tout seul et se
+  connecte s'il n'en trouve qu'un (ou le dernier utilisé) ; le bouton *Rechercher* n'apparaît que
+  quand il y a un Bluetooth à utiliser. L'adresse IP n'est demandée que si aucun téléphone n'est
+  trouvé. Le PC pilote ensuite le trainer comme s'il était à lui (ERG, pente, vitesses virtuelles).
+  Garder l'appli du téléphone ouverte au premier plan : l'écran reste allumé pendant le relais. Si le
+  PC part (ou le Wi-Fi coupe plus de 8 s), le trainer repasse en simulation sur le plat, pour ne pas
+  rester en ERG. *Revenir au Bluetooth du PC* n'apparaît que si ce PC a un Bluetooth utilisable.
 
 Fonctionnement du relais (`Relay/`) : connexion TCP du PC vers le téléphone (port 47801), un message
 JSON par ligne, qui transporte les mêmes octets que le Bluetooth (le décodage reste celui du jeu) ;

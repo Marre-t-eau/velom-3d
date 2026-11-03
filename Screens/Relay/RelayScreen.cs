@@ -9,7 +9,9 @@ namespace Velom3d.Screens;
 /// Mode relais du téléphone (mise en page : RelayScreen.tscn) : le Bluetooth du téléphone sert au
 /// PC, sur le réseau local (voir <see cref="RelayHost"/>). L'écran montre l'adresse à saisir sur le
 /// PC si la découverte automatique échoue, le PC connecté, les capteurs et leurs mesures.
-/// « Arrêter le relais » déconnecte tout et revient à la connexion des capteurs.
+/// « Connecter des capteurs » ouvre la page de connexion sans arrêter le relais (les capteurs
+/// connectés sur le téléphone sont annoncés au PC) ; « Arrêter le relais » l'arrête, sans
+/// déconnecter les capteurs.
 /// </summary>
 public partial class RelayScreen : Screen
 {
@@ -34,31 +36,34 @@ public partial class RelayScreen : Screen
         _devices = GetNode<Label>("%Devices");
         _status = GetNode<Label>("%Status");
         _panel = GetNode<PanelContainer>("%StatePanel");
-        GetNode<Button>("%StopButton").Pressed += OnBack;
+        GetNode<Button>("%StopButton").Pressed += () =>
+        {
+            RelayHost.Stop();
+            Navigator.GoTo(this, Navigator.Connection);
+        };
+        GetNode<Button>("%SensorsButton").Pressed += OnBack;
         Hub.StatusMessage += ShowStatus;
 
-        _host = new RelayHost { Name = "RelayHost" };
+        _host = RelayHost.Start();
         _host.Changed += Refresh;
-        AddChild(_host);
-        // Le PC peut piloter le trainer pendant une heure : l'écran ne doit pas se mettre en veille.
-        DisplayServer.ScreenSetKeepOn(true);
         Refresh();
     }
 
     public override void _ExitTree()
     {
         Hub.StatusMessage -= ShowStatus;
-        DisplayServer.ScreenSetKeepOn(false);
+        if (IsInstanceValid(_host)) _host.Changed -= Refresh;
     }
 
+    /// <summary>Retour à la page de connexion : le relais continue.</summary>
     protected override void OnBack() => Navigator.GoTo(this, Navigator.Connection);
 
     public override void _Process(double delta)
     {
         var connected = Hub.Devices.Sorted.Where(d => d.State == LinkState.Connected).ToList();
         _devices.Text = connected.Count == 0
-            ? (_host.ClientName is null ? "" : "Aucun capteur connecté : le PC les recherche et les connecte.")
-            : "Capteurs utilisés par le PC :\n" + string.Join("\n", connected.Select(d => $"•  {d.DisplayName}  ({DeviceList.KindLabel(d.Kind)})"));
+            ? "Aucun capteur connecté : connectez-les ici (« Connecter des capteurs ») ou depuis le PC."
+            : (_host.ClientName is null ? "Capteurs connectés, transmis au PC dès qu'il se connecte :\n" : "Capteurs transmis au PC :\n") + string.Join("\n", connected.Select(d => $"•  {d.DisplayName}  ({DeviceList.KindLabel(d.Kind)})"));
         _values.Text = connected.Count == 0 ? ""
             : $"{Hub.Power} W  ·  {Hub.Cadence:0} tr/min" + (Hub.HeartRate > 0 ? $"  ·  {Hub.HeartRate} bpm" : "");
     }

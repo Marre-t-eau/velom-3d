@@ -12,6 +12,8 @@ namespace Velom3d.Screens;
 /// ceinture cardio, par le Bluetooth du téléphone ou du PC. Pensé pour le tactile (grandes cibles,
 /// liste qui défile au doigt). Sans Bluetooth (éditeur, PC sans Bluetooth), l'écran
 /// l'indique et ne cherche rien, sauf en mode debug (capteurs simulés, voir SensorBackends). « Continuer » mène au menu principal.
+/// Ouvert depuis le menu d'une sortie (<see cref="ReturnToRide"/>), il se pose par-dessus la sortie,
+/// qui reste en mémoire : le bouton principal devient « Revenir à la sortie ».
 ///
 /// Sur PC, le cadre « relais » permet d'utiliser le Bluetooth d'un téléphone du même réseau
 /// (mode « Relais pour PC » sur le téléphone, voir RelayScreen) : téléphones trouvés tout seuls,
@@ -42,6 +44,8 @@ public partial class DeviceConnectionScreen : Control
     LineEdit _relayAddress = null!;
     Button _localBleButton = null!;
     HFlowContainer _phones = null!;
+    Control _manualRow = null!;
+    Label _relayHint = null!;
     RelayBackend? _watchedRelay;
 
     const string RelayConfig = "user://relay.cfg";
@@ -55,6 +59,13 @@ public partial class DeviceConnectionScreen : Control
 
     SensorHub Sensors => SensorHub.Instance;
 
+    /// <summary>Ouvert pendant une sortie : appelé par « Revenir à la sortie » (null = premier écran, vers le menu).
+    /// À renseigner avant l'ajout à l'arbre.</summary>
+    public Action? ReturnToRide { get; set; }
+
+    /// <summary>Bouton principal (pour les tests).</summary>
+    internal Button ContinueButton => _continueButton;
+
     /// <summary>Ligne affichée pour un appareil (pour les tests).</summary>
     internal Control? RowFor(string address) => _rows.GetValueOrDefault(address)?.Panel;
 
@@ -67,7 +78,9 @@ public partial class DeviceConnectionScreen : Control
         if (Sensors.Backend is null && SensorBackends.Create() is { } backend) Sensors.UseBackend(backend);
         _relayPanel.Visible = !IsPhone;
         // Sur PC, le mode relais sert aussi à tester à deux PC (l'un en mode debug prête ses capteurs simulés).
-        GetNode<Button>("%RelayModeButton").Visible = IsPhone || Sensors.Backend is SimulatedBackend;
+        var relayMode = GetNode<Button>("%RelayModeButton");
+        relayMode.Visible = ReturnToRide is null && (IsPhone || Sensors.Backend is SimulatedBackend);
+        relayMode.Text = RelayHost.Current is null ? "Relais pour PC" : "Relais pour PC : actif";
         WatchRelay();
         RefreshSource();
         if (!IsPhone)
@@ -82,8 +95,7 @@ public partial class DeviceConnectionScreen : Control
             ShowStatus(IsPhone
                 ? "Le plugin Bluetooth n'est pas dans cette version de l'appli. À l'export : fichiers velom3d_ble-*.aar "
                   + "dans addons/velom3d_ble/bin/, extension « Velom3d BLE » activée et « Use Gradle Build » coché."
-                : $"Pas de Bluetooth utilisable sur ce PC : passez par un téléphone (cadre ci-dessus), ou lancez le mode debug "
-                  + $"({SensorBackends.DebugEnvVar}=1 ou {SensorBackends.DebugArg}) pour des capteurs simulés.");
+                : "");
             Refresh();
             return;
         }
@@ -101,12 +113,14 @@ public partial class DeviceConnectionScreen : Control
 
     public override void _Notification(int what)
     {
-        if (what == NotificationWMGoBackRequest) GetTree().Quit();
+        // Pendant une sortie, Retour est géré par l'écran de sortie (retour à la sortie).
+        if (what == NotificationWMGoBackRequest && ReturnToRide is null) GetTree().Quit();
     }
 
     public override void _Process(double delta)
     {
-        _continueButton.Text = Sensors.Devices.Sorted.Any(d => d.State == LinkState.Connected) ? "Continuer" : "Continuer sans capteur";
+        _continueButton.Text = ReturnToRide is not null ? "Revenir à la sortie"
+            : Sensors.Devices.Sorted.Any(d => d.State == LinkState.Connected) ? "Continuer" : "Continuer sans capteur";
         foreach (var (kind, _) in Slots)
         {
             var (panel, name, value) = _slots[kind];
@@ -255,7 +269,19 @@ public partial class DeviceConnectionScreen : Control
                 : r.IsRelayConnected ? $"Capteurs via le téléphone {r.DisplayName} ({r.Host})" : $"Connexion au téléphone {r.Host}…",
             _ => "Capteurs via le Bluetooth de cet appareil",
         };
-        _localBleButton.Visible = WindowsBle.IsWindows && Sensors.Backend is not RelayBackend { IsLocalHelper: true, IsLost: false };
+        // « Revenir au Bluetooth du PC » : seulement quand on est passé par un téléphone et que ce PC a du Bluetooth.
+        _localBleButton.Visible = WindowsBle.Available == true && Sensors.Backend is RelayBackend { IsLocalHelper: false };
+        // Sans Bluetooth utilisable, rien à rechercher : on garde seulement les cases des capteurs.
+        bool canSearch = Sensors.Backend is not null and not RelayBackend { IsLost: true } and not RelayBackend { Problem: not null };
+        _scanButton.Visible = canSearch;
+        _list.GetParent<Control>().Visible = canSearch;
+        bool onPhone = Sensors.Backend is RelayBackend { IsLocalHelper: false, IsLost: false };
+        _relayHint.Visible = !onPhone;
+        if (onPhone)
+        {
+            _manualRow.Visible = false;
+            foreach (var child in _phones.GetChildren()) child.QueueFree();
+        }
         // Le Bluetooth du PC vient de se révéler absent : on cherche les téléphones.
         if (NeedsPhone) AutoFindPhones();
     }
@@ -309,16 +335,20 @@ public partial class DeviceConnectionScreen : Control
             button.Pressed += () => UseRelay(phone.Host, phone.Port, phone.Name);
             _phones.AddChild(button);
         }
+        // L'adresse à saisir ne sert que si la recherche n'a rien donné.
+        _manualRow.Visible = found.Count == 0;
+        if (found.Count == 0)
+        {
+            ShowStatus("Aucun téléphone trouvé. Sur le téléphone : même Wi-Fi que le PC, Velom3d ouvert, « Relais pour PC » activé. "
+                + "Sinon, saisissez l'adresse affichée sur le téléphone.");
+            return;
+        }
         if (autoConnect)
         {
             var last = LastRelay();
-            var known = found.FirstOrDefault(p => last == p.Host || last == $"{p.Host}:{p.Port}");
+            var known = found.Count == 1 ? found[0] : found.FirstOrDefault(p => last == p.Host || last == $"{p.Host}:{p.Port}");
             if (known is not null && NeedsPhone) UseRelay(known.Host, known.Port, known.Name);
-            return;
         }
-        if (found.Count == 0)
-            ShowStatus("Aucun téléphone trouvé. Sur le téléphone : même Wi-Fi que le PC, Velom3d ouvert sur « Relais pour PC ». "
-                + "Sinon, saisissez l'adresse affichée sur le téléphone.");
     }
 
     void FindNodes()
@@ -334,7 +364,8 @@ public partial class DeviceConnectionScreen : Control
         _continueButton.Pressed += () =>
         {
             Sensors.StopScan();
-            Navigator.GoTo(this, Navigator.Menu);
+            if (ReturnToRide is { } back) back();
+            else Navigator.GoTo(this, Navigator.Menu);
         };
         _status = GetNode<Label>("%Status");
         _list = GetNode<VBoxContainer>("%List");
@@ -349,6 +380,8 @@ public partial class DeviceConnectionScreen : Control
         _localBleButton = GetNode<Button>("%LocalBleButton");
         _localBleButton.Pressed += OnLocalBlePressed;
         _phones = GetNode<HFlowContainer>("%Phones");
+        _manualRow = GetNode<Control>("%ManualRow");
+        _relayHint = GetNode<Label>("%RelayHint");
         GetNode<Button>("%RelayModeButton").Pressed += () =>
         {
             Sensors.StopScan();

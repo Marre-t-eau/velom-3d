@@ -11,13 +11,36 @@ namespace Velom3d.Relay;
 /// <summary>
 /// Mode relais du téléphone : prête son Bluetooth à un PC du même réseau (RelayScreen).
 ///
-/// Le PC pilote tout (recherche, connexion, commandes du trainer) comme s'il avait le Bluetooth :
-/// chaque demande passe par le <see cref="SensorHub"/> du téléphone, qui garde ainsi sa liste
-/// d'appareils à jour (et affiche les mesures), et chaque octet reçu des capteurs part tel quel
-/// au PC. Quand le PC s'en va, les capteurs sont déconnectés : le trainer n'est pas laissé en ERG.
+/// Les capteurs se connectent sur le téléphone, comme d'habitude (page de connexion), ou depuis
+/// le PC : chaque demande du PC passe par le <see cref="SensorHub"/> du téléphone, qui garde ainsi
+/// sa liste d'appareils à jour (et affiche les mesures), et chaque octet reçu des capteurs part
+/// tel quel au PC. À l'arrivée du PC, les capteurs déjà connectés lui sont annoncés (avec leur
+/// fiche). Activer ou arrêter le relais ne déconnecte rien. Quand le PC s'en va, le trainer
+/// repasse en simulation sur le plat : il n'est pas laissé en ERG sans pilote.
+///
+/// Le relais vit sous l'autoload Sensors (<see cref="Start"/>, <see cref="Stop"/>) : il continue
+/// quand on change d'écran sur le téléphone.
 /// </summary>
 public partial class RelayHost : Node
 {
+    /// <summary>Le relais en marche, ou null.</summary>
+    public static RelayHost? Current { get; private set; }
+
+    /// <summary>Démarre le relais s'il ne tourne pas déjà.</summary>
+    public static RelayHost Start()
+    {
+        if (Current is { } running && IsInstanceValid(running)) return running;
+        Current = new RelayHost { Name = "RelayHost" };
+        SensorHub.Instance.AddChild(Current);
+        return Current;
+    }
+
+    public static void Stop()
+    {
+        if (Current is { } running && IsInstanceValid(running)) running.QueueFree();
+        Current = null;
+    }
+
     RelayServer? _server;
     SensorBackend? _backend;
 
@@ -39,8 +62,9 @@ public partial class RelayHost : Node
     public override void _Ready()
     {
         if (Hub.Backend is null && SensorBackends.Create() is { } created) Hub.UseBackend(created);
-        ReleaseDevices();
         _backend = Hub.Backend;
+        // Le PC peut piloter le trainer pendant une heure : l'écran ne doit pas se mettre en veille.
+        DisplayServer.ScreenSetKeepOn(true);
         var server = new RelayServer(DeviceName(), IPAddress.Any)
         {
             Problem = _backend is null ? "Le Bluetooth n'est pas disponible dans cette version de l'appli sur le téléphone." : null,
@@ -53,6 +77,7 @@ public partial class RelayHost : Node
         {
             StartError = $"Impossible d'ouvrir le port {RelayProtocol.TcpPort} ({e.Message}).";
             server.Dispose();
+            Changed?.Invoke();
             return;
         }
         _server = server;
@@ -60,14 +85,14 @@ public partial class RelayHost : Node
         {
             ClientName = name;
             LastLoss = null;
-            ReleaseDevices(); // le PC commence avec une liste propre
+            AnnounceConnected(); // capteurs déjà connectés sur le téléphone
             Changed?.Invoke();
         };
         server.ClientLost += reason =>
         {
             ClientName = null;
             LastLoss = reason;
-            ReleaseDevices();
+            ReleaseTrainer();
             Changed?.Invoke();
         };
         server.Received += OnCommand;
@@ -98,9 +123,11 @@ public partial class RelayHost : Node
         }
         Hub.DeviceConnected -= OnConnected;
         Hub.DeviceDisconnected -= OnDisconnected;
+        if (_server?.Client is not null) ReleaseTrainer();
         _server?.Dispose();
         _server = null;
-        ReleaseDevices();
+        DisplayServer.ScreenSetKeepOn(false);
+        if (Current == this) Current = null;
     }
 
     /// <summary>Adresses IP du téléphone sur le réseau local, à saisir sur le PC si la découverte échoue.</summary>
@@ -154,14 +181,32 @@ public partial class RelayHost : Node
     void OnNotified(string address, string charUuid, byte[] data) => _server?.Send(RelayMessage.Notify(address, charUuid, data));
     void OnRead(string address, string charUuid, byte[] data) => _server?.Send(RelayMessage.Read(address, charUuid, data));
     void OnError(string message) => _server?.Send(RelayMessage.Error(message));
-    void OnConnected(string address, string[] services) => _server?.Send(RelayMessage.Connected(address, services));
+    void OnConnected(string address, string[] services)
+    {
+        if (_server is null) return;
+        // Connecté depuis le téléphone : le PC ne l'a peut-être pas vu au scan.
+        if (Hub.Devices.Get(address) is { } d) _server.Send(RelayMessage.Found(address, d.Name, d.Services, d.Rssi));
+        _server.Send(RelayMessage.Connected(address, services));
+    }
     void OnDisconnected(string address) => _server?.Send(RelayMessage.Disconnected(address));
 
-    /// <summary>Arrête la recherche et déconnecte tout (un trainer ne reste pas en ERG sans pilote).</summary>
-    static void ReleaseDevices()
+    /// <summary>Annonce au PC qui arrive les capteurs déjà connectés, avec leur fiche.</summary>
+    void AnnounceConnected()
+    {
+        if (_server is null) return;
+        foreach (var d in Hub.Devices.Sorted)
+        {
+            if (d.State != LinkState.Connected) continue;
+            _server.Send(RelayMessage.Found(d.Address, d.Name, d.Services, d.Rssi));
+            foreach (var (charUuid, data) in Hub.RawReads(d.Address)) _server.Send(RelayMessage.Read(d.Address, charUuid, data));
+            _server.Send(RelayMessage.Connected(d.Address, d.Services));
+        }
+    }
+
+    /// <summary>Le PC est parti : le trainer quitte l'ERG (plat), les capteurs restent connectés.</summary>
+    static void ReleaseTrainer()
     {
         Hub.StopScan();
-        foreach (var d in Hub.Devices.Sorted)
-            if (d.State != LinkState.Available) Hub.DisconnectDevice(d.Address);
+        if (Hub.TrainerAddress != "") Hub.EnterSimulation(0.0);
     }
 }

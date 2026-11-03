@@ -38,6 +38,12 @@ public partial class SensorHub : Node
     public DeviceList Devices { get; } = new();
     public SensorBackend? Backend { get; private set; }
     public bool IsScanning { get; private set; }
+
+    readonly System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<(string Char, byte[] Data)>> _reads = new();
+
+    /// <summary>Fiche brute lue à la connexion d'un appareil (pour la renvoyer telle quelle, ex. au PC du relais).</summary>
+    public System.Collections.Generic.IReadOnlyList<(string Char, byte[] Data)> RawReads(string address) =>
+        _reads.TryGetValue(address, out var list) ? list : [];
     /// <summary>Appareil qui expose FTMS : c'est lui qu'on pilote.</summary>
     public string TrainerAddress { get; private set; } = "";
 
@@ -94,7 +100,13 @@ public partial class SensorHub : Node
                 foreach (var (type, value) in SensorValues.Decode(charUuid, data)) measured(address, type, value);
             Fusion.Feed(address, charUuid, data, Now);
         };
-        backend.Read += (address, charUuid, data) => Devices.Get(address)?.Specs.Apply(charUuid, data);
+        backend.Read += (address, charUuid, data) =>
+        {
+            Devices.Get(address)?.Specs.Apply(charUuid, data);
+            if (!_reads.TryGetValue(address, out var list)) _reads[address] = list = new();
+            list.RemoveAll(r => r.Char == charUuid);
+            list.Add((charUuid, data));
+        };
         backend.DeviceFound += (a, n, s, rssi) => Devices.Found(a, n, s, rssi, Now);
         backend.ScanFinished += () =>
         {
@@ -181,8 +193,9 @@ public partial class SensorHub : Node
 
     void OnDeviceConnected(string address, string[] services)
     {
-        // Connexion arrivée après l'abandon (délai dépassé ou annulée) : on la referme.
-        if (Devices.Get(address) is { State: LinkState.Available })
+        // Connexion arrivée après l'abandon (délai dépassé ou annulée) : on la referme,
+        // sauf si le transport annonce des appareils déjà connectés (relais du téléphone).
+        if (Devices.Get(address) is { State: LinkState.Available } && !Backend!.AdoptsConnections)
         {
             Backend!.DisconnectDevice(address);
             return;

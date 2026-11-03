@@ -18,6 +18,9 @@ public static class WindowsBle
 
     static int _pid = -1;
 
+    /// <summary>Le Bluetooth de ce PC a répondu présent (true), absent (false), ou pas encore essayé (null).</summary>
+    public static bool? Available { get; set; }
+
     public static bool IsWindows => OS.GetName() == "Windows";
 
     /// <summary>Transport vers le programme d'aide (lancé si besoin), ou null hors Windows.</summary>
@@ -28,7 +31,11 @@ public static class WindowsBle
         if (_pid <= 0 || !OS.IsProcessRunning(_pid))
         {
             _pid = Launch(out slow);
-            if (_pid <= 0) return null;
+            if (_pid <= 0)
+            {
+                Available = false;
+                return null;
+            }
         }
         // Avec « dotnet run » (depuis l'éditeur), la première compilation prend du temps.
         return new RelayBackend("127.0.0.1", RelayProtocol.HelperPort, "Bluetooth de ce PC", isLocalHelper: true,

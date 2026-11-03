@@ -20,6 +20,8 @@ namespace Velom3d.Tests;
 public partial class GodotSmokeTest : Node
 {
     int _failures;
+    /// <summary>Échecs repris à la fin : les avertissements du moteur peuvent noyer le début du journal.</summary>
+    readonly System.Collections.Generic.List<string> _failed = new();
     int _powerSignals;
     int _okResponses;
 
@@ -96,7 +98,7 @@ public partial class GodotSmokeTest : Node
 
         await RelayMode();
 
-        GD.Print(_failures == 0 ? "\nTOUS LES TESTS PASSENT" : $"\n{_failures} ÉCHEC(S)");
+        GD.Print(_failures == 0 ? "\nTOUS LES TESTS PASSENT" : $"\n{_failures} ÉCHEC(S) :\n  " + string.Join("\n  ", _failed));
         GetTree().Quit(_failures == 0 ? 0 : 1);
     }
 
@@ -141,10 +143,19 @@ public partial class GodotSmokeTest : Node
         ride.ShowAveragePower();
         await Wait(0.1);
         Check(ride.PowerTileTitle == "Puissance moyenne", "Toucher la puissance affiche la moyenne");
+        Check(ride.FinishButtonShown, "Sortie libre : Terminer reste dans la barre du bas");
+        ride.OpenMenu();
+        Check(ride.MenuOpen && !ride.MenuSkipButton.Visible, "Menu : ouvert, pas de bloc suivant en sortie libre");
+        ride.CloseMenu();
         ride.OnFinishPressed();
         await Wait(0.1);
-        Check(rec.IsPaused && ride.PauseButtonText == "Reprendre", "Terminer : la sortie se met en pause, Pause devient Reprendre");
+        Check(rec.IsPaused && ride.PauseButtonText == "Reprendre" && ride.Popup is not null,
+            "Terminer : fenêtre de confirmation, la sortie se met en pause");
+        ride.Popup?.NoButton.EmitSignal(BaseButton.SignalName.Pressed);
+        await Wait(0.1);
+        Check(ride.Popup is null && !rec.IsPaused && ride.Recorder == rec, "Non : la fenêtre se ferme, la sortie reprend");
         ride.OnFinishPressed();
+        ride.Popup?.YesButton.EmitSignal(BaseButton.SignalName.Pressed);
         await Wait(0.3);
         Check(!sim.Model.ErgMode, "Fin de sortie : le trainer n'impose plus de puissance");
         Check(next is RideSummaryScreen, "Fin de sortie : ouverture du bilan");
@@ -159,7 +170,7 @@ public partial class GodotSmokeTest : Node
             Check(summary.Ride.Info.Summary.Tss > 0 && summary.Ride.Info.Summary.Kcal > 0, "Bilan : TSS et calories calculés");
             var info = summary.Ride.Info;
             var r = summary.Ride;
-            Check(info.RiderMassKg > 0 && info.EndedAt is not null && r.Pauses.Count == 1 && RideSummaryScreen.PausesText.StartsWith("Pause 1"),
+            Check(info.RiderMassKg > 0 && info.EndedAt is not null && r.Pauses.Count == 2 && RideSummaryScreen.PausesText.StartsWith("Pause 1"),
                 $"Bilan : poids, heure de fin et pause ({r.Pauses.Count} pause)");
             var trainer = info.Sensors.FirstOrDefault(x => x.Kind == DeviceKind.Trainer);
             Check(trainer is { Specs.PowerMaxW: 2000, Specs.Model: "Home trainer démo" } && info.Sensors.Count == 3
@@ -184,6 +195,19 @@ public partial class GodotSmokeTest : Node
         Check(sim.Model.TargetPowerW == 0, "Simulation après ERG : l'ancienne consigne est effacée");
         Check(!sim.Model.ErgMode && sim.Model.GradePct == 0 && Mathf.IsEqualApprox(sim.Model.Crr, 0.004)
               && Mathf.IsEqualApprox(sim.Model.Cw, 0.25), $"Simulation : plat, pneus et air envoyés (Crr {sim.Model.Crr}, Cw {sim.Model.Cw})");
+        // Menu > Capteurs (sortie sans contrôle des pauses du bilan) : aller-retour sans perdre la sortie.
+        var simRec = ride.Recorder!;
+        ride.OpenMenu();
+        ride.OpenSensors();
+        await Wait(0.2);
+        Check(!ride.MenuOpen && ride.SensorsPage is { } page && page.ContinueButton.Text == "Revenir à la sortie" && simRec.IsPaused,
+            "Menu > Capteurs : page des capteurs par-dessus la sortie, mise en pause");
+        int sentBefore = simRec.Ride.Events.Count(e => e.Type.StartsWith("set_"));
+        ride.SensorsPage?.ContinueButton.EmitSignal(BaseButton.SignalName.Pressed);
+        await Wait(0.3);
+        Check(ride.SensorsPage is null && ride.Recorder == simRec && !simRec.IsPaused && !sim.Model.ErgMode
+              && simRec.Ride.Events.Count(e => e.Type.StartsWith("set_")) > sentBefore,
+            "Retour à la sortie : la même sortie reprend, simulation renvoyée au trainer");
         ride.Finish();
         await Wait(0.2);
         ride.QueueFree();
@@ -323,6 +347,10 @@ public partial class GodotSmokeTest : Node
         await Wait(1.5);
         Check(sim.Model.ErgMode && sim.Model.TargetPowerW == 210, $"Bloc 1 : consigne ERG 210 W ({sim.Model.TargetPowerW} W)");
         Check(ride.UpcomingCount == 3, $"Les trois blocs suivants sont affichés ({ride.UpcomingCount})");
+        Check(!ride.FinishButtonShown, "Entraînement en cours : pas de Terminer dans la barre du bas");
+        ride.OpenMenu();
+        Check(ride.MenuOpen && ride.MenuSkipButton.Visible, "Entraînement : le menu propose le bloc suivant");
+        ride.CloseMenu();
         Check(ride.Scene3D is { PropCount: > 500 }, "Entraînement : le cycliste roule aussi en 3D");
         await Wait(2.5);
         Check(ride.Progress?.BlockIndex == 1, "Passage automatique au bloc 2 à la fin du bloc 1");
@@ -346,6 +374,8 @@ public partial class GodotSmokeTest : Node
         ride.SkipBlock();
         await Wait(1.0);
         Check(ride.Progress?.IsFinished == true && !sim.Model.ErgMode, "Fin de l'entraînement : puissance libre");
+        await Wait(0.1);
+        Check(ride.FinishButtonShown, "Entraînement fini : Terminer réapparaît");
         var samples = ride.Recorder!.Ride.Samples;
         Check(samples.Any(x => x.TargetPowerW == 210 && x.TargetCadenceRpm == 90) && samples.Any(x => x.TargetPowerW == 0),
             "Les cibles sont enregistrées à chaque seconde");
@@ -433,9 +463,15 @@ public partial class GodotSmokeTest : Node
         var hub = SensorHub.Instance;
         var sim = new SimulatedBackend { ScanDelayS = 0.0, ConnectDelayS = 0.0 };
         hub.UseBackend(sim);
+        // Ceinture connectée sur le téléphone avant le relais : elle doit rester connectée et être annoncée au PC.
+        hub.StartScan();
+        await Wait(0.3);
+        hub.ConnectDevice(SimulatedBackend.Hrm);
+        await Wait(0.3);
         var screen = Navigator.Create<RelayScreen>(Navigator.Relay);
         AddChild(screen);
         await Wait(0.2);
+        Check(hub.Devices.Get(SimulatedBackend.Hrm)?.State == LinkState.Connected, "Relais : activer le relais ne déconnecte pas la ceinture");
         Check(screen.Host.IsRunning, $"Relais : port {RelayProtocol.TcpPort} ouvert ({screen.Host.StartError})");
         var found = await RelayDiscovery.FindAsync(TimeSpan.FromSeconds(1),
             [new IPEndPoint(IPAddress.Loopback, RelayProtocol.DiscoveryPort)]);
@@ -456,6 +492,9 @@ public partial class GodotSmokeTest : Node
         pc.Send(RelayMessage.Scan(5));
         await Pump(1.0);
         Check(screen.Host.ClientName == "PC test", "Relais : le téléphone affiche le PC connecté");
+        Check(messages.Any(m => m.T == RelayOp.Connected && m.Address == SimulatedBackend.Hrm)
+              && messages.Any(m => m.T == RelayOp.Read && m.Address == SimulatedBackend.Hrm),
+            "Relais : la ceinture déjà connectée est annoncée au PC, avec sa fiche");
         Check(messages.Any(m => m.T == RelayOp.Found && m.Address == SimulatedBackend.Trainer), "Relais : le PC voit le trainer");
 
         pc.Send(RelayMessage.Connect(SimulatedBackend.Trainer));
@@ -470,9 +509,22 @@ public partial class GodotSmokeTest : Node
 
         pc.Dispose();
         await Wait(0.5);
-        Check(hub.Devices.Get(SimulatedBackend.Trainer)?.State is null or LinkState.Available, "Relais : PC parti, trainer libéré");
-        screen.QueueFree();
+        Check(!sim.Model.ErgMode && hub.Devices.Get(SimulatedBackend.Trainer)?.State == LinkState.Connected,
+            "Relais : PC parti, le trainer quitte l'ERG et reste connecté");
+
+        // Page de connexion pendant le relais : il continue.
+        Node? next = null;
+        Navigator.Override = n => next = n;
+        screen.GetNode<Button>("%SensorsButton").EmitSignal(BaseButton.SignalName.Pressed);
         await Wait(0.1);
+        Check(next is DeviceConnectionScreen && RelayHost.Current is { IsRunning: true },
+            "Relais : « Connecter des capteurs » ouvre la page de connexion, le relais continue");
+        (next as Node)?.Free();
+        Navigator.Override = null;
+        screen.QueueFree();
+        RelayHost.Stop();
+        await Wait(0.1);
+        Check(RelayHost.Current is null, "Relais : arrêté");
     }
 
     SignalAwaiter Wait(double s) => ToSignal(GetTree().CreateTimer(s), SceneTreeTimer.SignalName.Timeout);
@@ -480,6 +532,6 @@ public partial class GodotSmokeTest : Node
     void Check(bool ok, string label)
     {
         GD.Print((ok ? "  ok   " : "  FAIL ") + label);
-        if (!ok) _failures++;
+        if (!ok) { _failures++; _failed.Add(label); }
     }
 }

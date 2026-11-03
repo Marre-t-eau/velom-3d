@@ -42,6 +42,9 @@ public partial class RelayBackend : SensorBackend
         _client.Lost += OnLost;
     }
 
+    /// <summary>Le téléphone annonce aussi les capteurs qu'il a connectés lui-même.</summary>
+    public override bool AdoptsConnections => !IsLocalHelper;
+
     public override void _Ready() => _client.Start();
 
     public override void _Process(double delta) => _client.Poll();
@@ -75,6 +78,7 @@ public partial class RelayBackend : SensorBackend
     {
         if (!IsLocalHelper && name.Length > 0) DisplayName = name;
         Problem = problem;
+        if (IsLocalHelper) WindowsBle.Available = problem is null;
         if (problem is not null)
         {
             RaiseError(problem);
@@ -118,6 +122,7 @@ public partial class RelayBackend : SensorBackend
     void OnLost(string reason)
     {
         IsLost = true;
+        if (IsLocalHelper) WindowsBle.Available = false;
         RaiseError(IsLocalHelper
             ? $"Bluetooth de ce PC indisponible : {reason}"
             : $"Connexion au téléphone ({DisplayName}) perdue : {reason}");
