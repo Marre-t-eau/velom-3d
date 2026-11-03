@@ -86,7 +86,7 @@ public partial class DeviceConnectionScreen : Control
         if (!IsPhone)
         {
             _relayAddress.Text = LastRelay();
-            // Sans Bluetooth sur ce PC, on cherche tout de suite les téléphones (et on reprend le dernier utilisé).
+            // Sans Bluetooth sur ce PC, on cherche tout de suite les téléphones : le joueur choisit le sien.
             if (NeedsPhone) AutoFindPhones();
         }
         if (Sensors.Backend is null)
@@ -290,7 +290,7 @@ public partial class DeviceConnectionScreen : Control
     {
         if (_autoSearched) return;
         _autoSearched = true;
-        FindPhones(autoConnect: true);
+        FindPhones();
     }
 
     void OnRelayConnectPressed()
@@ -309,9 +309,8 @@ public partial class DeviceConnectionScreen : Control
         else ShowStatus($"{WindowsBle.HelperExe} est introuvable à côté du jeu : réexportez le jeu (voir README).");
     }
 
-    /// <summary>Cherche les téléphones en mode relais sur le réseau et en fait des boutons.
-    /// <paramref name="autoConnect"/> : reprend tout seul le dernier téléphone utilisé s'il répond.</summary>
-    async void FindPhones(bool autoConnect = false)
+    /// <summary>Cherche les téléphones en mode relais sur le réseau et en fait des boutons.</summary>
+    async void FindPhones()
     {
         _findPhonesButton.Disabled = true;
         _findPhonesButton.Text = "Recherche…";
@@ -342,12 +341,6 @@ public partial class DeviceConnectionScreen : Control
             ShowStatus("Aucun téléphone trouvé. Sur le téléphone : même Wi-Fi que le PC, Velom3d ouvert, « Relais pour PC » activé. "
                 + "Sinon, saisissez l'adresse affichée sur le téléphone.");
             return;
-        }
-        if (autoConnect)
-        {
-            var last = LastRelay();
-            var known = found.Count == 1 ? found[0] : found.FirstOrDefault(p => last == p.Host || last == $"{p.Host}:{p.Port}");
-            if (known is not null && NeedsPhone) UseRelay(known.Host, known.Port, known.Name);
         }
     }
 

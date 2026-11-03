@@ -157,8 +157,8 @@ sur les deux avec le même compte. Seuls les capteurs changent, au choix dans *C
   Relais pour PC*. Le téléphone transmet les mesures en direct au PC sur le réseau local, sans aucun
   serveur. Les capteurs se connectent sur le téléphone, comme d'habitude (*Connecter des capteurs*
   ramène à la page de connexion, le relais continue), ou depuis le PC ; activer ou arrêter le relais
-  ne déconnecte rien. Sur le PC, sans Bluetooth, l'écran cherche les téléphones tout seul et se
-  connecte s'il n'en trouve qu'un (ou le dernier utilisé) ; le bouton *Rechercher* n'apparaît que
+  ne déconnecte rien. Sur le PC, sans Bluetooth, l'écran cherche les téléphones tout seul et les
+  affiche : il faut toujours choisir le sien (aucune connexion automatique) ; le bouton *Rechercher* n'apparaît que
   quand il y a un Bluetooth à utiliser. L'adresse IP n'est demandée que si aucun téléphone n'est
   trouvé. Le PC pilote ensuite le trainer comme s'il était à lui (ERG, pente, vitesses virtuelles).
   Garder l'appli du téléphone ouverte au premier plan : l'écran reste allumé pendant le relais. Si le
