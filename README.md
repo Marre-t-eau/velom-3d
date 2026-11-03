@@ -29,6 +29,10 @@ Le transport est une classe `SensorBackend` à deux implémentations, choisie pa
   ERG et simulation. À activer sur ordinateur avec la variable d'environnement
   `VELOM3D_DEBUG_SENSORS=1`, ou l'argument `--debug-sensors`
   (`godot --path . -- --debug-sensors`, ou *Projet > Paramètres > Éditeur > Run > Main Run Args*).
+  Sur Android, où l'appli ne reçoit ni arguments ni variables d'environnement : ajouter
+  `debug_sensors` dans *Projet > Exporter > (préréglage Android) > Features > Custom*. Le plus
+  simple est de dupliquer le préréglage Android (« Android debug capteurs ») pour ne pas livrer
+  une version simulée par erreur.
 
 Sans mode debug et sans plugin natif (ordinateur, éditeur), l'écran indique que le Bluetooth est
 indisponible.

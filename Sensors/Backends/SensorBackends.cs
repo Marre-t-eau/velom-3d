@@ -14,15 +14,20 @@ namespace Velom3d.Sensors;
 /// </list>
 /// Le mode debug s'active avec la variable d'environnement <c>VELOM3D_DEBUG_SENSORS=1</c>
 /// ou l'argument <c>--debug-sensors</c> (après <c>--</c> sur la ligne de commande Godot, ou dans
-/// Projet > Paramètres > Éditeur > Run > Main Run Args). Sinon : Bluetooth natif s'il existe.
+/// Projet > Paramètres > Éditeur > Run > Main Run Args). Sur Android, qui ne transmet ni arguments
+/// ni variables d'environnement, il s'active avec la fonctionnalité personnalisée
+/// <c>debug_sensors</c> du préréglage d'export (Exporter > Features > Custom).
+/// Sinon : Bluetooth natif s'il existe.
 /// </summary>
 public static class SensorBackends
 {
     public const string DebugEnvVar = "VELOM3D_DEBUG_SENSORS";
     public const string DebugArg = "--debug-sensors";
+    public const string DebugFeature = "debug_sensors";
 
     public static bool DebugRequested =>
-        IsOn(OS.GetEnvironment(DebugEnvVar))
+        OS.HasFeature(DebugFeature)
+        || IsOn(OS.GetEnvironment(DebugEnvVar))
         || OS.GetCmdlineUserArgs().Contains(DebugArg)
         || OS.GetCmdlineArgs().Contains(DebugArg);
 
