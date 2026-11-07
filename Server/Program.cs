@@ -20,7 +20,6 @@ if (isAdminCommand) return Admin.Run(args, new Database(dbPath));
 
 bool allowRegistration = config.GetValue("AllowRegistration", true);
 int authPerMinute = config.GetValue("AuthRequestsPerMinute", 20);
-int registrationsPerHour = config.GetValue("RegistrationsPerHour", 5);
 int freeAttempts = config.GetValue("MaxFailedLogins", 5);
 var maxLock = TimeSpan.FromMinutes(config.GetValue("LockoutMaxMinutes", 60));
 var sessionIdle = TimeSpan.FromDays(config.GetValue("SessionDays", 90));
@@ -49,10 +48,6 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "?",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = authPerMinute, Window = TimeSpan.FromMinutes(1) }));
-    // Contre la création de comptes en masse.
-    o.AddPolicy("register", ctx => RateLimitPartition.GetFixedWindowLimiter(
-        ctx.Connection.RemoteIpAddress?.ToString() ?? "?",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = registrationsPerHour, Window = TimeSpan.FromHours(1) }));
 });
 
 var app = builder.Build();
@@ -168,7 +163,7 @@ account.MapPost("/register", (AccountRequest req, Database db) =>
     res.RecoveryCode = code;
     res.Email = email;
     return Results.Json(res, statusCode: 201);
-}).RequireRateLimiting("register"); // une seule politique par route : celle-ci, plus stricte
+}).RequireRateLimiting("auth");
 
 account.MapPost("/login", (AccountRequest req, HttpContext ctx, Database db) =>
 {

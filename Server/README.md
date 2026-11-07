@@ -69,7 +69,6 @@ Dans `appsettings.json` ou en variables d'environnement (`Velom3d__Nom`) :
 | `Velom3d__Database` | `data/velom3d.db` (`/data/velom3d.db` dans Docker) | fichier de la base |
 | `Velom3d__AllowRegistration` | `true` | `false` : plus de nouveaux comptes (serveur fermé, une fois les vôtres créés) |
 | `Velom3d__AuthRequestsPerMinute` | `20` | essais de connexion par minute et par adresse IP |
-| `Velom3d__RegistrationsPerHour` | `5` | comptes créés par heure et par adresse IP |
 | `Velom3d__MaxFailedLogins` | `5` | échecs de suite sur un compte avant qu'il soit bloqué |
 | `Velom3d__LockoutMaxMinutes` | `60` | blocage le plus long (1 min, puis 2, 4, 8… jusqu'à cette durée) |
 | `Velom3d__SessionDays` | `90` | un appareil qui ne s'est pas synchronisé depuis ce nombre de jours doit se reconnecter |
@@ -90,7 +89,7 @@ Sauvegarde : copier le fichier de la base (`sqlite3 velom3d.db ".backup copie.db
   PBKDF2-SHA256 (600 000 itérations, sel aléatoire) ; un mot de passe enregistré avec moins
   d'itérations (versions précédentes) est refait à la connexion suivante.
 - **Contre les essais en boucle**, deux protections qui s'ajoutent :
-  - par adresse IP : 20 essais par minute sur les routes de compte, 5 créations de compte par heure ;
+  - par adresse IP : 20 essais par minute sur les routes de compte (création comprise) ;
   - par compte, quelle que soit l'adresse : après 5 échecs de suite, le compte est bloqué 1 minute,
     puis 2, 4, 8… jusqu'à 1 heure. Une connexion réussie remet le compteur à zéro, et il s'oublie
     après 24 heures sans échec. Un nom qui n'existe pas se bloque de la même façon : rien n'indique

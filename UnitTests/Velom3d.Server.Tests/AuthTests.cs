@@ -24,7 +24,7 @@ public sealed class AuthTests : IDisposable
     const string Pw = "Roue-Libre-42";
     readonly string _root = Path.Combine(Path.GetTempPath(), "velom3d-auth-" + Guid.NewGuid().ToString("N"));
     readonly FakeMailer _mailer = new();
-    WebApplicationFactory<Program> _factory;
+    readonly WebApplicationFactory<Program> _factory;
 
     /// <summary>Garde les e-mails au lieu de les envoyer.</summary>
     sealed class FakeMailer() : Mailer(new ConfigurationBuilder().Build(), NullLogger<Mailer>.Instance)
@@ -38,17 +38,16 @@ public sealed class AuthTests : IDisposable
     public AuthTests()
     {
         Directory.CreateDirectory(_root);
-        _factory = Factory(registrationsPerHour: 1000);
+        _factory = Factory();
     }
 
     string DbPath => Path.Combine(_root, "server", "velom3d.db");
 
-    WebApplicationFactory<Program> Factory(int registrationsPerHour) =>
+    WebApplicationFactory<Program> Factory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             b.UseSetting("Velom3d:Database", DbPath);
             b.UseSetting("Velom3d:AuthRequestsPerMinute", "1000");
-            b.UseSetting("Velom3d:RegistrationsPerHour", registrationsPerHour.ToString());
             b.ConfigureServices(s => s.AddSingleton<Mailer>(_mailer));
         });
 
@@ -258,18 +257,6 @@ public sealed class AuthTests : IDisposable
         await a.ChangePasswordAsync(Pw, "Nouveau-Mot-77");
         await a.SyncAsync();
         await Assert.ThrowsAsync<SyncException>(() => b.SyncAsync());
-    }
-
-    [Fact]
-    public async Task Account_creation_is_limited_per_address()
-    {
-        _factory.Dispose();
-        _factory = Factory(registrationsPerHour: 2);
-        await NewDevice().RegisterAsync(Url, "uno", Pw);
-        await NewDevice().RegisterAsync(Url, "dos", Pw);
-        var e = await Assert.ThrowsAsync<SyncException>(() => NewDevice().RegisterAsync(Url, "tres", Pw));
-        Assert.Contains("Trop d'essais", e.Message);
-        await NewDevice().LoginAsync(Url, "uno", Pw); // la connexion n'est pas concernée
     }
 
     [Fact]

@@ -29,7 +29,6 @@ public sealed class SyncTests : IDisposable
         {
             b.UseSetting("Velom3d:Database", Path.Combine(_root, "server", "velom3d.db"));
             b.UseSetting("Velom3d:AuthRequestsPerMinute", "1000");
-            b.UseSetting("Velom3d:RegistrationsPerHour", "1000");
         });
     }
 
