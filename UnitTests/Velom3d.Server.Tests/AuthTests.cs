@@ -30,9 +30,20 @@ public sealed class AuthTests : IDisposable
     sealed class FakeMailer() : Mailer(new ConfigurationBuilder().Build(), NullLogger<Mailer>.Instance)
     {
         public bool On { get; set; }
-        public ConcurrentQueue<(string To, string Code)> Sent { get; } = new();
+        public ConcurrentQueue<(string To, string Subject, string Body)> Sent { get; } = new();
         public override bool Enabled => On;
-        public override void SendResetCode(string to, string username, string code, TimeSpan validity) => Sent.Enqueue((to, code));
+        protected override void Send(string to, string subject, string body)
+        {
+            if (On) Sent.Enqueue((to, subject, body));
+        }
+
+        /// <summary>Codes de réinitialisation envoyés (adresse, code).</summary>
+        public (string To, string Code)[] Codes => Sent.Where(m => m.Subject.Contains("code pour changer"))
+            .Select(m => (m.To, System.Text.RegularExpressions.Regex.Match(m.Body, "[0-9A-Z]{4}-[0-9A-Z]{4}").Value)).ToArray();
+
+        public string[] Subjects => Sent.Select(m => m.Subject).ToArray();
+
+        public void Clear() { while (Sent.TryDequeue(out _)) { } }
     }
 
     public AuthTests()
@@ -178,8 +189,7 @@ public sealed class AuthTests : IDisposable
         await b.ForgotAsync(Url, "black");
         await b.ForgotAsync(Url, "personne"); // même réponse, rien n'est envoyé
         await b.ForgotAsync(Url, "black");    // moins d'une minute après : pas de second e-mail
-        Assert.Single(_mailer.Sent);
-        Assert.True(_mailer.Sent.TryPeek(out var mail));
+        var mail = Assert.Single(_mailer.Codes);
         Assert.Equal("black@exemple.fr", mail.To);
         Assert.Matches("^[0-9A-Z]{4}-[0-9A-Z]{4}$", mail.Code);
 
@@ -195,10 +205,7 @@ public sealed class AuthTests : IDisposable
         Assert.Contains("invalide", (await Assert.ThrowsAsync<SyncException>(() => b.SetEmailAsync("Nouveau-Mot-77", "pas-une-adresse"))).Message);
         await b.SetEmailAsync("Nouveau-Mot-77", "");
         Assert.Equal("", b.State.Email);
-        while (_mailer.Sent.TryDequeue(out _)) { }
-        await Task.Delay(10);
-        var db = new Database(DbPath);
-        db.SetResetCode(db.FindUser("black")!.Id, null, null);
+        _mailer.Clear();
         await NewDevice().ForgotAsync(Url, "black");
         Assert.Empty(_mailer.Sent);
     }
@@ -262,6 +269,88 @@ public sealed class AuthTests : IDisposable
     }
 
     [Fact]
+    public async Task Security_alerts_by_email()
+    {
+        _mailer.On = true;
+        var a = NewDevice();
+        a.DeviceName = "Pixel 8";
+        await a.RegisterAsync(Url, "black", Pw, "black@exemple.fr");
+        await NewDevice().RegisterAsync(Url, "sansadresse", Pw); // pas d'adresse : jamais d'e-mail
+        Assert.Empty(_mailer.Sent); // la création n'envoie rien
+
+        // Nouvelle connexion : nom de l'appareil (sans accents dans l'en-tête) et adresse.
+        var b = NewDevice();
+        b.DeviceName = "Ordinateur de Black";
+        await b.LoginAsync(Url, "black", Pw);
+        await NewDevice().LoginAsync(Url, "sansadresse", Pw);
+        var login = Assert.Single(_mailer.Sent);
+        Assert.Equal("black@exemple.fr", login.To);
+        Assert.Contains("nouvelle connexion", login.Subject);
+        Assert.Contains("« Ordinateur de Black »", login.Body);
+        _mailer.Clear();
+
+        // Compte bloqué : un seul e-mail, au premier blocage.
+        for (int i = 0; i < 5; i++) await Assert.ThrowsAsync<SyncException>(() => NewDevice().LoginAsync(Url, "black", "Mauvais-" + i));
+        Assert.Equal(["Velom3d : trop d'essais sur votre compte"], _mailer.Subjects);
+        new Database(DbPath).ClearFailures("login:black");
+        _mailer.Clear();
+
+        // Mot de passe changé.
+        await b.ChangePasswordAsync(Pw, "Nouveau-Mot-77");
+        Assert.Contains("mot de passe changé", Assert.Single(_mailer.Sent).Subject);
+        _mailer.Clear();
+
+        // Adresse changée : l'ancienne est prévenue.
+        await b.SetEmailAsync("Nouveau-Mot-77", "autre@exemple.fr");
+        var changed = Assert.Single(_mailer.Sent);
+        Assert.Equal("black@exemple.fr", changed.To);
+        Assert.Contains("autre@exemple.fr", changed.Body);
+        _mailer.Clear();
+
+        // Compte supprimé.
+        await b.DeleteAccountAsync("Nouveau-Mot-77");
+        var deleted = Assert.Single(_mailer.Sent);
+        Assert.Equal("autre@exemple.fr", deleted.To);
+        Assert.Contains("compte supprimé", deleted.Subject);
+    }
+
+    [Fact]
+    public async Task Account_deletion_from_the_app()
+    {
+        var a = NewDevice();
+        await a.RegisterAsync(Url, "black", Pw);
+        var b = NewDevice();
+        await b.LoginAsync(Url, "black", Pw);
+        Assert.Contains("incorrect", (await Assert.ThrowsAsync<SyncException>(() => a.DeleteAccountAsync("Mauvais-1"))).Message);
+        Assert.True(a.State.LoggedIn); // un mauvais mot de passe ne déconnecte pas
+        await a.DeleteAccountAsync(Pw);
+        Assert.False(a.State.LoggedIn);
+        Assert.Equal("", a.State.Account);
+        Assert.Contains("reconnectez-vous", (await Assert.ThrowsAsync<SyncException>(() => b.SyncAsync())).Message);
+        await Assert.ThrowsAsync<SyncException>(() => NewDevice().LoginAsync(Url, "black", Pw));
+        await NewDevice().RegisterAsync(Url, "black", Pw); // le nom est libre à nouveau
+    }
+
+    [Fact]
+    public void Daily_backups_keep_the_most_recent()
+    {
+        var db = new Database(DbPath);
+        db.CreateUser("black", Passwords.Hash(Pw));
+        var dir = Path.Combine(_root, "backups");
+        for (int day = 1; day <= 9; day++) File.WriteAllText(Path.Combine(dir.EnsureDir(), $"velom3d-2026-01-0{day}.db"), "ancienne");
+        var path = db.Backup(dir, 7);
+        var kept = Directory.GetFiles(dir).Select(Path.GetFileName).OrderBy(f => f).ToArray();
+        Assert.Equal(7, kept.Length);
+        Assert.Contains(Path.GetFileName(path), kept);
+        Assert.DoesNotContain("velom3d-2026-01-03.db", kept); // les plus anciennes partent
+        Assert.Contains("velom3d-2026-01-09.db", kept);
+        // La copie est une vraie base, avec le compte.
+        Assert.NotNull(new Database(path).FindUser("black"));
+        db.Backup(dir, 7); // même jour : remplacée, pas doublée
+        Assert.Equal(7, Directory.GetFiles(dir, "*.db").Length);
+    }
+
+    [Fact]
     public void Admin_gives_a_new_recovery_code()
     {
         var db = new Database(DbPath);
@@ -281,5 +370,14 @@ public sealed class AuthTests : IDisposable
         Assert.Contains("black@exemple.fr", output.ToString());
         Assert.True(Admin.IsCommand(["users"]));
         Assert.False(Admin.IsCommand(["--urls", "http://0.0.0.0:8080"]));
+    }
+}
+
+static class TestPaths
+{
+    public static string EnsureDir(this string dir)
+    {
+        Directory.CreateDirectory(dir);
+        return dir;
     }
 }

@@ -245,6 +245,26 @@ public sealed class Database
         cmd.ExecuteNonQuery();
     }
 
+    // ---- Sauvegardes ----
+
+    /// <summary>Copie cohérente de la base (même serveur allumé) dans <paramref name="directory"/>,
+    /// nommée par la date du jour (« velom3d-2026-11-07.db », remplacée si elle existe), puis ne garde
+    /// que les <paramref name="keep"/> plus récentes. Renvoie le chemin de la copie.</summary>
+    public string Backup(string directory, int keep)
+    {
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, $"velom3d-{DateTime.Now:yyyy-MM-dd}.db");
+        var tmp = path + ".tmp";
+        if (File.Exists(tmp)) File.Delete(tmp);
+        using (var c = Open())
+        using (var cmd = Cmd(c, "VACUUM INTO $p;", ("$p", tmp)))
+            cmd.ExecuteNonQuery();
+        File.Move(tmp, path, overwrite: true);
+        foreach (var old in Directory.GetFiles(directory, "velom3d-????-??-??.db").OrderByDescending(f => f, StringComparer.Ordinal).Skip(Math.Max(1, keep)))
+            File.Delete(old);
+        return path;
+    }
+
     // ---- Échecs de connexion ----
 
     /// <summary>Jusqu'à quand cette clé (« login:nom ») est bloquée ; null si elle ne l'est pas.</summary>
@@ -259,7 +279,11 @@ public sealed class Database
     /// <summary>Note un échec. À partir de <paramref name="freeAttempts"/> échecs de suite, la clé est
     /// bloquée 1 min, puis 2, 4, 8… jusqu'à <paramref name="maxLock"/>. Les échecs sont oubliés après
     /// <paramref name="forgetAfter"/> sans nouvel essai. Renvoie la fin du blocage, s'il y en a un.</summary>
-    public DateTimeOffset? RecordFailure(string key, int freeAttempts, TimeSpan maxLock, TimeSpan forgetAfter)
+    public DateTimeOffset? RecordFailure(string key, int freeAttempts, TimeSpan maxLock, TimeSpan forgetAfter) =>
+        RecordFailure(key, freeAttempts, maxLock, forgetAfter, out _);
+
+    /// <param name="justLocked">Cet échec déclenche le premier blocage de la série.</param>
+    public DateTimeOffset? RecordFailure(string key, int freeAttempts, TimeSpan maxLock, TimeSpan forgetAfter, out bool justLocked)
     {
         using var c = Open();
         using var tx = c.BeginTransaction();
@@ -273,6 +297,7 @@ public sealed class Database
                 count = r.GetInt32(0) + 1;
         }
         DateTimeOffset? until = null;
+        justLocked = count == freeAttempts;
         if (count >= freeAttempts)
         {
             var minutes = Math.Min(Math.Pow(2, Math.Min(count - freeAttempts, 20)), maxLock.TotalMinutes);

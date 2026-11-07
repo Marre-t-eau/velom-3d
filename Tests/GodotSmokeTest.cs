@@ -230,6 +230,7 @@ public partial class GodotSmokeTest : Node
         Check(recoverForm.Visible && !settings.GetNode<Control>("%PasswordEdit").Visible, "mot de passe oublié : formulaire du code");
         settings.GetNode<Button>("%ForgotButton").EmitSignal(BaseButton.SignalName.Pressed);
         Check(!recoverForm.Visible && settings.GetNode<Control>("%PasswordEdit").Visible, "mot de passe oublié : annulé");
+        Check(settings.GetNodeOrNull<Button>("%DeleteAccountButton") is not null, "bouton de suppression du compte");
         settings.GetNode<CheckButton>("%SyncToggle").ButtonPressed = false;
         Check(settings.GetNode<Control>("%FtpStepper").MouseFilter == Control.MouseFilterEnum.Pass
               && settings.GetNode<Control>("%ServerUrlEdit").MouseFilter == Control.MouseFilterEnum.Pass,

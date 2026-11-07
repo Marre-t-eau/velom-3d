@@ -28,7 +28,7 @@ public partial class SettingsScreen : Screen
     LineEdit _recoverCode = null!, _newPassword = null!, _accountPassword = null!, _accountEmail = null!;
     Label _accountLabel = null!, _accountEmailLabel = null!, _syncStatus = null!, _codeLabel = null!;
     Button _login = null!, _register = null!, _syncNow = null!, _logout = null!, _forgot = null!, _emailCode = null!,
-        _recover = null!, _setEmail = null!, _logoutOthers = null!, _copyCode = null!, _codeDone = null!;
+        _recover = null!, _setEmail = null!, _logoutOthers = null!, _deleteAccount = null!, _copyCode = null!, _codeDone = null!;
     bool _syncBusy;
 
     /// <summary>Profil en cours de modification (pour les tests).</summary>
@@ -106,6 +106,7 @@ public partial class SettingsScreen : Screen
         _accountEmail = GetNode<LineEdit>("%AccountEmailEdit");
         _setEmail = GetNode<Button>("%SetEmailButton");
         _logoutOthers = GetNode<Button>("%LogoutOthersButton");
+        _deleteAccount = GetNode<Button>("%DeleteAccountButton");
         _codeBox = GetNode<Control>("%SyncRecoveryCodeBox");
         _codeLabel = GetNode<Label>("%RecoveryCodeLabel");
         _copyCode = GetNode<Button>("%CopyCodeButton");
@@ -171,6 +172,20 @@ public partial class SettingsScreen : Screen
         {
             if (await Busy("Déconnexion des autres appareils…", Sync.LogoutOthersAsync) && IsInstanceValid(this))
                 _syncStatus.Text = "Vos autres appareils sont déconnectés : il faudra s'y reconnecter.";
+        };
+        _deleteAccount.Pressed += () =>
+        {
+            string pw = _accountPassword.Text;
+            if (pw.Length == 0) { _syncStatus.Text = "Saisissez votre mot de passe actuel pour supprimer le compte."; return; }
+            Confirm("Supprimer votre compte ?",
+                $"Le compte « {Sync.State.Username} » et toutes ses données seront effacés du serveur, pour tous vos appareils. " +
+                "Les sorties, entraînements et réglages de cet appareil restent ici.",
+                "Supprimer", async () =>
+                {
+                    if (!await Busy("Suppression du compte…", () => Sync.DeleteAccountAsync(pw)) || !IsInstanceValid(this)) return;
+                    _accountPassword.Text = "";
+                    _syncStatus.Text = "Compte supprimé du serveur. Vos données restent sur cet appareil.";
+                });
         };
         _copyCode.Pressed += () =>
         {
@@ -256,7 +271,7 @@ public partial class SettingsScreen : Screen
         // Pendant « mot de passe oublié », seul le nom d'utilisateur du formulaire sert.
         _password.Visible = _email.Visible = _login.GetParent<Control>().Visible = !_recoverForm.Visible;
         foreach (var b in new[] { _login, _register, _syncNow, _logout, _forgot, _emailCode, _recover, _setEmail,
-                     _logoutOthers, _copyCode, _codeDone })
+                     _logoutOthers, _deleteAccount, _copyCode, _codeDone })
             b.Disabled = _syncBusy;
         if (!_syncBusy && _syncStatus.Text.Length == 0)
             _syncStatus.Text = state.LastError.Length > 0 ? state.LastError : LastSync();

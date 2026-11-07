@@ -77,9 +77,16 @@ Dans `appsettings.json` ou en variables d'environnement (`Velom3d__Nom`) :
 | `Velom3d__Smtp__User` / `__Password` | vides | identifiants SMTP |
 | `Velom3d__Smtp__From` | `User` | adresse d'expédition |
 | `Velom3d__Smtp__ServerName` | `Velom3d` | nom du serveur dans l'objet des e-mails |
+| `Velom3d__Smtp__SecurityAlerts` | `true` | `false` : pas d'alertes de sécurité (les codes de réinitialisation partent quand même) |
+| `Velom3d__Backups` | `7` | copies quotidiennes de la base gardées ; `0` : pas de sauvegarde |
+| `Velom3d__BackupDirectory` | `backups/` à côté de la base | dossier des copies (`/data/backups` dans Docker) |
 | `ASPNETCORE_HTTP_PORTS` | `8080` dans Docker | port d'écoute |
 
-Sauvegarde : copier le fichier de la base (`sqlite3 velom3d.db ".backup copie.db"` serveur allumé).
+**Sauvegardes** : chaque jour (et à chaque démarrage), le serveur copie la base dans
+`backups/velom3d-AAAA-MM-JJ.db`, à côté du fichier de la base, et garde les 7 plus récentes. La copie
+est cohérente même serveur allumé. Pour restaurer : arrêter le serveur, remplacer le fichier de la
+base par une copie (et supprimer les fichiers `-wal` et `-shm` qui l'accompagnent), relancer. Pensez à
+copier ce dossier ailleurs de temps en temps (autre disque, cloud) : il est sur la même machine.
 
 ## Sécurité des comptes
 
@@ -94,6 +101,10 @@ Sauvegarde : copier le fichier de la base (`sqlite3 velom3d.db ".backup copie.db
   existe. Les appareils déjà connectés continuent de synchroniser pendant un blocage. Le code de
   secours et le code e-mail ont leur propre compteur, aux mêmes règles.
 - **Création de compte** : pas de limite ; `AllowRegistration=false` ferme le serveur aux nouveaux comptes.
+- **Alertes par e-mail** (serveur avec SMTP, compte avec une adresse) : connexion d'un appareil avec
+  le mot de passe (nom de l'appareil et adresse IP), mot de passe changé ou réinitialisé, compte
+  bloqué (au premier blocage d'une série), adresse changée (envoyé à l'ancienne adresse), compte
+  supprimé. La création du compte et les synchronisations n'envoient rien.
 - **Sessions** : un jeton aléatoire par appareil (seule son empreinte est en base), qui expire après
   90 jours sans synchronisation. Dans l'appli, *Déconnecter mes autres appareils* les révoque tous
   sauf celui-ci ; changer de mot de passe ou le réinitialiser aussi.
@@ -158,7 +169,9 @@ Les routes marquées 🔒 demandent `Authorization: Bearer <jeton>`.
 | `POST /api/account/logout` 🔒 | révoque le jeton |
 | `POST /api/account/logout-others` 🔒 | révoque tous les jetons du compte sauf celui-ci |
 | `POST /api/account/password` 🔒 | `{"password","newPassword"}` ; déconnecte les autres appareils |
-| `DELETE /api/account` 🔒 | `{"password"}` ; supprime le compte et toutes ses données |
+| `DELETE /api/account` 🔒 | `{"password"}` ; supprime le compte et toutes ses données (dans l'appli : *Supprimer mon compte du serveur*) |
+
+L'appli envoie le nom de l'appareil dans l'en-tête `X-Velom3d-Device` (ASCII), repris dans les alertes.
 
 Un mauvais mot de passe répond 401 à la connexion et 403 sur les routes 🔒 (un 401 y veut dire
 « session expirée », et l'appli oublie alors son jeton).

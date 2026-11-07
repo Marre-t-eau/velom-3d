@@ -53,6 +53,10 @@ public sealed class SyncClient : IDisposable
 
     public SyncState State { get; }
 
+    /// <summary>Nom de cet appareil, envoyé au serveur pour les alertes par e-mail (« nouvelle connexion
+    /// depuis Pixel 8 »).</summary>
+    public string DeviceName { get; set; } = Environment.MachineName;
+
     public bool IsRunning { get { lock (_lock) return _running is { IsCompleted: false }; } }
 
     public SyncClient(string statePath, string ridesDirectory, string workoutsDirectory, HttpMessageHandler? handler = null)
@@ -146,6 +150,25 @@ public sealed class SyncClient : IDisposable
     public Task ChangePasswordAsync(string password, string newPassword) =>
         SendNoContent(HttpMethod.Post, State.ServerUrl, "/api/account/password",
             Json(new PasswordRequest { Password = password, NewPassword = newPassword }, SyncJson.Default.PasswordRequest));
+
+    /// <summary>Supprime le compte et toutes ses données sur le serveur (mot de passe demandé), puis
+    /// déconnecte cet appareil. Les fichiers locaux restent.</summary>
+    public async Task DeleteAccountAsync(string password)
+    {
+        await SendNoContent(HttpMethod.Delete, State.ServerUrl, "/api/account",
+            Json(new AccountRequest { Username = State.Username, Password = password }, SyncJson.Default.AccountRequest)).ConfigureAwait(false);
+        lock (State)
+        {
+            State.Token = "";
+            State.Email = "";
+            State.Account = "";
+            State.Cursor = 0;
+            State.Known.Clear();
+            State.Pending.Clear();
+            State.LastSyncAt = null;
+        }
+        SaveState();
+    }
 
     /// <summary>Déconnecte tous les autres appareils du compte (celui-ci reste connecté).</summary>
     public Task LogoutOthersAsync() => SendNoContent(HttpMethod.Post, State.ServerUrl, "/api/account/logout-others", null);
@@ -504,6 +527,9 @@ public sealed class SyncClient : IDisposable
     {
         var req = new HttpRequestMessage(method, baseUrl.TrimEnd('/') + path) { Content = body };
         req.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
+        // En-tête HTTP : caractères ASCII visibles seulement (« Téléphone » → « Tlphone » plutôt qu'une erreur).
+        var device = new string(DeviceName.Where(c => c is >= ' ' and <= '~').Take(64).ToArray()).Trim();
+        if (device.Length > 0) req.Headers.TryAddWithoutValidation("X-Velom3d-Device", device);
         if (auth) req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", State.Token);
         try
         {

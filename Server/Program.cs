@@ -21,6 +21,9 @@ bool allowRegistration = config.GetValue("AllowRegistration", true);
 int freeAttempts = config.GetValue("MaxFailedLogins", 3);
 var maxLock = TimeSpan.FromMinutes(config.GetValue("LockoutMaxMinutes", 60));
 var sessionIdle = TimeSpan.FromDays(config.GetValue("SessionDays", 90));
+int backupsKept = config.GetValue("Backups", 7);
+var backupDir = config["BackupDirectory"] is { Length: > 0 } bd ? bd
+    : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(dbPath)) ?? ".", "backups");
 bool trustProxy = config.GetValue("TrustProxy", false);
 
 // Sans adresse précisée (--urls, ASPNETCORE_URLS…) : port 8080 sur toutes les interfaces, pour que
@@ -34,6 +37,7 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResol
 builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 64 * 1024 * 1024);
 
 var app = builder.Build();
+var mailer = app.Services.GetRequiredService<Mailer>();
 if (trustProxy)
 {
     // Derrière un proxy (Caddy, nginx…) qui fait le HTTPS : vraie adresse du client.
@@ -112,9 +116,22 @@ IResult? CheckPassword(HttpContext ctx, Database db, string username, string pas
         if (Passwords.NeedsRehash(user.PasswordHash)) db.SetPassword(user.Id, Passwords.Hash(password));
         return null;
     }
-    return db.RecordFailure(key, freeAttempts, maxLock, TimeSpan.FromDays(1)) is { } until
+    return Failure(db, key, user) is { } until
         ? Locked(ctx, until)
         : Error(wrongStatus, wrongMessage);
+}
+
+// Nom de l'appareil (envoyé par l'appli) et adresse du client, pour les alertes par e-mail.
+static string? DeviceOf(HttpContext ctx) =>
+    ctx.Request.Headers["X-Velom3d-Device"].ToString() is { Length: > 0 } d ? new string(d.Take(64).Where(c => !char.IsControl(c)).ToArray()) : null;
+static string? IpOf(HttpContext ctx) => ctx.Connection.RemoteIpAddress?.ToString();
+
+// Échec noté ; au premier blocage d'une série, le propriétaire du compte est prévenu par e-mail.
+DateTimeOffset? Failure(Database db, string key, UserRow? user)
+{
+    var until = db.RecordFailure(key, freeAttempts, maxLock, TimeSpan.FromDays(1), out bool justLocked);
+    if (justLocked && until is { } u && user is not null) mailer.NotifyLocked(user.Email, user.Username, u);
+    return until;
 }
 
 // Pour les routes qui redemandent le mot de passe : le compte du jeton.
@@ -123,7 +140,7 @@ UserRow? CurrentUser(Database db, long userId) =>
 
 var api = app.MapGroup("/api");
 
-api.MapGet("/info", (Mailer mailer) => new ServerInfo { Name = "velom3d", Version = 1, Registration = allowRegistration, Recovery = true, Email = mailer.Enabled });
+api.MapGet("/info", () => new ServerInfo { Name = "velom3d", Version = 1, Registration = allowRegistration, Recovery = true, Email = mailer.Enabled });
 
 // ---- Comptes ----
 
@@ -154,12 +171,13 @@ account.MapPost("/login", (AccountRequest req, HttpContext ctx, Database db) =>
         return fail;
     var res = NewSession(db, user!.Id, user.Username);
     res.Email = user.Email ?? "";
+    mailer.NotifyLogin(user.Email, user.Username, DeviceOf(ctx), IpOf(ctx));
     return Results.Json(res);
 });
 
 // Mot de passe oublié, 1re étape facultative : un code envoyé à l'adresse e-mail du compte.
 // La réponse est toujours la même, que le compte existe ou non, ait une adresse ou non.
-account.MapPost("/forgot", (ForgotRequest req, Database db, Mailer mailer) =>
+account.MapPost("/forgot", (ForgotRequest req, Database db) =>
 {
     if (!mailer.Enabled) return Error(400, "Ce serveur n'envoie pas d'e-mails : utilisez votre code de secours.");
     if (db.FindUser(req.Username.Trim()) is { Email: { } email } user
@@ -185,7 +203,7 @@ account.MapPost("/recover", (RecoverRequest req, HttpContext ctx, Database db) =
     bool bySecours = SameHash(given, user?.RecoveryHash);
     bool byEmail = SameHash(given, user?.ResetHash) && user!.ResetExpires > DateTimeOffset.UtcNow;
     if (!bySecours && !byEmail)
-        return db.RecordFailure(key, freeAttempts, maxLock, TimeSpan.FromDays(1)) is { } until
+        return Failure(db, key, user) is { } until
             ? Locked(ctx, until)
             : Error(401, "Nom d'utilisateur ou code incorrect (un code reçu par e-mail ne vaut que 30 minutes).");
     if (PasswordRules.Problem(req.NewPassword, user!.Username) is { } problem) return Error(400, problem);
@@ -201,6 +219,8 @@ account.MapPost("/recover", (RecoverRequest req, HttpContext ctx, Database db) =
         res.RecoveryCode = Passwords.NewRecoveryCode();
         db.SetRecoveryHash(user.Id, Passwords.RecoveryHash(res.RecoveryCode));
     }
+    mailer.NotifyPasswordChanged(user.Email, user.Username, bySecours ? "avec le code de secours" : "avec un code reçu par e-mail",
+        DeviceOf(ctx), IpOf(ctx));
     return Results.Json(res);
 });
 
@@ -219,6 +239,8 @@ account.MapPost("/email", (EmailRequest req, HttpContext ctx, Database db) =>
     if (email.Length > 0 && (email.Length > 254 || !emailPattern.IsMatch(email))) return Error(400, "Adresse e-mail invalide.");
     db.SetEmail(userId, email.Length > 0 ? email : null);
     db.SetResetCode(userId, null, null);
+    if (!string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+        mailer.NotifyEmailChanged(user.Email, user.Username, email);
     return Results.NoContent();
 });
 
@@ -245,6 +267,7 @@ account.MapPost("/password", (PasswordRequest req, HttpContext ctx, Database db)
     if (PasswordRules.Problem(req.NewPassword, user.Username) is { } problem) return Error(400, problem);
     db.SetPassword(userId, Passwords.Hash(req.NewPassword));
     db.DeleteOtherTokens(userId, Passwords.TokenHash(BearerToken(ctx)!));
+    mailer.NotifyPasswordChanged(user.Email, user.Username, "avec l'ancien mot de passe", DeviceOf(ctx), IpOf(ctx));
     return Results.NoContent();
 });
 
@@ -256,6 +279,7 @@ account.MapDelete("", ([Microsoft.AspNetCore.Mvc.FromBody] AccountRequest req, H
     if (user is null) return Unauthorized();
     if (CheckPassword(ctx, db, user.Username, req.Password, user, "Mot de passe incorrect.") is { } fail) return fail;
     db.DeleteUser(userId);
+    mailer.NotifyAccountDeleted(user.Email, user.Username);
     return Results.NoContent();
 });
 
@@ -323,7 +347,7 @@ api.MapGet("/rides/{id}/data", (string id, HttpContext ctx, Database db) =>
     return Results.Bytes(output.ToArray(), "text/csv; charset=utf-8");
 });
 
-// Jetons expirés et vieux échecs de connexion : oubliés au démarrage puis chaque jour.
+// Chaque jour (et au démarrage) : jetons expirés et vieux échecs oubliés, copie de sauvegarde de la base.
 var expiry = new Timer(_ =>
 {
     try
@@ -331,8 +355,10 @@ var expiry = new Timer(_ =>
         var db = app.Services.GetRequiredService<Database>();
         db.DeleteExpiredTokens(sessionIdle);
         db.DeleteOldFailures();
+        if (backupsKept > 0)
+            app.Logger.LogInformation("Sauvegarde de la base : {Path}", db.Backup(backupDir, backupsKept));
     }
-    catch (Exception e) { app.Logger.LogWarning(e, "Nettoyage des sessions expirées impossible."); }
+    catch (Exception e) { app.Logger.LogWarning(e, "Nettoyage ou sauvegarde de la base impossible."); }
 }, null, TimeSpan.Zero, TimeSpan.FromDays(1));
 
 app.Run();
