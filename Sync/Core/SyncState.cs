@@ -17,6 +17,8 @@ public sealed class SyncState
     public bool Enabled { get; set; }
     public string ServerUrl { get; set; } = SyncClient.DefaultServerUrl;
     public string Username { get; set; } = "";
+    /// <summary>Adresse e-mail du compte sur le serveur (vide : aucune), pour l'afficher.</summary>
+    public string Email { get; set; } = "";
     /// <summary>Jeton de connexion donné par le serveur, vide si déconnecté.</summary>
     public string Token { get; set; } = "";
     /// <summary>Compte (adresse + nom) auquel se rapportent <see cref="Cursor"/> et <see cref="Known"/>.</summary>

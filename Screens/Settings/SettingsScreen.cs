@@ -23,10 +23,12 @@ public partial class SettingsScreen : Screen
     readonly List<(Button Chip, int[] Teeth)> _chainringChips = new();
     readonly List<(Button Chip, int[] Teeth)> _cassetteChips = new();
     CheckButton _syncToggle = null!;
-    Control _syncOptions = null!, _loginForm = null!, _account = null!;
-    LineEdit _serverUrl = null!, _username = null!, _password = null!;
-    Label _accountLabel = null!, _syncStatus = null!;
-    Button _login = null!, _register = null!, _syncNow = null!, _logout = null!;
+    Control _syncOptions = null!, _loginForm = null!, _account = null!, _recoverForm = null!, _codeBox = null!;
+    LineEdit _serverUrl = null!, _username = null!, _password = null!, _email = null!;
+    LineEdit _recoverCode = null!, _newPassword = null!, _accountPassword = null!, _accountEmail = null!;
+    Label _accountLabel = null!, _accountEmailLabel = null!, _syncStatus = null!, _codeLabel = null!;
+    Button _login = null!, _register = null!, _syncNow = null!, _logout = null!, _forgot = null!, _emailCode = null!,
+        _recover = null!, _setEmail = null!, _logoutOthers = null!, _deleteAccount = null!, _copyCode = null!, _codeDone = null!;
     bool _syncBusy;
 
     /// <summary>Profil en cours de modification (pour les tests).</summary>
@@ -92,6 +94,23 @@ public partial class SettingsScreen : Screen
         _syncNow = GetNode<Button>("%SyncNowButton");
         _logout = GetNode<Button>("%LogoutButton");
         _syncStatus = GetNode<Label>("%SyncStatus");
+        _email = GetNode<LineEdit>("%EmailEdit");
+        _forgot = GetNode<Button>("%ForgotButton");
+        _recoverForm = GetNode<Control>("%SyncRecoverForm");
+        _recoverCode = GetNode<LineEdit>("%RecoverCodeEdit");
+        _newPassword = GetNode<LineEdit>("%NewPasswordEdit");
+        _emailCode = GetNode<Button>("%EmailCodeButton");
+        _recover = GetNode<Button>("%RecoverButton");
+        _accountEmailLabel = GetNode<Label>("%SyncAccountEmail");
+        _accountPassword = GetNode<LineEdit>("%AccountPasswordEdit");
+        _accountEmail = GetNode<LineEdit>("%AccountEmailEdit");
+        _setEmail = GetNode<Button>("%SetEmailButton");
+        _logoutOthers = GetNode<Button>("%LogoutOthersButton");
+        _deleteAccount = GetNode<Button>("%DeleteAccountButton");
+        _codeBox = GetNode<Control>("%SyncRecoveryCodeBox");
+        _codeLabel = GetNode<Label>("%RecoveryCodeLabel");
+        _copyCode = GetNode<Button>("%CopyCodeButton");
+        _codeDone = GetNode<Button>("%CodeDoneButton");
 
         var state = Sync.State;
         _serverUrl.Text = state.ServerUrl;
@@ -113,18 +132,93 @@ public partial class SettingsScreen : Screen
             await Busy("Déconnexion…", Sync.LogoutAsync);
             if (IsInstanceValid(this)) _syncStatus.Text = "Déconnecté. Vos données restent sur cet appareil.";
         };
+
+        // Mot de passe oublié : code de secours, ou code reçu par e-mail.
+        _forgot.Pressed += () =>
+        {
+            _recoverForm.Visible = !_recoverForm.Visible;
+            RefreshSync();
+        };
+        _emailCode.Pressed += async () =>
+        {
+            string url = _serverUrl.Text, user = _username.Text;
+            if (user.Trim().Length == 0) { _syncStatus.Text = "Saisissez d'abord votre nom d'utilisateur."; return; }
+            if (await Busy("Envoi du code…", () => Sync.ForgotAsync(url, user)) && IsInstanceValid(this))
+                _syncStatus.Text = "Si ce compte a une adresse e-mail, un code vient d'y être envoyé (valable 30 minutes).";
+        };
+        _recover.Pressed += async () =>
+        {
+            string url = _serverUrl.Text, user = _username.Text, code = _recoverCode.Text, pw = _newPassword.Text;
+            AccountResponse? res = null;
+            if (!await Busy("Changement du mot de passe…", async () => res = await Sync.RecoverAsync(url, user, code, pw))
+                || !IsInstanceValid(this)) return;
+            _recoverCode.Text = _newPassword.Text = _password.Text = "";
+            _recoverForm.Visible = false;
+            _serverUrl.Text = Sync.State.ServerUrl;
+            ShowRecoveryCode(res!.RecoveryCode);
+            SyncNow();
+        };
+
+        // Sécurité du compte connecté.
+        _setEmail.Pressed += async () =>
+        {
+            string pw = _accountPassword.Text, email = _accountEmail.Text;
+            if (!await Busy("Changement de l'adresse…", () => Sync.SetEmailAsync(pw, email)) || !IsInstanceValid(this)) return;
+            _accountPassword.Text = _accountEmail.Text = "";
+            _syncStatus.Text = email.Trim().Length > 0 ? "Adresse e-mail enregistrée." : "Adresse e-mail retirée.";
+            RefreshSync();
+        };
+        _logoutOthers.Pressed += async () =>
+        {
+            if (await Busy("Déconnexion des autres appareils…", Sync.LogoutOthersAsync) && IsInstanceValid(this))
+                _syncStatus.Text = "Vos autres appareils sont déconnectés : il faudra s'y reconnecter.";
+        };
+        _deleteAccount.Pressed += () =>
+        {
+            string pw = _accountPassword.Text;
+            if (pw.Length == 0) { _syncStatus.Text = "Saisissez votre mot de passe actuel pour supprimer le compte."; return; }
+            Confirm("Supprimer votre compte ?",
+                $"Le compte « {Sync.State.Username} » et toutes ses données seront effacés du serveur, pour tous vos appareils. " +
+                "Les sorties, entraînements et réglages de cet appareil restent ici.",
+                "Supprimer", async () =>
+                {
+                    if (!await Busy("Suppression du compte…", () => Sync.DeleteAccountAsync(pw)) || !IsInstanceValid(this)) return;
+                    _accountPassword.Text = "";
+                    _syncStatus.Text = "Compte supprimé du serveur. Vos données restent sur cet appareil.";
+                });
+        };
+        _copyCode.Pressed += () =>
+        {
+            DisplayServer.ClipboardSet(_codeLabel.Text);
+            _syncStatus.Text = "Code copié.";
+        };
+        _codeDone.Pressed += () => ShowRecoveryCode("");
+        RefreshSync();
+    }
+
+    /// <summary>Montre le code de secours (une seule fois : il n'est gardé nulle part) ; vide pour le cacher.</summary>
+    void ShowRecoveryCode(string code)
+    {
+        _codeLabel.Text = code;
+        _codeBox.Visible = code.Length > 0;
         RefreshSync();
     }
 
     async void SignIn(bool register)
     {
         if (_syncBusy) return;
-        string url = _serverUrl.Text, user = _username.Text, password = _password.Text;
-        bool ok = await Busy(register ? "Création du compte…" : "Connexion…",
-            () => register ? Sync.RegisterAsync(url, user, password) : Sync.LoginAsync(url, user, password));
+        string url = _serverUrl.Text, user = _username.Text, password = _password.Text, email = _email.Text;
+        string code = "";
+        bool ok = await Busy(register ? "Création du compte…" : "Connexion…", async () =>
+        {
+            if (register) code = await Sync.RegisterAsync(url, user, password, email);
+            else await Sync.LoginAsync(url, user, password);
+        });
         if (!ok || !IsInstanceValid(this)) return;
-        _password.Text = "";
+        _password.Text = _email.Text = "";
         _serverUrl.Text = Sync.State.ServerUrl;
+        _recoverForm.Visible = false;
+        ShowRecoveryCode(code);
         SyncNow();
     }
 
@@ -172,7 +266,13 @@ public partial class SettingsScreen : Screen
         _account.Visible = state.LoggedIn;
         _serverUrl.Editable = !state.LoggedIn && !_syncBusy;
         _accountLabel.Text = $"Connecté : {state.Username}";
-        foreach (var b in new[] { _login, _register, _syncNow, _logout }) b.Disabled = _syncBusy;
+        _accountEmailLabel.Text = state.Email.Length > 0 ? $"E-mail : {state.Email}." : "Aucune adresse e-mail.";
+        _forgot.Text = _recoverForm.Visible ? "Annuler" : "Mot de passe oublié ?";
+        // Pendant « mot de passe oublié », seul le nom d'utilisateur du formulaire sert.
+        _password.Visible = _email.Visible = _login.GetParent<Control>().Visible = !_recoverForm.Visible;
+        foreach (var b in new[] { _login, _register, _syncNow, _logout, _forgot, _emailCode, _recover, _setEmail,
+                     _logoutOthers, _deleteAccount, _copyCode, _codeDone })
+            b.Disabled = _syncBusy;
         if (!_syncBusy && _syncStatus.Text.Length == 0)
             _syncStatus.Text = state.LastError.Length > 0 ? state.LastError : LastSync();
     }

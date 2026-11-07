@@ -224,6 +224,13 @@ public partial class GodotSmokeTest : Node
         settings.GetNode<CheckButton>("%SyncToggle").ButtonPressed = true;
         Check(syncOptions.Visible && settings.GetNode<Control>("%SyncLoginForm").Visible
               && !settings.GetNode<Control>("%SyncAccount").Visible, "synchro activée : formulaire de connexion");
+        var recoverForm = settings.GetNode<Control>("%SyncRecoverForm");
+        Check(!recoverForm.Visible && !settings.GetNode<Control>("%SyncRecoveryCodeBox").Visible, "mot de passe oublié et code de secours cachés");
+        settings.GetNode<Button>("%ForgotButton").EmitSignal(BaseButton.SignalName.Pressed);
+        Check(recoverForm.Visible && !settings.GetNode<Control>("%PasswordEdit").Visible, "mot de passe oublié : formulaire du code");
+        settings.GetNode<Button>("%ForgotButton").EmitSignal(BaseButton.SignalName.Pressed);
+        Check(!recoverForm.Visible && settings.GetNode<Control>("%PasswordEdit").Visible, "mot de passe oublié : annulé");
+        Check(settings.GetNodeOrNull<Button>("%DeleteAccountButton") is not null, "bouton de suppression du compte");
         settings.GetNode<CheckButton>("%SyncToggle").ButtonPressed = false;
         Check(settings.GetNode<Control>("%FtpStepper").MouseFilter == Control.MouseFilterEnum.Pass
               && settings.GetNode<Control>("%ServerUrlEdit").MouseFilter == Control.MouseFilterEnum.Pass,

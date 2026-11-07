@@ -74,12 +74,49 @@ public sealed class AccountRequest
 {
     public string Username { get; set; } = "";
     public string Password { get; set; } = "";
+    /// <summary>Création du compte : adresse e-mail facultative, pour recevoir un code si on oublie
+    /// son mot de passe (serveur avec envoi d'e-mails seulement).</summary>
+    public string Email { get; set; } = "";
 }
 
 public sealed class AccountResponse
 {
     public string Username { get; set; } = "";
     public string Token { get; set; } = "";
+    /// <summary>Code de secours, donné une seule fois (création du compte, réinitialisation) : il permet
+    /// de choisir un nouveau mot de passe si on a oublié le sien. Vide sinon.</summary>
+    public string RecoveryCode { get; set; } = "";
+    /// <summary>Adresse e-mail du compte (vide : aucune).</summary>
+    public string Email { get; set; } = "";
+}
+
+/// <summary>Mot de passe oublié : demande d'un code par e-mail.</summary>
+public sealed class ForgotRequest
+{
+    public string Username { get; set; } = "";
+}
+
+/// <summary>Ajout, changement ou suppression (vide) de l'adresse e-mail ; mot de passe demandé.</summary>
+public sealed class EmailRequest
+{
+    public string Password { get; set; } = "";
+    public string Email { get; set; } = "";
+}
+
+/// <summary>Mot de passe oublié : le code de secours, ou celui reçu par e-mail, permet d'en choisir un nouveau.</summary>
+public sealed class RecoverRequest
+{
+    public string Username { get; set; } = "";
+    /// <summary>Code de secours ou code reçu par e-mail.</summary>
+    public string RecoveryCode { get; set; } = "";
+    public string NewPassword { get; set; } = "";
+}
+
+/// <summary>Changement de mot de passe (<see cref="NewPassword"/>) ou action qui demande le mot de passe actuel.</summary>
+public sealed class PasswordRequest
+{
+    public string Password { get; set; } = "";
+    public string NewPassword { get; set; } = "";
 }
 
 public sealed class ServerInfo
@@ -87,6 +124,10 @@ public sealed class ServerInfo
     public string Name { get; set; } = "";
     public int Version { get; set; }
     public bool Registration { get; set; }
+    /// <summary>Le serveur gère les codes de secours (mot de passe oublié).</summary>
+    public bool Recovery { get; set; }
+    /// <summary>Le serveur peut envoyer un code par e-mail (SMTP configuré).</summary>
+    public bool Email { get; set; }
 }
 
 public sealed class ErrorResponse
@@ -102,6 +143,10 @@ public sealed class ErrorResponse
 [JsonSerializable(typeof(SyncPushResponse))]
 [JsonSerializable(typeof(AccountRequest))]
 [JsonSerializable(typeof(AccountResponse))]
+[JsonSerializable(typeof(RecoverRequest))]
+[JsonSerializable(typeof(ForgotRequest))]
+[JsonSerializable(typeof(EmailRequest))]
+[JsonSerializable(typeof(PasswordRequest))]
 [JsonSerializable(typeof(ServerInfo))]
 [JsonSerializable(typeof(ErrorResponse))]
 public partial class SyncJson : JsonSerializerContext;

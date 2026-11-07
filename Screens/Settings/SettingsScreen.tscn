@@ -364,6 +364,15 @@ placeholder_text = "Mot de passe (8 caractères au moins)"
 secret = true
 virtual_keyboard_type = 6
 
+[node name="EmailEdit" type="LineEdit" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 64)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+placeholder_text = "E-mail (facultatif : sert si vous oubliez le mot de passe)"
+virtual_keyboard_type = 5
+
 [node name="Buttons" type="HBoxContainer" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm"]
 layout_mode = 2
 theme_override_constants/separation = 12
@@ -386,6 +395,69 @@ size_flags_horizontal = 3
 mouse_filter = 1
 theme_override_font_sizes/font_size = 22
 text = "Créer un compte"
+
+[node name="ForgotButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Mot de passe oublié ?"
+
+[node name="SyncRecoverForm" type="VBoxContainer" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+visible = false
+
+[node name="RecoverHint" type="Label" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm/SyncRecoverForm"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_type_variation = &"MutedLabel"
+text = "Saisissez votre nom d'utilisateur ci-dessus, puis votre code de secours (donné à la création du compte) ou le code reçu par e-mail, et un nouveau mot de passe."
+autowrap_mode = 3
+
+[node name="RecoverCodeEdit" type="LineEdit" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm/SyncRecoverForm"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 64)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+placeholder_text = "Code de secours ou code reçu par e-mail"
+
+[node name="NewPasswordEdit" type="LineEdit" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm/SyncRecoverForm"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 64)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+placeholder_text = "Nouveau mot de passe (8 caractères au moins)"
+secret = true
+virtual_keyboard_type = 6
+
+[node name="Buttons" type="HBoxContainer" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm/SyncRecoverForm"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="EmailCodeButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm/SyncRecoverForm/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Recevoir un code par e-mail"
+
+[node name="RecoverButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncLoginForm/SyncRecoverForm/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+theme_type_variation = &"PrimaryButton"
+text = "Changer le mot de passe"
 
 [node name="SyncAccount" type="VBoxContainer" parent="Margin/Page/Scroll/Content/SyncOptions"]
 unique_name_in_owner = true
@@ -422,6 +494,124 @@ size_flags_horizontal = 3
 mouse_filter = 1
 theme_override_font_sizes/font_size = 22
 text = "Se déconnecter"
+
+[node name="SecurityTitle" type="Label" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+custom_minimum_size = Vector2(0, 44)
+vertical_alignment = 2
+text = "Sécurité du compte"
+autowrap_mode = 3
+
+[node name="SyncAccountEmail" type="Label" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_type_variation = &"MutedLabel"
+text = ""
+autowrap_mode = 3
+
+[node name="AccountPasswordEdit" type="LineEdit" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 64)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+placeholder_text = "Mot de passe actuel (pour changer l'e-mail ou supprimer le compte)"
+secret = true
+virtual_keyboard_type = 6
+
+[node name="AccountEmailEdit" type="LineEdit" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 64)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+placeholder_text = "Nouvelle adresse e-mail (vide pour la retirer)"
+virtual_keyboard_type = 5
+
+[node name="SecurityButtons" type="HBoxContainer" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SetEmailButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount/SecurityButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Changer l'e-mail"
+
+[node name="LogoutOthersButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Déconnecter mes autres appareils"
+
+[node name="DeleteAccountButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.95, 0.38, 0.36, 1)
+text = "Supprimer mon compte du serveur"
+
+[node name="SyncRecoveryCodeBox" type="VBoxContainer" parent="Margin/Page/Scroll/Content/SyncOptions"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+visible = false
+
+[node name="CodeTitle" type="Label" parent="Margin/Page/Scroll/Content/SyncOptions/SyncRecoveryCodeBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Votre code de secours"
+autowrap_mode = 3
+
+[node name="CodeHint" type="Label" parent="Margin/Page/Scroll/Content/SyncOptions/SyncRecoveryCodeBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_type_variation = &"MutedLabel"
+text = "Notez-le et gardez-le en lieu sûr : c'est lui qui permet de choisir un nouveau mot de passe si vous oubliez le vôtre. Il ne sera plus affiché (vous pourrez en demander un autre)."
+autowrap_mode = 3
+
+[node name="RecoveryCodeLabel" type="Label" parent="Margin/Page/Scroll/Content/SyncOptions/SyncRecoveryCodeBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+theme_type_variation = &"AccentLabel"
+horizontal_alignment = 1
+text = ""
+autowrap_mode = 3
+
+[node name="Buttons" type="HBoxContainer" parent="Margin/Page/Scroll/Content/SyncOptions/SyncRecoveryCodeBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="CopyCodeButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncRecoveryCodeBox/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Copier"
+
+[node name="CodeDoneButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncRecoveryCodeBox/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+theme_type_variation = &"PrimaryButton"
+text = "C'est noté"
 
 [node name="SyncStatus" type="Label" parent="Margin/Page/Scroll/Content/SyncOptions"]
 unique_name_in_owner = true

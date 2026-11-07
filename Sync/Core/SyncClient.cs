@@ -53,6 +53,10 @@ public sealed class SyncClient : IDisposable
 
     public SyncState State { get; }
 
+    /// <summary>Nom de cet appareil, envoyé au serveur pour les alertes par e-mail (« nouvelle connexion
+    /// depuis Pixel 8 »).</summary>
+    public string DeviceName { get; set; } = Environment.MachineName;
+
     public bool IsRunning { get { lock (_lock) return _running is { IsCompleted: false }; } }
 
     public SyncClient(string statePath, string ridesDirectory, string workoutsDirectory, HttpMessageHandler? handler = null)
@@ -93,20 +97,88 @@ public sealed class SyncClient : IDisposable
 
     // ---- Compte ----
 
-    public Task RegisterAsync(string serverUrl, string username, string password) =>
-        SignInAsync("/api/account/register", serverUrl, username, password);
+    /// <summary>Crée le compte et s'y connecte. Renvoie le code de secours, à montrer une seule fois au joueur.</summary>
+    public async Task<string> RegisterAsync(string serverUrl, string username, string password, string email = "") =>
+        (await SignInAsync("/api/account/register", serverUrl,
+            new AccountRequest { Username = username.Trim(), Password = password, Email = email.Trim() },
+            SyncJson.Default.AccountRequest).ConfigureAwait(false)).RecoveryCode;
 
-    public Task LoginAsync(string serverUrl, string username, string password) =>
-        SignInAsync("/api/account/login", serverUrl, username, password);
+    /// <summary>Se connecte.</summary>
+    public Task<AccountResponse> LoginAsync(string serverUrl, string username, string password) =>
+        SignInAsync("/api/account/login", serverUrl,
+            new AccountRequest { Username = username.Trim(), Password = password }, SyncJson.Default.AccountRequest);
 
-    async Task SignInAsync(string path, string serverUrl, string username, string password)
+    /// <summary>Mot de passe oublié : nouveau mot de passe grâce au code de secours ou au code reçu par
+    /// e-mail, puis connexion. Les autres appareils sont déconnectés. Après un code de secours, le
+    /// nouveau code est dans <see cref="AccountResponse.RecoveryCode"/>.</summary>
+    public Task<AccountResponse> RecoverAsync(string serverUrl, string username, string code, string newPassword) =>
+        SignInAsync("/api/account/recover", serverUrl,
+            new RecoverRequest { Username = username.Trim(), RecoveryCode = code.Trim(), NewPassword = newPassword },
+            SyncJson.Default.RecoverRequest);
+
+    /// <summary>Ce que propose le serveur (création de comptes, e-mails…).</summary>
+    public async Task<ServerInfo> InfoAsync(string serverUrl)
     {
         var url = NormalizeUrl(serverUrl) ?? throw new SyncException("Adresse du serveur invalide.");
         var info = await Send(HttpMethod.Get, url, "/api/info", null, SyncJson.Default.ServerInfo, auth: false)
             .ConfigureAwait(false);
         if (info.Name != "velom3d") throw new SyncException("Cette adresse n'est pas un serveur Velom3d.");
-        var body = Json(new AccountRequest { Username = username.Trim(), Password = password }, SyncJson.Default.AccountRequest);
-        var res = await Send(HttpMethod.Post, url, path, body, SyncJson.Default.AccountResponse, auth: false).ConfigureAwait(false);
+        return info;
+    }
+
+    /// <summary>Mot de passe oublié : demande un code par e-mail (s'il y a une adresse sur le compte).</summary>
+    public async Task ForgotAsync(string serverUrl, string username)
+    {
+        var info = await InfoAsync(serverUrl).ConfigureAwait(false);
+        if (!info.Email) throw new SyncException("Ce serveur n'envoie pas d'e-mails : utilisez votre code de secours.");
+        var body = Json(new ForgotRequest { Username = username.Trim() }, SyncJson.Default.ForgotRequest);
+        using var res = await Request(HttpMethod.Post, NormalizeUrl(serverUrl)!, "/api/account/forgot", body, auth: false)
+            .ConfigureAwait(false);
+        await EnsureSuccess(res, auth: false).ConfigureAwait(false);
+    }
+
+    /// <summary>Change (ou retire, si vide) l'adresse e-mail du compte ; mot de passe demandé.</summary>
+    public async Task SetEmailAsync(string password, string email)
+    {
+        await SendNoContent(HttpMethod.Post, State.ServerUrl, "/api/account/email",
+            Json(new EmailRequest { Password = password, Email = email.Trim() }, SyncJson.Default.EmailRequest)).ConfigureAwait(false);
+        lock (State) State.Email = email.Trim();
+        SaveState();
+    }
+
+    /// <summary>Change le mot de passe ; les autres appareils sont déconnectés.</summary>
+    public Task ChangePasswordAsync(string password, string newPassword) =>
+        SendNoContent(HttpMethod.Post, State.ServerUrl, "/api/account/password",
+            Json(new PasswordRequest { Password = password, NewPassword = newPassword }, SyncJson.Default.PasswordRequest));
+
+    /// <summary>Supprime le compte et toutes ses données sur le serveur (mot de passe demandé), puis
+    /// déconnecte cet appareil. Les fichiers locaux restent.</summary>
+    public async Task DeleteAccountAsync(string password)
+    {
+        await SendNoContent(HttpMethod.Delete, State.ServerUrl, "/api/account",
+            Json(new AccountRequest { Username = State.Username, Password = password }, SyncJson.Default.AccountRequest)).ConfigureAwait(false);
+        lock (State)
+        {
+            State.Token = "";
+            State.Email = "";
+            State.Account = "";
+            State.Cursor = 0;
+            State.Known.Clear();
+            State.Pending.Clear();
+            State.LastSyncAt = null;
+        }
+        SaveState();
+    }
+
+    /// <summary>Déconnecte tous les autres appareils du compte (celui-ci reste connecté).</summary>
+    public Task LogoutOthersAsync() => SendNoContent(HttpMethod.Post, State.ServerUrl, "/api/account/logout-others", null);
+
+    async Task<AccountResponse> SignInAsync<TReq>(string path, string serverUrl, TReq request, JsonTypeInfo<TReq> type)
+    {
+        var url = NormalizeUrl(serverUrl) ?? throw new SyncException("Adresse du serveur invalide.");
+        await InfoAsync(url).ConfigureAwait(false);
+        var res = await Send(HttpMethod.Post, url, path, Json(request, type), SyncJson.Default.AccountResponse, auth: false)
+            .ConfigureAwait(false);
         lock (State)
         {
             var account = url.ToLowerInvariant() + "|" + res.Username.ToLowerInvariant();
@@ -121,11 +193,13 @@ public sealed class SyncClient : IDisposable
             }
             State.ServerUrl = url;
             State.Username = res.Username;
+            State.Email = res.Email;
             State.Token = res.Token;
             State.Enabled = true;
             State.LastError = "";
         }
         SaveState();
+        return res;
     }
 
     /// <summary>Oublie le jeton (et le révoque sur le serveur si possible). Les fichiers locaux restent.</summary>
@@ -453,6 +527,9 @@ public sealed class SyncClient : IDisposable
     {
         var req = new HttpRequestMessage(method, baseUrl.TrimEnd('/') + path) { Content = body };
         req.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
+        // En-tête HTTP : caractères ASCII visibles seulement (« Téléphone » → « Tlphone » plutôt qu'une erreur).
+        var device = new string(DeviceName.Where(c => c is >= ' ' and <= '~').Take(64).ToArray()).Trim();
+        if (device.Length > 0) req.Headers.TryAddWithoutValidation("X-Velom3d-Device", device);
         if (auth) req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", State.Token);
         try
         {
@@ -488,7 +565,7 @@ public sealed class SyncClient : IDisposable
         if (string.IsNullOrEmpty(message))
             message = res.StatusCode switch
             {
-                HttpStatusCode.TooManyRequests => "Trop d'essais : réessayez dans une minute.",
+                HttpStatusCode.TooManyRequests => "Trop d'essais : réessayez dans quelques minutes.",
                 HttpStatusCode.NotFound => "Cette adresse n'est pas un serveur Velom3d.",
                 _ => $"Erreur du serveur ({(int)res.StatusCode}).",
             };

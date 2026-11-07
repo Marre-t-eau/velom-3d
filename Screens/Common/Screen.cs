@@ -31,7 +31,10 @@ public abstract partial class Screen : Control
     {
         get
         {
-            _sync ??= new SyncClient(ProjectSettings.GlobalizePath("user://sync.json"), Store.Directory, Workouts.Directory);
+            _sync ??= new SyncClient(ProjectSettings.GlobalizePath("user://sync.json"), Store.Directory, Workouts.Directory)
+            {
+                DeviceName = OS.GetModelName() is { Length: > 0 } m && m != "GenericDevice" ? m : System.Environment.MachineName,
+            };
             _sync.RidesDirectory = Store.Directory;
             _sync.WorkoutsDirectory = Workouts.Directory;
             return _sync;

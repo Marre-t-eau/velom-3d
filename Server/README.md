@@ -36,7 +36,7 @@ velom3d.mon-domaine.fr {
 }
 ```
 
-et réglez `Velom3d__TrustProxy=true` pour que le serveur voie la vraie adresse des clients. Sur un
+et réglez `Velom3d__TrustProxy=true` pour que le serveur voie la vraie adresse et le schéma (`https`) des clients. Sur un
 réseau local, `http://192.168.1.10:8080` marche aussi (les mots de passe passent alors en clair sur le réseau).
 
 ## L'appli ne trouve pas le serveur
@@ -68,11 +68,73 @@ Dans `appsettings.json` ou en variables d'environnement (`Velom3d__Nom`) :
 |---|---|---|
 | `Velom3d__Database` | `data/velom3d.db` (`/data/velom3d.db` dans Docker) | fichier de la base |
 | `Velom3d__AllowRegistration` | `true` | `false` : plus de nouveaux comptes (serveur fermé, une fois les vôtres créés) |
-| `Velom3d__AuthRequestsPerMinute` | `20` | essais de connexion par minute et par adresse IP |
+| `Velom3d__MaxFailedLogins` | `3` | échecs de suite sur un compte avant qu'il soit bloqué |
+| `Velom3d__LockoutMaxMinutes` | `60` | blocage le plus long (1 min, puis 2, 4, 8… jusqu'à cette durée) |
+| `Velom3d__SessionDays` | `90` | un appareil qui ne s'est pas synchronisé depuis ce nombre de jours doit se reconnecter |
 | `Velom3d__TrustProxy` | `false` | `true` derrière un proxy (lit `X-Forwarded-For`) |
+| `Velom3d__Smtp__Host` | vide | serveur d'envoi d'e-mails ; vide : pas d'e-mails (voir « Mot de passe oublié ») |
+| `Velom3d__Smtp__Port` / `__Ssl` | `587` / `true` | port et STARTTLS (le port 465, TLS direct, n'est pas géré) |
+| `Velom3d__Smtp__User` / `__Password` | vides | identifiants SMTP |
+| `Velom3d__Smtp__From` | `User` | adresse d'expédition |
+| `Velom3d__Smtp__ServerName` | `Velom3d` | nom du serveur dans l'objet des e-mails |
+| `Velom3d__Smtp__SecurityAlerts` | `true` | `false` : pas d'alertes de sécurité (les codes de réinitialisation partent quand même) |
+| `Velom3d__Backups` | `7` | copies quotidiennes de la base gardées ; `0` : pas de sauvegarde |
+| `Velom3d__BackupDirectory` | `backups/` à côté de la base | dossier des copies (`/data/backups` dans Docker) |
 | `ASPNETCORE_HTTP_PORTS` | `8080` dans Docker | port d'écoute |
 
-Sauvegarde : copier le fichier de la base (`sqlite3 velom3d.db ".backup copie.db"` serveur allumé).
+**Sauvegardes** : chaque jour (et à chaque démarrage), le serveur copie la base dans
+`backups/velom3d-AAAA-MM-JJ.db`, à côté du fichier de la base, et garde les 7 plus récentes. La copie
+est cohérente même serveur allumé. Pour restaurer : arrêter le serveur, remplacer le fichier de la
+base par une copie (et supprimer les fichiers `-wal` et `-shm` qui l'accompagnent), relancer. Pensez à
+copier ce dossier ailleurs de temps en temps (autre disque, cloud) : il est sur la même machine.
+
+## Sécurité des comptes
+
+- **Mots de passe** : 8 caractères au moins ; les plus courants (« motdepasse », « azerty123 »,
+  « 12345678 »…), ceux qui contiennent le nom d'utilisateur et les suites sont refusés. Gardés en
+  PBKDF2-SHA256 (600 000 itérations, sel aléatoire) ; un mot de passe enregistré avec moins
+  d'itérations (versions précédentes) est refait à la connexion suivante.
+- **Contre les essais en boucle** : blocage par compte, quelle que soit l'adresse IP (il n'y a pas de
+  limite par adresse). Après 3 échecs de suite, le compte est bloqué 1 minute, puis 2, 4, 8…
+  jusqu'à 1 heure. Une connexion réussie remet le compteur à zéro, et il s'oublie après 24 heures
+  sans échec. Un nom qui n'existe pas se bloque de la même façon : rien n'indique si un compte
+  existe. Les appareils déjà connectés continuent de synchroniser pendant un blocage. Le code de
+  secours et le code e-mail ont leur propre compteur, aux mêmes règles.
+- **Création de compte** : pas de limite ; `AllowRegistration=false` ferme le serveur aux nouveaux comptes.
+- **Alertes par e-mail** (serveur avec SMTP, compte avec une adresse) : connexion d'un appareil avec
+  le mot de passe (nom de l'appareil et adresse IP), mot de passe changé ou réinitialisé, compte
+  bloqué (au premier blocage d'une série), adresse changée (envoyé à l'ancienne adresse), compte
+  supprimé. La création du compte et les synchronisations n'envoient rien.
+- **Sessions** : un jeton aléatoire par appareil (seule son empreinte est en base), qui expire après
+  90 jours sans synchronisation. Dans l'appli, *Déconnecter mes autres appareils* les révoque tous
+  sauf celui-ci ; changer de mot de passe ou le réinitialiser aussi.
+- **HTTPS** : sur un réseau local en `http://`, le mot de passe passe en clair sur le Wi-Fi. Depuis
+  Internet, mettez toujours le proxy HTTPS décrit plus haut.
+
+## Mot de passe oublié
+
+Trois façons, de la plus simple à la plus exceptionnelle :
+
+1. **Code de secours.** À la création du compte, l'appli affiche une seule fois un code
+   (`7K2M-Q9XD-4HTR-B8WN`) à noter. Dans *Réglages > Synchronisation > Mot de passe oublié*, ce
+   code permet de choisir un nouveau mot de passe ; il est alors remplacé par un nouveau (affiché
+   aussi), et tous les appareils sont déconnectés. Les comptes créés avant les codes de secours
+   n'en ont pas : l'administrateur peut leur en donner un (point 3).
+2. **E-mail**, si le serveur a un SMTP configuré (`Velom3d__Smtp__*`) et que le compte a une adresse
+   (facultative, à la création ou plus tard dans les Réglages). *Recevoir un code par e-mail*
+   envoie un code de 8 caractères valable 30 minutes, qui ne sert qu'une fois. Au plus un e-mail par
+   minute et par compte ; la réponse est la même que le compte existe ou non.
+   Pour Gmail : `smtp.gmail.com`, port 587, et un « mot de passe d'application » du compte Google.
+3. **L'administrateur du serveur**, sur la machine du serveur :
+
+   ```
+   dotnet run --project Server -- users                 # liste des comptes
+   dotnet run --project Server -- recovery-code black   # nouveau code de secours pour « black »
+   dotnet run --project Server -- unlock black          # lève un blocage après trop d'essais
+   ```
+
+   Avec Docker : `docker compose -f Server/docker-compose.yml exec velom3d dotnet Velom3d.Server.dll recovery-code black`.
+   Le code affiché se saisit dans *Mot de passe oublié*, comme un code de secours.
 
 ## Règles de synchronisation
 
@@ -98,12 +160,21 @@ Les routes marquées 🔒 demandent `Authorization: Bearer <jeton>`.
 
 | Route | Rôle |
 |---|---|
-| `GET /api/info` | `{"name":"velom3d","version":1,"registration":true}` |
-| `POST /api/account/register` | `{"username","password"}` → `{"username","token"}` (201). Nom : 3 à 32 caractères `A-Z a-z 0-9 . - _`, sans distinction de casse ; mot de passe : 8 caractères au moins |
-| `POST /api/account/login` | même corps → `{"username","token"}` |
+| `GET /api/info` | `{"name":"velom3d","version":1,"registration":true,"recovery":true,"email":false}` |
+| `POST /api/account/register` | `{"username","password","email"?}` → `{"username","token","recoveryCode","email"}` (201). Nom : 3 à 32 caractères `A-Z a-z 0-9 . - _`, sans distinction de casse ; mot de passe : voir « Sécurité des comptes » |
+| `POST /api/account/login` | `{"username","password"}` → `{"username","token","email"}` ; 429 si le compte est bloqué |
+| `POST /api/account/forgot` | `{"username"}` → 202 ; envoie un code à l'adresse du compte, s'il en a une |
+| `POST /api/account/recover` | `{"username","recoveryCode","newPassword"}` (code de secours ou reçu par e-mail) → comme `login`, avec le nouveau `recoveryCode` après un code de secours ; déconnecte tous les autres appareils |
+| `POST /api/account/email` 🔒 | `{"password","email"}` ; `email` vide la retire |
 | `POST /api/account/logout` 🔒 | révoque le jeton |
+| `POST /api/account/logout-others` 🔒 | révoque tous les jetons du compte sauf celui-ci |
 | `POST /api/account/password` 🔒 | `{"password","newPassword"}` ; déconnecte les autres appareils |
-| `DELETE /api/account` 🔒 | `{"password"}` ; supprime le compte et toutes ses données |
+| `DELETE /api/account` 🔒 | `{"password"}` ; supprime le compte et toutes ses données (dans l'appli : *Supprimer mon compte du serveur*) |
+
+L'appli envoie le nom de l'appareil dans l'en-tête `X-Velom3d-Device` (ASCII), repris dans les alertes.
+
+Un mauvais mot de passe répond 401 à la connexion et 403 sur les routes 🔒 (un 401 y veut dire
+« session expirée », et l'appli oublie alors son jeton).
 | `GET /api/sync?since=N` 🔒 | changements après le n° `N` : `{"changes":[…],"cursor","more"}` (200 par page) |
 | `POST /api/sync` 🔒 | `{"changes":[…]}` (200 au plus) → `{"accepted"}` |
 | `PUT /api/rides/{id}/data` 🔒 | fichier de données CSV de la sortie, brut ou `Content-Encoding: gzip` |
@@ -114,8 +185,9 @@ Un changement : `{"kind","id","updatedAt","deleted","content","seq"}`. `kind` va
 `content` est le fichier JSON tel qu'il est sur l'appareil. Les ids ne contiennent que
 `A-Z a-z 0-9 - _` (64 caractères au plus).
 
-Base : tables `users` (mot de passe en PBKDF2-SHA256), `tokens` (empreinte SHA-256 des jetons
-seulement), `documents` (dernier état de chaque fichier, suppressions comprises) et `ride_data`
+Base : tables `users` (mot de passe en PBKDF2-SHA256, empreintes du code de secours et du code
+e-mail, adresse e-mail), `tokens` (empreinte SHA-256 des jetons seulement), `auth_failures`
+(échecs de connexion par nom, pour le blocage), `documents` (dernier état de chaque fichier, suppressions comprises) et `ride_data`
 (CSV compressés).
 
 ## Tests
@@ -126,4 +198,6 @@ dotnet test UnitTests/Velom3d.Server.Tests
 
 Serveur en mémoire et plusieurs « appareils » (dossiers temporaires) : comptes, envoi et réception,
 modifications et suppressions dans les deux sens, priorité aux données locales, premier passage
-d'un appareil, comptes séparés, sortie reçue avant ses données, session révoquée.
+d'un appareil, comptes séparés, sortie reçue avant ses données, session révoquée ; et pour les
+comptes (`AuthTests.cs`) : mots de passe faibles, blocage, codes de secours et e-mail, mise à
+niveau des anciens mots de passe, expiration des sessions, commandes d'administration.
