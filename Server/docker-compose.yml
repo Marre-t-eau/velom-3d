@@ -11,6 +11,10 @@ services:
     environment:
       Velom3d__AllowRegistration: "true"
       Velom3d__TrustProxy: "false"
+      # Envoi d'un code par e-mail si on oublie son mot de passe (facultatif, voir README.md) :
+      # Velom3d__Smtp__Host: "smtp.exemple.fr"
+      # Velom3d__Smtp__User: "velom3d@exemple.fr"
+      # Velom3d__Smtp__Password: "..."
     volumes:
       - velom3d-data:/data
 

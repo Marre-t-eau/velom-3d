@@ -29,6 +29,7 @@ public sealed class SyncTests : IDisposable
         {
             b.UseSetting("Velom3d:Database", Path.Combine(_root, "server", "velom3d.db"));
             b.UseSetting("Velom3d:AuthRequestsPerMinute", "1000");
+            b.UseSetting("Velom3d:RegistrationsPerHour", "1000");
         });
     }
 
@@ -72,7 +73,7 @@ public sealed class SyncTests : IDisposable
     public async Task Accounts_register_login_and_errors()
     {
         var a = NewDevice("a");
-        await a.Sync.RegisterAsync(Url, "black", "motdepasse");
+        await a.Sync.RegisterAsync(Url, "black", "Roue-Libre-42");
         Assert.True(a.Sync.State.LoggedIn);
         Assert.True(a.Sync.State.Enabled);
 
@@ -81,14 +82,14 @@ public sealed class SyncTests : IDisposable
         Assert.Contains("déjà pris", dup.Message);
         var wrong = await Assert.ThrowsAsync<SyncException>(() => b.Sync.LoginAsync(Url, "black", "mauvais!!"));
         Assert.Contains("incorrect", wrong.Message);
-        var unknown = await Assert.ThrowsAsync<SyncException>(() => b.Sync.LoginAsync(Url, "personne", "motdepasse"));
+        var unknown = await Assert.ThrowsAsync<SyncException>(() => b.Sync.LoginAsync(Url, "personne", "Roue-Libre-42"));
         Assert.Contains("incorrect", unknown.Message);
         var shortPw = await Assert.ThrowsAsync<SyncException>(() => b.Sync.RegisterAsync(Url, "autre", "court"));
         Assert.Contains("8 caractères", shortPw.Message);
-        await Assert.ThrowsAsync<SyncException>(() => b.Sync.RegisterAsync(Url, "a b/../c", "motdepasse"));
+        await Assert.ThrowsAsync<SyncException>(() => b.Sync.RegisterAsync(Url, "a b/../c", "Roue-Libre-42"));
         Assert.False(b.Sync.State.LoggedIn);
 
-        await b.Sync.LoginAsync(Url, "Black", "motdepasse");
+        await b.Sync.LoginAsync(Url, "Black", "Roue-Libre-42");
         Assert.Equal("black", b.Sync.State.Username); // le nom tel qu'il a été créé
     }
 
@@ -103,12 +104,12 @@ public sealed class SyncTests : IDisposable
         var ride = NewRide(new DateTimeOffset(2026, 10, 30, 18, 0, 0, TimeSpan.Zero), 210);
         a.Rides.Save(ride);
 
-        await a.Sync.RegisterAsync(Url, "black", "motdepasse");
+        await a.Sync.RegisterAsync(Url, "black", "Roue-Libre-42");
         var sent = await a.Sync.SyncAsync();
         Assert.Equal(3, sent.Sent);
 
         var b = NewDevice("b");
-        await b.Sync.LoginAsync(Url, "black", "motdepasse");
+        await b.Sync.LoginAsync(Url, "black", "Roue-Libre-42");
         var got = await b.Sync.SyncAsync();
         Assert.Equal(3, got.Received);
         Assert.Equal(287, b.Rides.LoadProfile().FtpW);
@@ -132,9 +133,9 @@ public sealed class SyncTests : IDisposable
         a.Workouts.Save(w);
         var ride = NewRide(new DateTimeOffset(2026, 10, 29, 7, 0, 0, TimeSpan.Zero), 180);
         a.Rides.Save(ride);
-        await a.Sync.RegisterAsync(Url, "black", "motdepasse");
+        await a.Sync.RegisterAsync(Url, "black", "Roue-Libre-42");
         await a.Sync.SyncAsync();
-        await b.Sync.LoginAsync(Url, "black", "motdepasse");
+        await b.Sync.LoginAsync(Url, "black", "Roue-Libre-42");
         await b.Sync.SyncAsync();
 
         // Modifié sur B, reçu sur A.
@@ -167,9 +168,9 @@ public sealed class SyncTests : IDisposable
         var b = NewDevice("b");
         var w = NewWorkout("Sweet spot", DateTimeOffset.Now);
         a.Workouts.Save(w);
-        await a.Sync.RegisterAsync(Url, "black", "motdepasse");
+        await a.Sync.RegisterAsync(Url, "black", "Roue-Libre-42");
         await a.Sync.SyncAsync();
-        await b.Sync.LoginAsync(Url, "black", "motdepasse");
+        await b.Sync.LoginAsync(Url, "black", "Roue-Libre-42");
         await b.Sync.SyncAsync();
 
         // Les deux le modifient hors ligne ; A synchronise d'abord.
@@ -206,7 +207,7 @@ public sealed class SyncTests : IDisposable
     {
         var a = NewDevice("a");
         a.Rides.SaveProfile(new RiderProfile { FtpW = 290 });
-        await a.Sync.RegisterAsync(Url, "black", "motdepasse");
+        await a.Sync.RegisterAsync(Url, "black", "Roue-Libre-42");
         await a.Sync.SyncAsync();
 
         // Un nouvel appareil avec des réglages plus anciens : ceux du compte l'emportent.
@@ -217,14 +218,14 @@ public sealed class SyncTests : IDisposable
         var stale = System.Text.Json.Nodes.JsonNode.Parse(json)!;
         stale["UpdatedAt"] = DateTimeOffset.Now.AddDays(-30);
         File.WriteAllText(path, stale.ToJsonString());
-        await b.Sync.LoginAsync(Url, "black", "motdepasse");
+        await b.Sync.LoginAsync(Url, "black", "Roue-Libre-42");
         await b.Sync.SyncAsync();
         Assert.Equal(290, b.Rides.LoadProfile().FtpW);
 
         // Un appareil aux réglages plus récents les garde et les envoie.
         var c = NewDevice("c");
         c.Rides.SaveProfile(new RiderProfile { FtpW = 310 });
-        await c.Sync.LoginAsync(Url, "black", "motdepasse");
+        await c.Sync.LoginAsync(Url, "black", "Roue-Libre-42");
         Assert.Equal(1, (await c.Sync.SyncAsync()).Sent);
         Assert.Equal(310, c.Rides.LoadProfile().FtpW);
         await a.Sync.SyncAsync();
@@ -238,9 +239,9 @@ public sealed class SyncTests : IDisposable
         var b = NewDevice("b");
         Assert.Equal(2, a.Workouts.List().Count);
         Assert.Equal(2, b.Workouts.List().Count);
-        await a.Sync.RegisterAsync(Url, "black", "motdepasse");
+        await a.Sync.RegisterAsync(Url, "black", "Roue-Libre-42");
         await a.Sync.SyncAsync();
-        await b.Sync.LoginAsync(Url, "black", "motdepasse");
+        await b.Sync.LoginAsync(Url, "black", "Roue-Libre-42");
         await b.Sync.SyncAsync();
         Assert.Equal(2, b.Workouts.List().Count);
 
@@ -251,7 +252,7 @@ public sealed class SyncTests : IDisposable
         Assert.Single(b.Workouts.List());
         var c = NewDevice("c");
         Assert.Equal(2, c.Workouts.List().Count); // nouvel appareil : les exemples sont créés
-        await c.Sync.LoginAsync(Url, "black", "motdepasse");
+        await c.Sync.LoginAsync(Url, "black", "Roue-Libre-42");
         await c.Sync.SyncAsync();
         Assert.Single(c.Workouts.List()); // la suppression, plus récente, l'emporte
     }
@@ -262,11 +263,11 @@ public sealed class SyncTests : IDisposable
         var a = NewDevice("a");
         a.Workouts.Save(NewWorkout("Privé", DateTimeOffset.Now));
         a.Rides.Save(NewRide(DateTimeOffset.Now.AddHours(-2), 200));
-        await a.Sync.RegisterAsync(Url, "black", "motdepasse");
+        await a.Sync.RegisterAsync(Url, "black", "Roue-Libre-42");
         await a.Sync.SyncAsync();
 
         var other = NewDevice("other");
-        await other.Sync.RegisterAsync(Url, "alice", "motdepasse");
+        await other.Sync.RegisterAsync(Url, "alice", "Roue-Libre-42");
         var r = await other.Sync.SyncAsync();
         Assert.Equal(0, r.Received);
         Assert.Empty(other.Rides.List());
@@ -276,9 +277,9 @@ public sealed class SyncTests : IDisposable
     public async Task Ride_waiting_for_its_data_is_received_later()
     {
         var a = NewDevice("a");
-        await a.Sync.RegisterAsync(Url, "black", "motdepasse");
+        await a.Sync.RegisterAsync(Url, "black", "Roue-Libre-42");
         var b = NewDevice("b");
-        await b.Sync.LoginAsync(Url, "black", "motdepasse");
+        await b.Sync.LoginAsync(Url, "black", "Roue-Libre-42");
 
         // Un en-tête arrivé sans son fichier de données (envoi coupé) : B attend.
         var ride = NewRide(new DateTimeOffset(2026, 10, 28, 12, 0, 0, TimeSpan.Zero), 230);
@@ -302,9 +303,9 @@ public sealed class SyncTests : IDisposable
     public async Task Revoked_session_asks_to_log_in_again()
     {
         var a = NewDevice("a");
-        await a.Sync.RegisterAsync(Url, "black", "motdepasse");
+        await a.Sync.RegisterAsync(Url, "black", "Roue-Libre-42");
         var b = NewDevice("b");
-        await b.Sync.LoginAsync(Url, "black", "motdepasse");
+        await b.Sync.LoginAsync(Url, "black", "Roue-Libre-42");
         await b.Sync.LogoutAsync();
         Assert.False(b.Sync.State.LoggedIn);
         Assert.True(a.Sync.State.LoggedIn);
@@ -314,7 +315,7 @@ public sealed class SyncTests : IDisposable
         var http = _factory.CreateClient();
         var del = new HttpRequestMessage(HttpMethod.Delete, "/api/account")
         {
-            Content = new StringContent("{\"password\":\"motdepasse\"}", Encoding.UTF8, "application/json"),
+            Content = new StringContent("{\"password\":\"Roue-Libre-42\"}", Encoding.UTF8, "application/json"),
         };
         del.Headers.Authorization = new AuthenticationHeaderValue("Bearer", a.Sync.State.Token);
         Assert.Equal(HttpStatusCode.NoContent, (await http.SendAsync(del)).StatusCode);
@@ -339,7 +340,7 @@ public sealed class SyncTests : IDisposable
         Assert.Equal("http://mon-pc.local:8080", SyncClient.NormalizeUrl("mon-pc.local:8080"));
         Assert.Equal("http://localhost:8080", SyncClient.NormalizeUrl("localhost:8080"));
         Assert.Equal("https://192.168.1.10:8443", SyncClient.NormalizeUrl("https://192.168.1.10:8443"));
-        var e = await Assert.ThrowsAsync<SyncException>(() => a.Sync.LoginAsync(Url + "/autre-chose", "black", "motdepasse"));
+        var e = await Assert.ThrowsAsync<SyncException>(() => a.Sync.LoginAsync(Url + "/autre-chose", "black", "Roue-Libre-42"));
         Assert.Contains("pas un serveur Velom3d", e.Message);
     }
 
@@ -347,7 +348,7 @@ public sealed class SyncTests : IDisposable
     public async Task Server_rejects_bad_documents()
     {
         var a = NewDevice("a");
-        await a.Sync.RegisterAsync(Url, "black", "motdepasse");
+        await a.Sync.RegisterAsync(Url, "black", "Roue-Libre-42");
         var http = _factory.CreateClient();
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", a.Sync.State.Token);
         async Task<HttpStatusCode> Push(SyncChange ch) => (await http.PostAsync("/api/sync", new StringContent(
