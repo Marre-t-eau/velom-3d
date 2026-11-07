@@ -14,6 +14,7 @@ public partial class WorkoutListScreen : Screen
     internal int WorkoutCount { get; private set; }
     internal Button NewButton { get; private set; } = null!;
     internal Label FtpLabel { get; private set; } = null!;
+    internal Button PlanButton { get; private set; } = null!;
 
     int _ftpW;
 
@@ -29,6 +30,8 @@ public partial class WorkoutListScreen : Screen
         GetNode<Label>("%FtpDetail").Text = (profile.FtpTestedAt is { } at ? $"testée le {Ui.Date(at)}" : "pas encore testée")
                                            + " · modifiable dans Réglages";
 
+        ShowPlan(profile);
+
         var list = GetNode<VBoxContainer>("%List");
         list.AddChild(Card(Workout.FtpTestWorkout(), "Test FTP : 20 min à fond, la FTP vaut 95 % de la moyenne."));
         list.AddChild(Card(Workout.RampTestWorkout(), "Test FTP : paliers de 1 min, de 100 W, +20 W chaque minute, jusqu'à ne plus tenir. "
@@ -39,6 +42,22 @@ public partial class WorkoutListScreen : Screen
         empty.Visible = workouts.Count == 0;
         list.MoveChild(empty, -1);
         foreach (var w in workouts) list.AddChild(Card(w));
+    }
+
+    /// <summary>Carte du plan endurance, en tête de liste : avancement et prochaine séance.</summary>
+    void ShowPlan(RiderProfile profile)
+    {
+        var plan = TrainingPlan.Endurance();
+        var done = plan.DoneSessions(Store.List(), profile.PlanStartedAt);
+        var next = plan.NextSession(done);
+        GetNode<Label>("%PlanName").Text = plan.Name;
+        GetNode<Label>("%PlanDetail").Text = profile.PlanStartedAt is null
+            ? "3 séances par semaine, surtout en zone 2, pour travailler l'endurance."
+            : $"{done.Count} / {plan.SessionCount} séances faites";
+        GetNode<Label>("%PlanNext").Text = next is null ? "Plan terminé !"
+            : (profile.PlanStartedAt is null ? "Première séance : " : "Prochaine séance : ") + next.Name;
+        PlanButton = GetNode<Button>("%PlanButton");
+        PlanButton.Pressed += () => Navigator.GoTo(this, Navigator.Plan);
     }
 
     /// <summary>Carte d'un entraînement ; avec <paramref name="fixedNote"/>, entraînement intégré (pas de bouton Modifier).</summary>

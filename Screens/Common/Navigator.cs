@@ -13,6 +13,7 @@ public static class Navigator
     public const string Summary = "res://Screens/RideSummary/RideSummaryScreen.tscn";
     public const string Settings = "res://Screens/Settings/SettingsScreen.tscn";
     public const string Workouts = "res://Screens/Workouts/WorkoutListScreen.tscn";
+    public const string Plan = "res://Screens/TrainingPlan/TrainingPlanScreen.tscn";
     public const string WorkoutEditor = "res://Screens/WorkoutEditor/WorkoutEditorScreen.tscn";
     public const string Relay = "res://Screens/Relay/RelayScreen.tscn";
 

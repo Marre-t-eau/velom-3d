@@ -112,6 +112,7 @@ Les graphiques et le bilan utilisent une mesure par seconde. Elle n'est pas enre
 | `Crr`, `CdA`, `WheelCircumferenceMm` | résistance des pneus, aéro (m²), roue |
 | `VirtualGears` | transmission virtuelle, par exemple `52/36 × 11-30 (12 v.)`, vide sinon |
 | `WorkoutName` | entraînement suivi, vide sinon |
+| `WorkoutId` | id de l'entraînement suivi (`plan-endurance-s3-2` pour une séance du plan), vide sinon |
 | `FtpTestW` | FTP mesurée si la sortie était un test FTP, 0 sinon |
 | `Sensors` | capteurs utilisés, voir ci-dessous |
 | `Summary` | bilan, pour la liste de l'historique (recalculé à l'ouverture) |
@@ -164,6 +165,7 @@ La fiche `Specs` contient :
 
 Le fichier contient :
 - `FtpW` et `FtpTestedAt` ;
+- `PlanStartedAt` : début du plan endurance (null s'il n'est pas commencé). Une séance du plan est faite quand une sortie d'après cette date porte son `WorkoutId` et a duré au moins 80 % de la séance ;
 - `RiderMassKg`, `BikeMassKg` ;
 - `VirtualGears`, `Chainrings`, `Cogs`, `WheelCircumferenceMm` ;
 - `LastMode`, `LastTargetPowerW` ;
@@ -178,7 +180,9 @@ Un fichier par entraînement contient `Id`, `Name`, `Unit` (`Watts` ou `PercentF
 - `CadenceRpm` (0 = libre) ;
 - `FtpTest` : bloc d'effort du test FTP, dont la moyenne × 0,95 donne la nouvelle FTP.
 
-Une sortie faite en suivant un entraînement porte son nom dans `WorkoutName`. Les consignes réellement données sont dans le fichier de données (`target_power`, `target_cadence`, `set_power`).
+Une sortie faite en suivant un entraînement porte son nom dans `WorkoutName` et son id dans `WorkoutId`.
+
+Le plan endurance (8 semaines, 3 séances par semaine) est intégré à l'appli, comme les tests FTP : ses séances ne sont pas des fichiers de `workouts/` et ne se modifient pas. Ses ids sont `plan-endurance-s{semaine}-{séance}`. Les consignes réellement données sont dans le fichier de données (`target_power`, `target_cadence`, `set_power`).
 
 ## Anciennes sorties
 

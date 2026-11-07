@@ -1,0 +1,166 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://Screens/TrainingPlan/TrainingPlanScreen.cs" id="1"]
+[ext_resource type="PackedScene" path="res://Screens/TrainingPlan/PlanWeek.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://Screens/TrainingPlan/PlanSessionRow.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://Screens/Common/Background.tscn" id="bg"]
+[ext_resource type="Script" path="res://Screens/Common/WorkoutChart.cs" id="4"]
+
+[node name="TrainingPlanScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+WeekScene = ExtResource("2")
+SessionScene = ExtResource("3")
+
+[node name="Background" parent="." instance=ExtResource("bg")]
+layout_mode = 1
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 32
+
+[node name="Page" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Header" type="HBoxContainer" parent="Margin/Page"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="Margin/Page/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+theme_type_variation = &"TitleLabel"
+text = "Plan endurance"
+autowrap_mode = 3
+size_flags_horizontal = 3
+
+[node name="RestartButton" type="Button" parent="Margin/Page/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(260, 72)
+mouse_filter = 1
+text = "Recommencer"
+
+[node name="BackButton" type="Button" parent="Margin/Page/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(200, 72)
+mouse_filter = 1
+text = "Retour"
+
+[node name="Scroll" type="ScrollContainer" parent="Margin/Page"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+scroll_deadzone = 12
+
+[node name="List" type="VBoxContainer" parent="Margin/Page/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 14
+size_flags_horizontal = 3
+
+[node name="Description" type="Label" parent="Margin/Page/Scroll/List"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+theme_type_variation = &"MutedLabel"
+text = "3 séances par semaine, surtout en zone 2."
+autowrap_mode = 3
+
+[node name="ProgressRow" type="HBoxContainer" parent="Margin/Page/Scroll/List"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="ProgressLabel" type="Label" parent="Margin/Page/Scroll/List/ProgressRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+theme_type_variation = &"AccentLabel"
+text = "0 / 24 séances"
+
+[node name="ProgressBar" type="ProgressBar" parent="Margin/Page/Scroll/List/ProgressRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 24.0
+show_percentage = false
+
+[node name="NextCard" type="PanelContainer" parent="Margin/Page/Scroll/List"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AccentPanel"
+
+[node name="Box" type="VBoxContainer" parent="Margin/Page/Scroll/List/NextCard"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Top" type="HBoxContainer" parent="Margin/Page/Scroll/List/NextCard/Box"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Titles" type="VBoxContainer" parent="Margin/Page/Scroll/List/NextCard/Box/Top"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="NextTitle" type="Label" parent="Margin/Page/Scroll/List/NextCard/Box/Top/Titles"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_type_variation = &"AccentLabel"
+text = "PROCHAINE SÉANCE"
+
+[node name="NextName" type="Label" parent="Margin/Page/Scroll/List/NextCard/Box/Top/Titles"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+theme_type_variation = &"TitleLabel"
+text = "S1.1 · Endurance 45 min"
+autowrap_mode = 3
+
+[node name="NextDetail" type="Label" parent="Margin/Page/Scroll/List/NextCard/Box/Top/Titles"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+theme_type_variation = &"MutedLabel"
+text = "45:00 · ≈ 30 TSS"
+autowrap_mode = 3
+
+[node name="NextStartButton" type="Button" parent="Margin/Page/Scroll/List/NextCard/Box/Top"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PrimaryButton"
+custom_minimum_size = Vector2(220, 72)
+mouse_filter = 1
+theme_override_font_sizes/font_size = 22
+text = "Démarrer"
+
+[node name="NextChart" type="Control" parent="Margin/Page/Scroll/List/NextCard/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 90)
+size_flags_horizontal = 3
+mouse_filter = 1
+script = ExtResource("4")
+
+[node name="Weeks" type="VBoxContainer" parent="Margin/Page/Scroll/List"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 22
