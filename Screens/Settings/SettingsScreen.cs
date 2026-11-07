@@ -28,10 +28,8 @@ public partial class SettingsScreen : Screen
     LineEdit _recoverCode = null!, _newPassword = null!, _accountPassword = null!, _accountEmail = null!;
     Label _accountLabel = null!, _accountEmailLabel = null!, _syncStatus = null!, _codeLabel = null!;
     Button _login = null!, _register = null!, _syncNow = null!, _logout = null!, _forgot = null!, _emailCode = null!,
-        _recover = null!, _setEmail = null!, _newCode = null!, _logoutOthers = null!, _copyCode = null!, _codeDone = null!;
+        _recover = null!, _setEmail = null!, _logoutOthers = null!, _copyCode = null!, _codeDone = null!;
     bool _syncBusy;
-    /// <summary>Le compte n'a pas encore de code de secours (créé avant leur arrivée).</summary>
-    bool _codeMissing;
 
     /// <summary>Profil en cours de modification (pour les tests).</summary>
     internal RiderProfile Profile => _profile;
@@ -107,7 +105,6 @@ public partial class SettingsScreen : Screen
         _accountPassword = GetNode<LineEdit>("%AccountPasswordEdit");
         _accountEmail = GetNode<LineEdit>("%AccountEmailEdit");
         _setEmail = GetNode<Button>("%SetEmailButton");
-        _newCode = GetNode<Button>("%NewCodeButton");
         _logoutOthers = GetNode<Button>("%LogoutOthersButton");
         _codeBox = GetNode<Control>("%SyncRecoveryCodeBox");
         _codeLabel = GetNode<Label>("%RecoveryCodeLabel");
@@ -157,8 +154,7 @@ public partial class SettingsScreen : Screen
             _recoverCode.Text = _newPassword.Text = _password.Text = "";
             _recoverForm.Visible = false;
             _serverUrl.Text = Sync.State.ServerUrl;
-            _codeMissing = res!.RecoveryCodeMissing;
-            ShowRecoveryCode(res.RecoveryCode);
+            ShowRecoveryCode(res!.RecoveryCode);
             SyncNow();
         };
 
@@ -170,15 +166,6 @@ public partial class SettingsScreen : Screen
             _accountPassword.Text = _accountEmail.Text = "";
             _syncStatus.Text = email.Trim().Length > 0 ? "Adresse e-mail enregistrée." : "Adresse e-mail retirée.";
             RefreshSync();
-        };
-        _newCode.Pressed += async () =>
-        {
-            string pw = _accountPassword.Text, code = "";
-            if (!await Busy("Nouveau code de secours…", async () => code = await Sync.NewRecoveryCodeAsync(pw)) || !IsInstanceValid(this)) return;
-            _accountPassword.Text = "";
-            _codeMissing = false;
-            ShowRecoveryCode(code);
-            _syncStatus.Text = "Nouveau code créé : l'ancien ne marche plus.";
         };
         _logoutOthers.Pressed += async () =>
         {
@@ -207,17 +194,15 @@ public partial class SettingsScreen : Screen
         if (_syncBusy) return;
         string url = _serverUrl.Text, user = _username.Text, password = _password.Text, email = _email.Text;
         string code = "";
-        AccountResponse? res = null;
         bool ok = await Busy(register ? "Création du compte…" : "Connexion…", async () =>
         {
             if (register) code = await Sync.RegisterAsync(url, user, password, email);
-            else res = await Sync.LoginAsync(url, user, password);
+            else await Sync.LoginAsync(url, user, password);
         });
         if (!ok || !IsInstanceValid(this)) return;
         _password.Text = _email.Text = "";
         _serverUrl.Text = Sync.State.ServerUrl;
         _recoverForm.Visible = false;
-        _codeMissing = res?.RecoveryCodeMissing ?? false;
         ShowRecoveryCode(code);
         SyncNow();
     }
@@ -266,12 +251,11 @@ public partial class SettingsScreen : Screen
         _account.Visible = state.LoggedIn;
         _serverUrl.Editable = !state.LoggedIn && !_syncBusy;
         _accountLabel.Text = $"Connecté : {state.Username}";
-        _accountEmailLabel.Text = (state.Email.Length > 0 ? $"E-mail : {state.Email}." : "Aucune adresse e-mail.")
-            + (_codeMissing ? " Ce compte n'a pas encore de code de secours : créez-en un avec votre mot de passe." : "");
+        _accountEmailLabel.Text = state.Email.Length > 0 ? $"E-mail : {state.Email}." : "Aucune adresse e-mail.";
         _forgot.Text = _recoverForm.Visible ? "Annuler" : "Mot de passe oublié ?";
         // Pendant « mot de passe oublié », seul le nom d'utilisateur du formulaire sert.
         _password.Visible = _email.Visible = _login.GetParent<Control>().Visible = !_recoverForm.Visible;
-        foreach (var b in new[] { _login, _register, _syncNow, _logout, _forgot, _emailCode, _recover, _setEmail, _newCode,
+        foreach (var b in new[] { _login, _register, _syncNow, _logout, _forgot, _emailCode, _recover, _setEmail,
                      _logoutOthers, _copyCode, _codeDone })
             b.Disabled = _syncBusy;
         if (!_syncBusy && _syncStatus.Text.Length == 0)

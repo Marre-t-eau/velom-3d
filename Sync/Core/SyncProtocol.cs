@@ -86,8 +86,6 @@ public sealed class AccountResponse
     /// <summary>Code de secours, donné une seule fois (création du compte, réinitialisation) : il permet
     /// de choisir un nouveau mot de passe si on a oublié le sien. Vide sinon.</summary>
     public string RecoveryCode { get; set; } = "";
-    /// <summary>Le compte n'a pas encore de code de secours (créé avant leur arrivée).</summary>
-    public bool RecoveryCodeMissing { get; set; }
     /// <summary>Adresse e-mail du compte (vide : aucune).</summary>
     public string Email { get; set; } = "";
 }
@@ -121,11 +119,6 @@ public sealed class PasswordRequest
     public string NewPassword { get; set; } = "";
 }
 
-public sealed class RecoveryCodeResponse
-{
-    public string RecoveryCode { get; set; } = "";
-}
-
 public sealed class ServerInfo
 {
     public string Name { get; set; } = "";
@@ -154,7 +147,6 @@ public sealed class ErrorResponse
 [JsonSerializable(typeof(ForgotRequest))]
 [JsonSerializable(typeof(EmailRequest))]
 [JsonSerializable(typeof(PasswordRequest))]
-[JsonSerializable(typeof(RecoveryCodeResponse))]
 [JsonSerializable(typeof(ServerInfo))]
 [JsonSerializable(typeof(ErrorResponse))]
 public partial class SyncJson : JsonSerializerContext;

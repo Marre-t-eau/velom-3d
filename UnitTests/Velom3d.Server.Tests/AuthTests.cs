@@ -86,15 +86,15 @@ public sealed class AuthTests : IDisposable
         var a = NewDevice();
         await a.RegisterAsync(Url, "black", Pw);
         var b = NewDevice();
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 2; i++)
             Assert.Contains("incorrect", (await Assert.ThrowsAsync<SyncException>(() => b.LoginAsync(Url, "black", "Mauvais-" + i))).Message);
-        var locked = await Assert.ThrowsAsync<SyncException>(() => b.LoginAsync(Url, "BLACK", "Mauvais-5"));
+        var locked = await Assert.ThrowsAsync<SyncException>(() => b.LoginAsync(Url, "BLACK", "Mauvais-3"));
         Assert.Contains("Trop d'essais pour ce compte", locked.Message);
         // Même le bon mot de passe attend la fin du blocage.
         locked = await Assert.ThrowsAsync<SyncException>(() => b.LoginAsync(Url, "black", Pw));
         Assert.Contains("réessayez dans 1 min", locked.Message);
         // Un nom qui n'existe pas se bloque pareil : le blocage ne dit pas si un compte existe.
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 3; i++)
             await Assert.ThrowsAsync<SyncException>(() => b.LoginAsync(Url, "personne", "Mauvais-" + i));
         Assert.Contains("Trop d'essais pour ce compte", (await Assert.ThrowsAsync<SyncException>(() => b.LoginAsync(Url, "personne", Pw))).Message);
         // Les appareils déjà connectés continuent de synchroniser.
@@ -111,12 +111,12 @@ public sealed class AuthTests : IDisposable
     {
         var db = new Database(DbPath);
         var max = TimeSpan.FromMinutes(60);
-        for (int i = 1; i < 5; i++) Assert.Null(db.RecordFailure("login:x", 5, max, TimeSpan.FromDays(1)));
-        var first = db.RecordFailure("login:x", 5, max, TimeSpan.FromDays(1))!.Value;
-        var second = db.RecordFailure("login:x", 5, max, TimeSpan.FromDays(1))!.Value;
+        for (int i = 1; i < 3; i++) Assert.Null(db.RecordFailure("login:x", 3, max, TimeSpan.FromDays(1)));
+        var first = db.RecordFailure("login:x", 3, max, TimeSpan.FromDays(1))!.Value;
+        var second = db.RecordFailure("login:x", 3, max, TimeSpan.FromDays(1))!.Value;
         Assert.InRange((first - DateTimeOffset.UtcNow).TotalMinutes, 0.9, 1.1);
         Assert.InRange((second - DateTimeOffset.UtcNow).TotalMinutes, 1.9, 2.1);
-        for (int i = 0; i < 20; i++) db.RecordFailure("login:x", 5, max, TimeSpan.FromDays(1));
+        for (int i = 0; i < 20; i++) db.RecordFailure("login:x", 3, max, TimeSpan.FromDays(1));
         Assert.InRange((db.LockedUntil("login:x")!.Value - DateTimeOffset.UtcNow).TotalMinutes, 59, 60.1);
         db.ClearFailures("login:x");
         Assert.Null(db.LockedUntil("login:x"));
@@ -147,11 +147,8 @@ public sealed class AuthTests : IDisposable
         await Assert.ThrowsAsync<SyncException>(() => a.RecoverAsync(Url, "black", code, "Encore-Autre-88"));
         await a.LoginAsync(Url, "black", "Nouveau-Mot-77");
 
-        // Nouveau code demandé depuis un appareil connecté (mot de passe exigé).
-        await Assert.ThrowsAsync<SyncException>(() => a.NewRecoveryCodeAsync("Mauvais-1"));
-        var fresh = await a.NewRecoveryCodeAsync("Nouveau-Mot-77");
-        await Assert.ThrowsAsync<SyncException>(() => NewDevice().RecoverAsync(Url, "black", res.RecoveryCode, "Encore-Autre-88"));
-        await NewDevice().RecoverAsync(Url, "black", fresh, "Encore-Autre-88");
+        // Le nouveau code marche à son tour.
+        await NewDevice().RecoverAsync(Url, "black", res.RecoveryCode, "Encore-Autre-88");
     }
 
     [Fact]
@@ -159,7 +156,7 @@ public sealed class AuthTests : IDisposable
     {
         var a = NewDevice();
         var code = await a.RegisterAsync(Url, "black", Pw);
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 2; i++)
             await Assert.ThrowsAsync<SyncException>(() => a.RecoverAsync(Url, "black", "AAAA-BBBB-CCCC-000" + i, "Nouveau-Mot-77"));
         var e = await Assert.ThrowsAsync<SyncException>(() => a.RecoverAsync(Url, "black", "AAAA-BBBB-CCCC-0009", "Nouveau-Mot-77"));
         Assert.Contains("Trop d'essais", e.Message);
@@ -208,7 +205,7 @@ public sealed class AuthTests : IDisposable
     }
 
     [Fact]
-    public async Task Old_hashes_are_upgraded_and_old_accounts_get_a_recovery_code()
+    public async Task Old_hashes_are_upgraded()
     {
         // Compte créé avant ces changements : 100 000 itérations, pas de code de secours.
         var db = new Database(DbPath);
@@ -218,11 +215,9 @@ public sealed class AuthTests : IDisposable
         db.CreateUser("ancien", $"pbkdf2-sha256$100000${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}");
 
         var a = NewDevice();
-        var res = await a.LoginAsync(Url, "ancien", Pw);
-        Assert.True(res.RecoveryCodeMissing);
+        await a.LoginAsync(Url, "ancien", Pw);
         Assert.StartsWith($"pbkdf2-sha256${Passwords.Iterations}$", db.FindUser("ancien")!.PasswordHash);
-        await a.NewRecoveryCodeAsync(Pw);
-        Assert.False((await NewDevice().LoginAsync(Url, "ancien", Pw)).RecoveryCodeMissing);
+        await NewDevice().LoginAsync(Url, "ancien", Pw);
     }
 
     [Fact]
@@ -257,6 +252,22 @@ public sealed class AuthTests : IDisposable
         await a.ChangePasswordAsync(Pw, "Nouveau-Mot-77");
         await a.SyncAsync();
         await Assert.ThrowsAsync<SyncException>(() => b.SyncAsync());
+    }
+
+    [Fact]
+    public async Task Account_creation_is_not_limited_but_logins_are_per_address()
+    {
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Velom3d:Database", DbPath);
+            b.UseSetting("Velom3d:AuthRequestsPerMinute", "2");
+        });
+        SyncClient Device() => new(Path.Combine(_root, "x" + _devices++, "sync.json"), _root, _root, factory.Server.CreateHandler());
+        foreach (var name in new[] { "uno", "dos", "tres", "cuatro" }) await Device().RegisterAsync(Url, name, Pw);
+        await Device().LoginAsync(Url, "uno", Pw);
+        await Device().LoginAsync(Url, "dos", Pw);
+        var e = await Assert.ThrowsAsync<SyncException>(() => Device().LoginAsync(Url, "tres", Pw));
+        Assert.Contains("Trop d'essais depuis cette adresse", e.Message);
     }
 
     [Fact]

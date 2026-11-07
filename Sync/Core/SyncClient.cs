@@ -99,7 +99,7 @@ public sealed class SyncClient : IDisposable
             new AccountRequest { Username = username.Trim(), Password = password, Email = email.Trim() },
             SyncJson.Default.AccountRequest).ConfigureAwait(false)).RecoveryCode;
 
-    /// <summary>Se connecte. Renvoie la réponse du serveur (<see cref="AccountResponse.RecoveryCodeMissing"/>…).</summary>
+    /// <summary>Se connecte.</summary>
     public Task<AccountResponse> LoginAsync(string serverUrl, string username, string password) =>
         SignInAsync("/api/account/login", serverUrl,
             new AccountRequest { Username = username.Trim(), Password = password }, SyncJson.Default.AccountRequest);
@@ -132,12 +132,6 @@ public sealed class SyncClient : IDisposable
             .ConfigureAwait(false);
         await EnsureSuccess(res, auth: false).ConfigureAwait(false);
     }
-
-    /// <summary>Nouveau code de secours (l'ancien ne marche plus) ; mot de passe demandé.</summary>
-    public async Task<string> NewRecoveryCodeAsync(string password) =>
-        (await Send(HttpMethod.Post, State.ServerUrl, "/api/account/recovery-code",
-            Json(new PasswordRequest { Password = password }, SyncJson.Default.PasswordRequest),
-            SyncJson.Default.RecoveryCodeResponse).ConfigureAwait(false)).RecoveryCode;
 
     /// <summary>Change (ou retire, si vide) l'adresse e-mail du compte ; mot de passe demandé.</summary>
     public async Task SetEmailAsync(string password, string email)

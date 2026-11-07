@@ -517,7 +517,7 @@ layout_mode = 2
 custom_minimum_size = Vector2(0, 64)
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 22
-placeholder_text = "Mot de passe actuel (pour les actions ci-dessous)"
+placeholder_text = "Mot de passe actuel (pour changer l'e-mail)"
 secret = true
 virtual_keyboard_type = 6
 
@@ -542,15 +542,6 @@ size_flags_horizontal = 3
 mouse_filter = 1
 theme_override_font_sizes/font_size = 22
 text = "Changer l'e-mail"
-
-[node name="NewCodeButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount/SecurityButtons"]
-unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(0, 72)
-size_flags_horizontal = 3
-mouse_filter = 1
-theme_override_font_sizes/font_size = 22
-text = "Nouveau code de secours"
 
 [node name="LogoutOthersButton" type="Button" parent="Margin/Page/Scroll/Content/SyncOptions/SyncAccount"]
 unique_name_in_owner = true

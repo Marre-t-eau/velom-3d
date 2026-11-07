@@ -68,8 +68,8 @@ Dans `appsettings.json` ou en variables d'environnement (`Velom3d__Nom`) :
 |---|---|---|
 | `Velom3d__Database` | `data/velom3d.db` (`/data/velom3d.db` dans Docker) | fichier de la base |
 | `Velom3d__AllowRegistration` | `true` | `false` : plus de nouveaux comptes (serveur fermé, une fois les vôtres créés) |
-| `Velom3d__AuthRequestsPerMinute` | `20` | essais de connexion par minute et par adresse IP |
-| `Velom3d__MaxFailedLogins` | `5` | échecs de suite sur un compte avant qu'il soit bloqué |
+| `Velom3d__AuthRequestsPerMinute` | `10` | essais de connexion par minute et par adresse IP (la création de compte n'est pas limitée) |
+| `Velom3d__MaxFailedLogins` | `3` | échecs de suite sur un compte avant qu'il soit bloqué |
 | `Velom3d__LockoutMaxMinutes` | `60` | blocage le plus long (1 min, puis 2, 4, 8… jusqu'à cette durée) |
 | `Velom3d__SessionDays` | `90` | un appareil qui ne s'est pas synchronisé depuis ce nombre de jours doit se reconnecter |
 | `Velom3d__TrustProxy` | `false` | `true` derrière un proxy (lit `X-Forwarded-For`) |
@@ -89,8 +89,9 @@ Sauvegarde : copier le fichier de la base (`sqlite3 velom3d.db ".backup copie.db
   PBKDF2-SHA256 (600 000 itérations, sel aléatoire) ; un mot de passe enregistré avec moins
   d'itérations (versions précédentes) est refait à la connexion suivante.
 - **Contre les essais en boucle**, deux protections qui s'ajoutent :
-  - par adresse IP : 20 essais par minute sur les routes de compte (création comprise) ;
-  - par compte, quelle que soit l'adresse : après 5 échecs de suite, le compte est bloqué 1 minute,
+  - par adresse IP : 10 essais par minute sur les routes de compte (la création de compte n'est pas
+    limitée ; `AllowRegistration=false` ferme le serveur aux nouveaux comptes) ;
+  - par compte, quelle que soit l'adresse : après 3 échecs de suite, le compte est bloqué 1 minute,
     puis 2, 4, 8… jusqu'à 1 heure. Une connexion réussie remet le compteur à zéro, et il s'oublie
     après 24 heures sans échec. Un nom qui n'existe pas se bloque de la même façon : rien n'indique
     si un compte existe. Les appareils déjà connectés continuent de synchroniser pendant un blocage.
@@ -107,8 +108,8 @@ Trois façons, de la plus simple à la plus exceptionnelle :
 1. **Code de secours.** À la création du compte, l'appli affiche une seule fois un code
    (`7K2M-Q9XD-4HTR-B8WN`) à noter. Dans *Réglages > Synchronisation > Mot de passe oublié*, ce
    code permet de choisir un nouveau mot de passe ; il est alors remplacé par un nouveau (affiché
-   aussi), et tous les appareils sont déconnectés. Un compte connecté peut demander un nouveau code
-   (mot de passe demandé) ; c'est utile aux comptes créés avant les codes de secours.
+   aussi), et tous les appareils sont déconnectés. Les comptes créés avant les codes de secours
+   n'en ont pas : l'administrateur peut leur en donner un (point 3).
 2. **E-mail**, si le serveur a un SMTP configuré (`Velom3d__Smtp__*`) et que le compte a une adresse
    (facultative, à la création ou plus tard dans les Réglages). *Recevoir un code par e-mail*
    envoie un code de 8 caractères valable 30 minutes, qui ne sert qu'une fois. Au plus un e-mail par
@@ -151,10 +152,9 @@ Les routes marquées 🔒 demandent `Authorization: Bearer <jeton>`.
 |---|---|
 | `GET /api/info` | `{"name":"velom3d","version":1,"registration":true,"recovery":true,"email":false}` |
 | `POST /api/account/register` | `{"username","password","email"?}` → `{"username","token","recoveryCode","email"}` (201). Nom : 3 à 32 caractères `A-Z a-z 0-9 . - _`, sans distinction de casse ; mot de passe : voir « Sécurité des comptes » |
-| `POST /api/account/login` | `{"username","password"}` → `{"username","token","email","recoveryCodeMissing"}` ; 429 si le compte est bloqué |
+| `POST /api/account/login` | `{"username","password"}` → `{"username","token","email"}` ; 429 si le compte est bloqué |
 | `POST /api/account/forgot` | `{"username"}` → 202 ; envoie un code à l'adresse du compte, s'il en a une |
 | `POST /api/account/recover` | `{"username","recoveryCode","newPassword"}` (code de secours ou reçu par e-mail) → comme `login`, avec le nouveau `recoveryCode` après un code de secours ; déconnecte tous les autres appareils |
-| `POST /api/account/recovery-code` 🔒 | `{"password"}` → `{"recoveryCode"}` ; l'ancien code ne marche plus |
 | `POST /api/account/email` 🔒 | `{"password","email"}` ; `email` vide la retire |
 | `POST /api/account/logout` 🔒 | révoque le jeton |
 | `POST /api/account/logout-others` 🔒 | révoque tous les jetons du compte sauf celui-ci |

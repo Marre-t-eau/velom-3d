@@ -19,8 +19,8 @@ var dbPath = config["Database"] ?? "data/velom3d.db";
 if (isAdminCommand) return Admin.Run(args, new Database(dbPath));
 
 bool allowRegistration = config.GetValue("AllowRegistration", true);
-int authPerMinute = config.GetValue("AuthRequestsPerMinute", 20);
-int freeAttempts = config.GetValue("MaxFailedLogins", 5);
+int authPerMinute = config.GetValue("AuthRequestsPerMinute", 10);
+int freeAttempts = config.GetValue("MaxFailedLogins", 3);
 var maxLock = TimeSpan.FromMinutes(config.GetValue("LockoutMaxMinutes", 60));
 var sessionIdle = TimeSpan.FromDays(config.GetValue("SessionDays", 90));
 bool trustProxy = config.GetValue("TrustProxy", false);
@@ -163,7 +163,7 @@ account.MapPost("/register", (AccountRequest req, Database db) =>
     res.RecoveryCode = code;
     res.Email = email;
     return Results.Json(res, statusCode: 201);
-}).RequireRateLimiting("auth");
+}); // pas de limite sur la création de comptes (demande de Black) ; AllowRegistration=false pour fermer le serveur
 
 account.MapPost("/login", (AccountRequest req, HttpContext ctx, Database db) =>
 {
@@ -171,7 +171,6 @@ account.MapPost("/login", (AccountRequest req, HttpContext ctx, Database db) =>
     if (CheckPassword(ctx, db, req.Username, req.Password, user, "Nom d'utilisateur ou mot de passe incorrect.", 401) is { } fail)
         return fail;
     var res = NewSession(db, user!.Id, user.Username);
-    res.RecoveryCodeMissing = user.RecoveryHash is null;
     res.Email = user.Email ?? "";
     return Results.Json(res);
 }).RequireRateLimiting("auth");
@@ -220,7 +219,6 @@ account.MapPost("/recover", (RecoverRequest req, HttpContext ctx, Database db) =
         res.RecoveryCode = Passwords.NewRecoveryCode();
         db.SetRecoveryHash(user.Id, Passwords.RecoveryHash(res.RecoveryCode));
     }
-    else res.RecoveryCodeMissing = user.RecoveryHash is null;
     return Results.Json(res);
 }).RequireRateLimiting("auth");
 
@@ -240,18 +238,6 @@ account.MapPost("/email", (EmailRequest req, HttpContext ctx, Database db) =>
     db.SetEmail(userId, email.Length > 0 ? email : null);
     db.SetResetCode(userId, null, null);
     return Results.NoContent();
-}).RequireRateLimiting("auth");
-
-// Nouveau code de secours (l'ancien ne marche plus). Mot de passe demandé.
-account.MapPost("/recovery-code", (PasswordRequest req, HttpContext ctx, Database db) =>
-{
-    if (Auth(ctx, db) is not { } userId) return Unauthorized();
-    var user = CurrentUser(db, userId);
-    if (user is null) return Unauthorized();
-    if (CheckPassword(ctx, db, user.Username, req.Password, user, "Mot de passe incorrect.") is { } fail) return fail;
-    var code = Passwords.NewRecoveryCode();
-    db.SetRecoveryHash(userId, Passwords.RecoveryHash(code));
-    return Results.Json(new RecoveryCodeResponse { RecoveryCode = code });
 }).RequireRateLimiting("auth");
 
 account.MapPost("/logout", (HttpContext ctx, Database db) =>
