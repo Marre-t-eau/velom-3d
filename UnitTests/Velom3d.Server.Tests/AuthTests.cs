@@ -47,7 +47,6 @@ public sealed class AuthTests : IDisposable
         new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             b.UseSetting("Velom3d:Database", DbPath);
-            b.UseSetting("Velom3d:AuthRequestsPerMinute", "1000");
             b.ConfigureServices(s => s.AddSingleton<Mailer>(_mailer));
         });
 
@@ -255,19 +254,11 @@ public sealed class AuthTests : IDisposable
     }
 
     [Fact]
-    public async Task Account_creation_is_not_limited_but_logins_are_per_address()
+    public async Task No_limit_per_address_only_per_account()
     {
-        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
-        {
-            b.UseSetting("Velom3d:Database", DbPath);
-            b.UseSetting("Velom3d:AuthRequestsPerMinute", "2");
-        });
-        SyncClient Device() => new(Path.Combine(_root, "x" + _devices++, "sync.json"), _root, _root, factory.Server.CreateHandler());
-        foreach (var name in new[] { "uno", "dos", "tres", "cuatro" }) await Device().RegisterAsync(Url, name, Pw);
-        await Device().LoginAsync(Url, "uno", Pw);
-        await Device().LoginAsync(Url, "dos", Pw);
-        var e = await Assert.ThrowsAsync<SyncException>(() => Device().LoginAsync(Url, "tres", Pw));
-        Assert.Contains("Trop d'essais depuis cette adresse", e.Message);
+        // Beaucoup de comptes et de connexions depuis la même adresse : rien n'est refusé.
+        for (int i = 0; i < 30; i++) await NewDevice().RegisterAsync(Url, "compte" + i, Pw);
+        for (int i = 0; i < 30; i++) await NewDevice().LoginAsync(Url, "compte" + i, Pw);
     }
 
     [Fact]

@@ -28,7 +28,6 @@ public sealed class SyncTests : IDisposable
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             b.UseSetting("Velom3d:Database", Path.Combine(_root, "server", "velom3d.db"));
-            b.UseSetting("Velom3d:AuthRequestsPerMinute", "1000");
         });
     }
 

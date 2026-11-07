@@ -1,7 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Velom3d.Server;
 using Velom3d.Sync;
@@ -19,7 +18,6 @@ var dbPath = config["Database"] ?? "data/velom3d.db";
 if (isAdminCommand) return Admin.Run(args, new Database(dbPath));
 
 bool allowRegistration = config.GetValue("AllowRegistration", true);
-int authPerMinute = config.GetValue("AuthRequestsPerMinute", 10);
 int freeAttempts = config.GetValue("MaxFailedLogins", 3);
 var maxLock = TimeSpan.FromMinutes(config.GetValue("LockoutMaxMinutes", 60));
 var sessionIdle = TimeSpan.FromDays(config.GetValue("SessionDays", 90));
@@ -34,21 +32,6 @@ builder.Services.AddSingleton(new Database(dbPath));
 builder.Services.AddSingleton(sp => new Mailer(config.GetSection("Smtp"), sp.GetRequiredService<ILogger<Mailer>>()));
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, SyncJson.Default));
 builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 64 * 1024 * 1024);
-builder.Services.AddRateLimiter(o =>
-{
-    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    o.OnRejected = async (ctx, ct) =>
-    {
-        if (ctx.Lease.TryGetMetadata(MetadataName.RetryAfter, out var wait))
-            ctx.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
-        await ctx.HttpContext.Response.WriteAsJsonAsync(new ErrorResponse { Error = "Trop d'essais depuis cette adresse : réessayez dans quelques minutes." },
-            SyncJson.Default.ErrorResponse, cancellationToken: ct);
-    };
-    // Contre les essais de mots de passe en boucle : par adresse IP (en plus du blocage par compte).
-    o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
-        ctx.Connection.RemoteIpAddress?.ToString() ?? "?",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = authPerMinute, Window = TimeSpan.FromMinutes(1) }));
-});
 
 var app = builder.Build();
 if (trustProxy)
@@ -59,7 +42,6 @@ if (trustProxy)
     fwd.KnownProxies.Clear();
     app.UseForwardedHeaders(fwd);
 }
-app.UseRateLimiter();
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     // Adresses à saisir dans l'appli (Réglages > Synchronisation) depuis le réseau local.
@@ -163,7 +145,7 @@ account.MapPost("/register", (AccountRequest req, Database db) =>
     res.RecoveryCode = code;
     res.Email = email;
     return Results.Json(res, statusCode: 201);
-}); // pas de limite sur la création de comptes (demande de Black) ; AllowRegistration=false pour fermer le serveur
+}); // pas de limite sur la création de comptes ; AllowRegistration=false pour fermer le serveur
 
 account.MapPost("/login", (AccountRequest req, HttpContext ctx, Database db) =>
 {
@@ -173,7 +155,7 @@ account.MapPost("/login", (AccountRequest req, HttpContext ctx, Database db) =>
     var res = NewSession(db, user!.Id, user.Username);
     res.Email = user.Email ?? "";
     return Results.Json(res);
-}).RequireRateLimiting("auth");
+});
 
 // Mot de passe oublié, 1re étape facultative : un code envoyé à l'adresse e-mail du compte.
 // La réponse est toujours la même, que le compte existe ou non, ait une adresse ou non.
@@ -189,7 +171,7 @@ account.MapPost("/forgot", (ForgotRequest req, Database db, Mailer mailer) =>
         mailer.SendResetCode(email, user.Username, code, resetValidity);
     }
     return Results.Accepted();
-}).RequireRateLimiting("auth");
+});
 
 // Mot de passe oublié : le code de secours, ou le code reçu par e-mail, permet d'en choisir un
 // nouveau. Tous les appareils sont déconnectés. Un code ne sert qu'une fois : après un code de
@@ -220,7 +202,7 @@ account.MapPost("/recover", (RecoverRequest req, HttpContext ctx, Database db) =
         db.SetRecoveryHash(user.Id, Passwords.RecoveryHash(res.RecoveryCode));
     }
     return Results.Json(res);
-}).RequireRateLimiting("auth");
+});
 
 static bool SameHash(string given, string? expected) => expected is not null &&
     System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
@@ -238,7 +220,7 @@ account.MapPost("/email", (EmailRequest req, HttpContext ctx, Database db) =>
     db.SetEmail(userId, email.Length > 0 ? email : null);
     db.SetResetCode(userId, null, null);
     return Results.NoContent();
-}).RequireRateLimiting("auth");
+});
 
 account.MapPost("/logout", (HttpContext ctx, Database db) =>
 {
@@ -264,7 +246,7 @@ account.MapPost("/password", (PasswordRequest req, HttpContext ctx, Database db)
     db.SetPassword(userId, Passwords.Hash(req.NewPassword));
     db.DeleteOtherTokens(userId, Passwords.TokenHash(BearerToken(ctx)!));
     return Results.NoContent();
-}).RequireRateLimiting("auth");
+});
 
 // Suppression du compte et de toutes ses données (mot de passe demandé).
 account.MapDelete("", ([Microsoft.AspNetCore.Mvc.FromBody] AccountRequest req, HttpContext ctx, Database db) =>
@@ -275,7 +257,7 @@ account.MapDelete("", ([Microsoft.AspNetCore.Mvc.FromBody] AccountRequest req, H
     if (CheckPassword(ctx, db, user.Username, req.Password, user, "Mot de passe incorrect.") is { } fail) return fail;
     db.DeleteUser(userId);
     return Results.NoContent();
-}).RequireRateLimiting("auth");
+});
 
 // ---- Synchronisation ----
 

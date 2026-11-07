@@ -36,7 +36,7 @@ velom3d.mon-domaine.fr {
 }
 ```
 
-et réglez `Velom3d__TrustProxy=true` pour que le serveur voie la vraie adresse des clients. Sur un
+et réglez `Velom3d__TrustProxy=true` pour que le serveur voie la vraie adresse et le schéma (`https`) des clients. Sur un
 réseau local, `http://192.168.1.10:8080` marche aussi (les mots de passe passent alors en clair sur le réseau).
 
 ## L'appli ne trouve pas le serveur
@@ -68,7 +68,6 @@ Dans `appsettings.json` ou en variables d'environnement (`Velom3d__Nom`) :
 |---|---|---|
 | `Velom3d__Database` | `data/velom3d.db` (`/data/velom3d.db` dans Docker) | fichier de la base |
 | `Velom3d__AllowRegistration` | `true` | `false` : plus de nouveaux comptes (serveur fermé, une fois les vôtres créés) |
-| `Velom3d__AuthRequestsPerMinute` | `10` | essais de connexion par minute et par adresse IP (la création de compte n'est pas limitée) |
 | `Velom3d__MaxFailedLogins` | `3` | échecs de suite sur un compte avant qu'il soit bloqué |
 | `Velom3d__LockoutMaxMinutes` | `60` | blocage le plus long (1 min, puis 2, 4, 8… jusqu'à cette durée) |
 | `Velom3d__SessionDays` | `90` | un appareil qui ne s'est pas synchronisé depuis ce nombre de jours doit se reconnecter |
@@ -88,13 +87,13 @@ Sauvegarde : copier le fichier de la base (`sqlite3 velom3d.db ".backup copie.db
   « 12345678 »…), ceux qui contiennent le nom d'utilisateur et les suites sont refusés. Gardés en
   PBKDF2-SHA256 (600 000 itérations, sel aléatoire) ; un mot de passe enregistré avec moins
   d'itérations (versions précédentes) est refait à la connexion suivante.
-- **Contre les essais en boucle**, deux protections qui s'ajoutent :
-  - par adresse IP : 10 essais par minute sur les routes de compte (la création de compte n'est pas
-    limitée ; `AllowRegistration=false` ferme le serveur aux nouveaux comptes) ;
-  - par compte, quelle que soit l'adresse : après 3 échecs de suite, le compte est bloqué 1 minute,
-    puis 2, 4, 8… jusqu'à 1 heure. Une connexion réussie remet le compteur à zéro, et il s'oublie
-    après 24 heures sans échec. Un nom qui n'existe pas se bloque de la même façon : rien n'indique
-    si un compte existe. Les appareils déjà connectés continuent de synchroniser pendant un blocage.
+- **Contre les essais en boucle** : blocage par compte, quelle que soit l'adresse IP (il n'y a pas de
+  limite par adresse). Après 3 échecs de suite, le compte est bloqué 1 minute, puis 2, 4, 8…
+  jusqu'à 1 heure. Une connexion réussie remet le compteur à zéro, et il s'oublie après 24 heures
+  sans échec. Un nom qui n'existe pas se bloque de la même façon : rien n'indique si un compte
+  existe. Les appareils déjà connectés continuent de synchroniser pendant un blocage. Le code de
+  secours et le code e-mail ont leur propre compteur, aux mêmes règles.
+- **Création de compte** : pas de limite ; `AllowRegistration=false` ferme le serveur aux nouveaux comptes.
 - **Sessions** : un jeton aléatoire par appareil (seule son empreinte est en base), qui expire après
   90 jours sans synchronisation. Dans l'appli, *Déconnecter mes autres appareils* les révoque tous
   sauf celui-ci ; changer de mot de passe ou le réinitialiser aussi.
