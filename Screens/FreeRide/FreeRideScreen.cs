@@ -58,9 +58,6 @@ public partial class FreeRideScreen : Screen
 
     /// <summary>Entraînement structuré à dérouler, à renseigner avant l'ouverture (null = sortie libre).</summary>
     public Workout? Workout { get; set; }
-    /// <summary>Où revenir sans sortie enregistrée : menu, liste des entraînements ou plan.</summary>
-    string ExitScreen => Workout is null ? Navigator.Menu
-        : TrainingPlan.IsPlanSession(Workout.Id) ? Navigator.Plan : Navigator.Workouts;
     /// <summary>Avancement de l'entraînement en cours (pour les tests).</summary>
     internal WorkoutProgress? Progress { get; private set; }
     Control _workoutPanel = null!;
@@ -290,7 +287,7 @@ public partial class FreeRideScreen : Screen
         Workout = workout;
         _target = 0;
         Progress = new WorkoutProgress(workout, _profile.FtpW);
-        Recorder = new RideRecorder(RideMode.Workout, _profile, DateTimeOffset.Now, Progress.TargetW ?? 0, workout.Name, workout.Id);
+        Recorder = new RideRecorder(RideMode.Workout, _profile, DateTimeOffset.Now, Progress.TargetW ?? 0, workout.Name);
         StartDataLog();
         Gears = null;
         _workoutChart.Workout = workout;
@@ -642,7 +639,7 @@ public partial class FreeRideScreen : Screen
         DisplayServer.ScreenSetKeepOn(false);
         if (ride.Samples.Count == 0)
         {
-            Navigator.GoTo(this, ExitScreen);
+            Navigator.GoTo(this, Workout is null ? Navigator.Menu : Navigator.Workouts);
             return;
         }
         Store.Save(ride);
@@ -743,7 +740,7 @@ public partial class FreeRideScreen : Screen
     {
         if (SensorsPage is not null) CloseSensors();
         else if (MenuOpen) CloseMenu();
-        else if (Recorder is null) Navigator.GoTo(this, ExitScreen);
+        else if (Recorder is null) Navigator.GoTo(this, Workout is null ? Navigator.Menu : Navigator.Workouts);
         else if (!Recorder.IsPaused) TogglePause(); // pendant la sortie, Retour met en pause sans rien perdre
     }
 }

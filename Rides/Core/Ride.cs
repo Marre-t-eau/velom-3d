@@ -30,9 +30,6 @@ public sealed class RiderProfile
     public int LastTargetPowerW { get; set; } = 150;
     /// <summary>Date du dernier test FTP réussi (null si la FTP a été saisie à la main).</summary>
     public DateTimeOffset? FtpTestedAt { get; set; }
-    /// <summary>Début du plan d'entraînement : seules les sorties d'après comptent comme séances faites
-    /// (null : plan pas commencé).</summary>
-    public DateTimeOffset? PlanStartedAt { get; set; }
 
     /// <summary>Vitesses virtuelles en mode simulation : on change de plateau et de pignon dans
     /// l'appli, la résistance du trainer suit.</summary>
@@ -85,8 +82,6 @@ public sealed class RideInfo
     public string VirtualGears { get; set; } = "";
     /// <summary>Nom de l'entraînement structuré suivi, vide sinon.</summary>
     public string WorkoutName { get; set; } = "";
-    /// <summary>Id de l'entraînement suivi (séances du plan : <c>plan-endurance-s3-2</c>…), vide sinon.</summary>
-    public string WorkoutId { get; set; } = "";
     /// <summary>FTP mesurée par cette sortie (test FTP), 0 sinon.</summary>
     public int FtpTestW { get; set; }
     public RideSummary Summary { get; set; } = new();

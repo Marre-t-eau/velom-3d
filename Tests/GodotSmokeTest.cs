@@ -274,31 +274,6 @@ public partial class GodotSmokeTest : Node
         if (Directory.Exists(dir)) Directory.Delete(dir, true);
     }
 
-    /// <summary>Plan endurance : 24 séances, la première est proposée, la démarrer commence le plan.</summary>
-    async System.Threading.Tasks.Task PlanScreen(System.Func<Node?> next, System.Action<Node?> setNext)
-    {
-        var profile = Screen.Store.LoadProfile();
-        profile.PlanStartedAt = null;
-        Screen.Store.SaveProfile(profile);
-        var plan = Navigator.Create<TrainingPlanScreen>(Navigator.Plan);
-        AddChild(plan);
-        await Wait(0.1);
-        var first = plan.Plan.Weeks[0].Sessions[0];
-        Check(plan.Plan.SessionCount == 24 && plan.Next?.Id == first.Id && !plan.RestartButton.Visible,
-            $"Plan : 24 séances, la première est proposée ({plan.Next?.Name})");
-        plan.NextStartButton.EmitSignal(BaseButton.SignalName.Pressed);
-        await Wait(0.1);
-        var ride = next() as FreeRideScreen;
-        Check(ride is { Workout: not null } && ride.Workout.Id == first.Id && Screen.Store.LoadProfile().PlanStartedAt is not null,
-            "Plan : Démarrer lance la séance et commence le plan");
-        ride?.Free();
-        setNext(null);
-        plan.QueueFree();
-        profile = Screen.Store.LoadProfile();
-        profile.PlanStartedAt = null;
-        Screen.Store.SaveProfile(profile);
-    }
-
     /// <summary>5. Entraînements : liste (exemples), édition, puis un entraînement déroulé bloc par bloc.</summary>
     async System.Threading.Tasks.Task Workouts(SimulatedBackend sim, System.Func<Node?> next, System.Action<Node?> setNext)
     {
@@ -317,13 +292,6 @@ public partial class GodotSmokeTest : Node
         await Wait(0.1);
         Check(list.WorkoutCount == 2, $"Liste : deux exemples au premier lancement ({list.WorkoutCount})");
         Check(list.FtpLabel.Text == $"FTP {Screen.Store.LoadProfile().FtpW} W", $"Liste : la FTP est affichée ({list.FtpLabel.Text})");
-        list.PlanButton.EmitSignal(BaseButton.SignalName.Pressed);
-        await Wait(0.1);
-        Check(next() is TrainingPlanScreen, "Liste : la carte du plan ouvre le plan endurance");
-        (next() as Node)?.Free();
-        setNext(null);
-        await PlanScreen(next, setNext);
-
         list.NewButton.EmitSignal(BaseButton.SignalName.Pressed);
         await Wait(0.1);
         var editor = next() as WorkoutEditorScreen;

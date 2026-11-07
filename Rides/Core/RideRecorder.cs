@@ -42,7 +42,7 @@ public sealed class RideRecorder
     int _targetPowerW, _targetCadenceRpm;
     readonly Dictionary<string, int> _sensorIndex = new();
 
-    public RideRecorder(RideMode mode, RiderProfile profile, DateTimeOffset startedAt, int targetPowerW = 0, string workoutName = "", string workoutId = "")
+    public RideRecorder(RideMode mode, RiderProfile profile, DateTimeOffset startedAt, int targetPowerW = 0, string workoutName = "")
     {
         Physics = new BikePhysics { MassKg = profile.TotalMassKg };
         _targetPowerW = mode == RideMode.Simulation ? 0 : targetPowerW;
@@ -61,7 +61,6 @@ public sealed class RideRecorder
             WheelCircumferenceMm = profile.WheelCircumferenceMm,
             VirtualGears = mode == RideMode.Simulation && profile.VirtualGears ? profile.CreateDrivetrain().Describe() : "",
             WorkoutName = mode == RideMode.Workout ? workoutName : "",
-            WorkoutId = mode == RideMode.Workout ? workoutId : "",
         });
         Log(startedAt, "start", RideEvent.App, mode.ToString());
         Log(startedAt, "grade", RideEvent.App, SensorValues.Number(Physics.GradePct));

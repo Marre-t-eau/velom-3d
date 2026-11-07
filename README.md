@@ -39,8 +39,7 @@ l'indique et propose le relais par téléphone.
 
 ```
 Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements ─┬─ Modifier ──► Édition des blocs
-                                            │                ├─ Démarrer ──► Séance ──Terminer──► Bilan
-                                            │                └─ Plan endurance ──Démarrer──► Séance
+                                            │                └─ Démarrer ──► Séance ──Terminer──► Bilan
                                             ├─ Réglages (cycliste, vélo, vitesses virtuelles, synchronisation)
                                             ├─ Sortie libre ──Terminer──► Bilan
                                             ├─ Mes sorties ──► Bilan d'une sortie
@@ -57,14 +56,6 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
   Second test au choix, le **test rampe** : paliers de 1 min en ERG à partir de 100 W,
   +20 W chaque minute, jusqu'à ne plus tenir (cadence sous 40 tr/min pendant 5 s, ou « J'arrête
   le test ») ; la FTP vaut 75 % de la meilleure minute (au moins 3 min de paliers).
-- **Plan endurance** (`Screens/TrainingPlan/`, séances dans `Rides/Core/TrainingPlan.cs`) :
-  8 semaines de 3 séances en % de FTP, surtout en zone 2 : une endurance continue (45 min à
-  1 h 15), une séance avec des blocs tempo / sweet spot (3 × 8 min à 78 % jusqu'à 2 × 25 min à
-  87 %), une sortie longue qui passe de 1 h 15 à 2 h. Semaines 4 et 8 allégées, puis un test FTP
-  conseillé. La carte du plan est en tête de la liste des entraînements, avec la prochaine
-  séance. Démarrer une première séance commence le plan ; une séance est cochée quand une sortie
-  l'a suivie sur au moins 80 % de sa durée (d'après l'historique, donc synchronisé avec les
-  sorties). « Recommencer » repart de la semaine 1.
 - **Édition** (`Screens/WorkoutEditor/`) : nom, puissances en watts ou en % de FTP (la FTP des
   Réglages, au moment de rouler ; changer d'unité convertit les valeurs), et les blocs. Chaque bloc
   a une durée, une puissance *fixe*, *libre* ou en *rampe* (début → fin), et une cadence *libre* ou
@@ -119,7 +110,7 @@ Godot (boutons, textes, marges, tailles de police). Le script C# du même nom ne
 il retrouve les nœuds par leur nom unique (`%Nom`, clic droit > *Accès comme nom unique*), branche
 les signaux et met les valeurs à jour. Ce qui se répète selon les données a sa petite scène, créée
 par le code pour chaque élément : `DeviceRow.tscn` (appareil), `RideCard.tscn` (sortie),
-`WorkoutCard.tscn` (entraînement), `PlanWeek.tscn` et `PlanSessionRow.tscn` (plan), `BlockCard.tscn` (bloc dans l'éditeur), `ConfirmPopup.tscn`
+`WorkoutCard.tscn` (entraînement), `BlockCard.tscn` (bloc dans l'éditeur), `ConfirmPopup.tscn`
 (fenêtre Non / Oui). Les styles communs (palette violette, cartes, boutons, boutons à bascule,
 textes grisés, contour lisible sur la 3D, taille de police par défaut) sont dans le thème
 `Screens/Common/Theme.tres`, appliqué à tout le projet (*Projet > Paramètres > GUI > Thème*) : on
