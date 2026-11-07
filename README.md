@@ -47,8 +47,8 @@ Connexion des capteurs ──Continuer──► Menu ─┬─ Entraînements �
 ```
 
 - **Entraînements** (`Screens/Workouts/`) : la liste des séances structurées, avec leur profil
-  (couleur = zone de puissance), leur durée et le TSS prévu. Deux exemples sont créés au premier
-  lancement. La FTP est rappelée en haut (avec la date du dernier test), et un **test FTP**
+  (couleur = zone de puissance), leur durée et le TSS prévu. Trois exemples sont créés au premier
+  lancement (sweet spot, PMA, et une endurance zone 2 de 1 h 30 à 68 % de FTP). La FTP est rappelée en haut (avec la date du dernier test), et un **test FTP**
   intégré est toujours proposé en premier (en watts fixes, comme le test rampe, pour ne pas
   dépendre de l'ancienne FTP) : échauffement, trois accélérations, 20 min à fond en
   puissance libre, retour au calme. Si l'effort a été roulé au moins à 90 %, la nouvelle FTP

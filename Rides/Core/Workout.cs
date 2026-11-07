@@ -259,7 +259,24 @@ public sealed class Workout
             vo2.Blocks.Add(new() { DurationS = 180, Kind = BlockPower.Free });
         }
         vo2.Blocks.Add(new() { DurationS = 300, Power = 50 });
-        return [sweetSpot, vo2];
+        return [sweetSpot, vo2, Endurance(at)];
+    }
+
+    public const string EnduranceId = "exemple-endurance";
+
+    /// <summary>Endurance zone 2, 1 h 30 : échauffement, 5 × 15 min à 68 % de FTP (un bloc sur deux
+    /// à 95 tr/min pour travailler la vélocité sans monter en intensité), retour au calme.</summary>
+    public static Workout Endurance(DateTimeOffset at)
+    {
+        var w = new Workout
+        {
+            Id = EnduranceId, Name = "Endurance zone 2 · 1 h 30", Unit = PowerUnit.PercentFtp, UpdatedAt = at,
+            Blocks = [new() { DurationS = 600, Kind = BlockPower.Ramp, Power = 50, PowerEnd = 68 }],
+        };
+        for (int i = 0; i < 5; i++)
+            w.Blocks.Add(new() { DurationS = 900, Power = 68, CadenceRpm = i % 2 == 1 ? 95 : 0 });
+        w.Blocks.Add(new() { DurationS = 300, Kind = BlockPower.Ramp, Power = 60, PowerEnd = 45 });
+        return w;
     }
 }
 

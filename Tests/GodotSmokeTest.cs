@@ -290,7 +290,7 @@ public partial class GodotSmokeTest : Node
         var list = Navigator.Create<WorkoutListScreen>(Navigator.Workouts);
         AddChild(list);
         await Wait(0.1);
-        Check(list.WorkoutCount == 2, $"Liste : deux exemples au premier lancement ({list.WorkoutCount})");
+        Check(list.WorkoutCount == 3, $"Liste : trois exemples au premier lancement ({list.WorkoutCount})");
         Check(list.FtpLabel.Text == $"FTP {Screen.Store.LoadProfile().FtpW} W", $"Liste : la FTP est affichée ({list.FtpLabel.Text})");
         list.NewButton.EmitSignal(BaseButton.SignalName.Pressed);
         await Wait(0.1);

@@ -106,7 +106,7 @@ public class WorkoutTests
     public void Examples_are_valid()
     {
         var examples = Workout.Examples(DateTimeOffset.Now);
-        Assert.Equal(2, examples.Select(e => e.Id).Distinct().Count());
+        Assert.Equal(3, examples.Select(e => e.Id).Distinct().Count());
         Assert.All(examples, e => Assert.True(e.TotalDurationS > 1800));
     }
 }
@@ -125,9 +125,32 @@ public class WorkoutStoreTests : IDisposable
     {
         var store = new WorkoutStore(_dir);
         var first = store.List();
-        Assert.Equal(2, first.Count);
+        Assert.Equal(3, first.Count);
         foreach (var w in first) store.Delete(w.Id);
         Assert.Empty(store.List());
+    }
+
+    [Fact]
+    public void Endurance_example_is_added_once_to_existing_devices()
+    {
+        // Appareil d'avant l'exemple d'endurance : dossier déjà là, sans la marque.
+        Directory.CreateDirectory(_dir);
+        var store = new WorkoutStore(_dir);
+        store.Save(Workout.CreateDefault(DateTimeOffset.Now, "Le mien"));
+        var list = store.List();
+        Assert.Equal(2, list.Count);
+        Assert.Contains(list, w => w.Id == Workout.EnduranceId);
+        store.Delete(Workout.EnduranceId);
+        Assert.Single(store.List()); // supprimé : pas recréé
+    }
+
+    [Fact]
+    public void Endurance_example_is_zone_2()
+    {
+        var w = Workout.Endurance(DateTimeOffset.Now);
+        Assert.Equal(90 * 60, w.TotalDurationS);
+        Assert.All(w.Blocks, b => Assert.InRange(b.Power, 45, 70));
+        Assert.Equal(PowerUnit.PercentFtp, w.Unit);
     }
 
     [Fact]
@@ -152,7 +175,7 @@ public class WorkoutStoreTests : IDisposable
         var store = new WorkoutStore(_dir);
         store.List();
         File.WriteAllText(Path.Combine(_dir, "broken.json"), "{ pas du json");
-        Assert.Equal(2, store.List().Count);
+        Assert.Equal(3, store.List().Count);
         Assert.Null(store.Load("absent"));
     }
 }
