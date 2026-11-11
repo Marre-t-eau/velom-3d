@@ -201,5 +201,10 @@ API sont décrites dans `Server/README.md`.
 - `Pending` : sorties reçues dont le CSV n'était pas encore sur le serveur, réessayées ensuite ;
 - `LastSyncAt`, `LastError`.
 
-Les deux exemples d'entraînement ont des ids fixes (`exemple-sweet-spot`, `exemple-pma`) et la date
-du 1er janvier 2026, pour ne pas être en double sur les appareils d'un même compte.
+Les exemples d'entraînement ont des ids fixes (`exemple-sweet-spot`, `exemple-pma`,
+`exemple-endurance`, `exemple-pma-30-30`, `exemple-seuil`, `exemple-over-under`, `exemple-tempo`,
+`exemple-sprints`) et la date du 1er janvier 2026, pour ne pas être en double sur les appareils
+d'un même compte. Les exemples ajoutés après la première version (`Workout.LaterExamples`) sont
+créés une fois sur les appareils qui avaient déjà leurs entraînements ; pour chacun, un fichier
+`workouts/.<id>` (par exemple `.exemple-endurance`, non synchronisé) note que c'est fait, pour ne
+pas le recréer s'il est supprimé.

@@ -22,12 +22,32 @@ public sealed class WorkoutStore
         {
             System.IO.Directory.CreateDirectory(Directory);
             foreach (var w in Workout.Examples(Workout.ExamplesDate)) Save(w);
+            foreach (var w in Workout.LaterExamples(Workout.ExamplesDate)) MarkAdded(w.Id);
         }
+        else AddLaterExamples();
         var workouts = new List<Workout>();
         foreach (var path in System.IO.Directory.GetFiles(Directory, "*.json"))
             if (Read(path) is { } w) workouts.Add(w);
         workouts.Sort((a, b) => b.UpdatedAt.CompareTo(a.UpdatedAt));
         return workouts;
+    }
+
+    /// <summary>Marque (non synchronisée : pas un .json) qu'un exemple ajouté après coup a été proposé,
+    /// par exemple <c>.exemple-endurance</c>.</summary>
+    string MarkerOf(string id) => Path.Combine(Directory, "." + id);
+
+    void MarkAdded(string id) => File.WriteAllText(MarkerOf(id), "");
+
+    /// <summary>Exemples ajoutés après la première version : chacun est proposé une seule fois aux appareils
+    /// qui ont déjà leurs entraînements (pas recréé s'il est supprimé ensuite).</summary>
+    void AddLaterExamples()
+    {
+        foreach (var w in Workout.LaterExamples(Workout.ExamplesDate))
+        {
+            if (File.Exists(MarkerOf(w.Id))) continue;
+            if (!File.Exists(PathOf(w.Id))) Save(w);
+            MarkAdded(w.Id);
+        }
     }
 
     public Workout? Load(string id) => File.Exists(PathOf(id)) ? Read(PathOf(id)) : null;

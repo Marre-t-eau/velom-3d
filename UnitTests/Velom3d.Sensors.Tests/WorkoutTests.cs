@@ -106,7 +106,7 @@ public class WorkoutTests
     public void Examples_are_valid()
     {
         var examples = Workout.Examples(DateTimeOffset.Now);
-        Assert.Equal(2, examples.Select(e => e.Id).Distinct().Count());
+        Assert.Equal(8, examples.Select(e => e.Id).Distinct().Count());
         Assert.All(examples, e => Assert.True(e.TotalDurationS > 1800));
     }
 }
@@ -125,9 +125,60 @@ public class WorkoutStoreTests : IDisposable
     {
         var store = new WorkoutStore(_dir);
         var first = store.List();
-        Assert.Equal(2, first.Count);
+        Assert.Equal(Workout.Examples(DateTimeOffset.Now).Count, first.Count);
         foreach (var w in first) store.Delete(w.Id);
         Assert.Empty(store.List());
+    }
+
+    [Fact]
+    public void Later_examples_are_added_once_to_existing_devices()
+    {
+        // Appareil d'avant les nouveaux exemples : dossier déjà là, sans les marques.
+        Directory.CreateDirectory(_dir);
+        var store = new WorkoutStore(_dir);
+        store.Save(Workout.CreateDefault(DateTimeOffset.Now, "Le mien"));
+        var later = Workout.LaterExamples(DateTimeOffset.Now);
+        var list = store.List();
+        Assert.Equal(1 + later.Count, list.Count);
+        Assert.Contains(list, w => w.Id == Workout.EnduranceId);
+        Assert.Contains(list, w => w.Id == "exemple-pma-30-30");
+        store.Delete(Workout.EnduranceId);
+        store.Delete("exemple-sprints");
+        Assert.Equal(later.Count - 1, store.List().Count); // supprimés : pas recréés
+    }
+
+    [Fact]
+    public void Device_that_already_had_the_endurance_example_gets_only_the_new_ones()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Path.Combine(_dir, ".exemple-endurance"), "");
+        var store = new WorkoutStore(_dir);
+        var list = store.List();
+        Assert.DoesNotContain(list, w => w.Id == Workout.EnduranceId);
+        Assert.Equal(Workout.LaterExamples(DateTimeOffset.Now).Count - 1, list.Count);
+    }
+
+    [Fact]
+    public void Interval_examples_stay_in_realistic_zones()
+    {
+        var byId = Workout.Examples(DateTimeOffset.Now).ToDictionary(w => w.Id);
+        // Rien en ERG au-dessus de 120 % de FTP : les sprints sont en puissance libre.
+        Assert.All(byId.Values, w => Assert.All(w.Blocks.Where(b => b.Kind != BlockPower.Free), b => Assert.InRange(b.Power, 0, 120)));
+        Assert.Contains(byId["exemple-sprints"].Blocks, b => b.Kind == BlockPower.Free && b.DurationS <= 15);
+        Assert.Equal(20, byId["exemple-pma-30-30"].Blocks.Count(b => b.Power == 120 && b.DurationS == 30));
+        Assert.Equal(30 * 60, byId["exemple-seuil"].Blocks.Where(b => b.Power >= 95).Sum(b => b.DurationS));
+        Assert.Equal(27 * 60, byId["exemple-over-under"].Blocks.Where(b => b.Power >= 95).Sum(b => b.DurationS));
+        Assert.Equal(36 * 60, byId["exemple-tempo"].Blocks.Where(b => b.Power == 80).Sum(b => b.DurationS));
+        Assert.All(byId.Values, w => Assert.Equal(PowerUnit.PercentFtp, w.Unit));
+    }
+
+    [Fact]
+    public void Endurance_example_is_zone_2()
+    {
+        var w = Workout.Endurance(DateTimeOffset.Now);
+        Assert.Equal(90 * 60, w.TotalDurationS);
+        Assert.All(w.Blocks, b => Assert.InRange(b.Power, 45, 70));
+        Assert.Equal(PowerUnit.PercentFtp, w.Unit);
     }
 
     [Fact]
@@ -152,7 +203,7 @@ public class WorkoutStoreTests : IDisposable
         var store = new WorkoutStore(_dir);
         store.List();
         File.WriteAllText(Path.Combine(_dir, "broken.json"), "{ pas du json");
-        Assert.Equal(2, store.List().Count);
+        Assert.Equal(Workout.Examples(DateTimeOffset.Now).Count, store.List().Count);
         Assert.Null(store.Load("absent"));
     }
 }

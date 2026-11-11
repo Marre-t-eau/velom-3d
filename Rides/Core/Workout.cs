@@ -259,7 +259,116 @@ public sealed class Workout
             vo2.Blocks.Add(new() { DurationS = 180, Kind = BlockPower.Free });
         }
         vo2.Blocks.Add(new() { DurationS = 300, Power = 50 });
-        return [sweetSpot, vo2];
+        return [sweetSpot, vo2, .. LaterExamples(at)];
+    }
+
+    /// <summary>Exemples ajoutés après la première version, dans l'ordre d'ajout : proposés une fois aux
+    /// appareils qui avaient déjà leurs entraînements (voir <see cref="WorkoutStore"/>).</summary>
+    public static List<Workout> LaterExamples(DateTimeOffset at) =>
+        [Endurance(at), Pma30x30(at), Threshold(at), OverUnder(at), Tempo(at), Sprints(at)];
+
+    /// <summary>Échauffement commun aux séances intenses : rampe de 50 % à <paramref name="endPct"/> % de FTP.</summary>
+    static WorkoutBlock WarmUp(int durationS, int endPct) =>
+        new() { DurationS = durationS, Kind = BlockPower.Ramp, Power = 50, PowerEnd = endPct };
+
+    static WorkoutBlock CoolDown(int durationS) =>
+        new() { DurationS = durationS, Kind = BlockPower.Ramp, Power = 60, PowerEnd = 40 };
+
+    static Workout NewExample(string id, string name, DateTimeOffset at, WorkoutBlock warmUp) => new()
+    {
+        Id = id, Name = name, Unit = PowerUnit.PercentFtp, UpdatedAt = at, Blocks = [warmUp],
+    };
+
+    /// <summary>PMA courte (type Billat) : 2 séries de 10 × (30 s à 120 % / 30 s à 50 %). Même stimulus
+    /// que les 3 min à 115 %, mais les récupérations fréquentes permettent d'accumuler plus de temps
+    /// au-dessus de la PMA : la bonne porte d'entrée quand les intervalles longs cassent.</summary>
+    public static Workout Pma30x30(DateTimeOffset at)
+    {
+        var w = NewExample("exemple-pma-30-30", "PMA 30/30 · 2 × 10", at, WarmUp(600, 75));
+        for (int set = 0; set < 2; set++)
+        {
+            for (int i = 0; i < 10; i++)
+            {
+                w.Blocks.Add(new() { DurationS = 30, Power = 120, CadenceRpm = 100 });
+                w.Blocks.Add(new() { DurationS = 30, Power = 50 });
+            }
+            if (set == 0) w.Blocks.Add(new() { DurationS = 300, Power = 50 });
+        }
+        w.Blocks.Add(CoolDown(300));
+        return w;
+    }
+
+    /// <summary>Seuil : 2 × 15 min à 97 % de FTP, 5 min de récupération.</summary>
+    public static Workout Threshold(DateTimeOffset at)
+    {
+        var w = NewExample("exemple-seuil", "Seuil 2 × 15 min", at, WarmUp(720, 80));
+        w.Blocks.Add(new() { DurationS = 900, Power = 97, CadenceRpm = 90 });
+        w.Blocks.Add(new() { DurationS = 300, Power = 55 });
+        w.Blocks.Add(new() { DurationS = 900, Power = 97, CadenceRpm = 90 });
+        w.Blocks.Add(CoolDown(480));
+        return w;
+    }
+
+    /// <summary>Over-under : 3 séries de 3 × (2 min à 95 % puis 1 min à 110 %), sans pause dans la série.
+    /// Apprend à relancer au-dessus du seuil puis à « digérer » l'effort juste en dessous.</summary>
+    public static Workout OverUnder(DateTimeOffset at)
+    {
+        var w = NewExample("exemple-over-under", "Over-under 3 × 9 min", at, WarmUp(600, 80));
+        for (int set = 0; set < 3; set++)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                w.Blocks.Add(new() { DurationS = 120, Power = 95, CadenceRpm = 90 });
+                w.Blocks.Add(new() { DurationS = 60, Power = 110, CadenceRpm = 95 });
+            }
+            if (set < 2) w.Blocks.Add(new() { DurationS = 300, Power = 55 });
+        }
+        w.Blocks.Add(CoolDown(300));
+        return w;
+    }
+
+    /// <summary>Tempo : 3 × 12 min à 80 % de FTP. Endurance de base « haute », peu de fatigue.</summary>
+    public static Workout Tempo(DateTimeOffset at)
+    {
+        var w = NewExample("exemple-tempo", "Tempo 3 × 12 min", at, WarmUp(600, 75));
+        for (int i = 0; i < 3; i++)
+        {
+            w.Blocks.Add(new() { DurationS = 720, Power = 80, CadenceRpm = 90 });
+            if (i < 2) w.Blocks.Add(new() { DurationS = 240, Power = 55 });
+        }
+        w.Blocks.Add(CoolDown(300));
+        return w;
+    }
+
+    /// <summary>Sprints : 8 × 12 s à fond en puissance libre (pas d'ERG, qui bride un sprint), avec
+    /// près de 4 min de récupération pour repartir frais à chaque fois.</summary>
+    public static Workout Sprints(DateTimeOffset at)
+    {
+        var w = NewExample("exemple-sprints", "Sprints 8 × 12 s", at, WarmUp(900, 75));
+        for (int i = 0; i < 8; i++)
+        {
+            w.Blocks.Add(new() { DurationS = 12, Kind = BlockPower.Free });
+            w.Blocks.Add(new() { DurationS = 228, Power = 50 });
+        }
+        w.Blocks.Add(CoolDown(300));
+        return w;
+    }
+
+    public const string EnduranceId = "exemple-endurance";
+
+    /// <summary>Endurance zone 2, 1 h 30 : échauffement, 5 × 15 min à 68 % de FTP (un bloc sur deux
+    /// à 95 tr/min pour travailler la vélocité sans monter en intensité), retour au calme.</summary>
+    public static Workout Endurance(DateTimeOffset at)
+    {
+        var w = new Workout
+        {
+            Id = EnduranceId, Name = "Endurance zone 2 · 1 h 30", Unit = PowerUnit.PercentFtp, UpdatedAt = at,
+            Blocks = [new() { DurationS = 600, Kind = BlockPower.Ramp, Power = 50, PowerEnd = 68 }],
+        };
+        for (int i = 0; i < 5; i++)
+            w.Blocks.Add(new() { DurationS = 900, Power = 68, CadenceRpm = i % 2 == 1 ? 95 : 0 });
+        w.Blocks.Add(new() { DurationS = 300, Kind = BlockPower.Ramp, Power = 60, PowerEnd = 45 });
+        return w;
     }
 }
 
