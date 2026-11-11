@@ -22,7 +22,7 @@ public sealed class WorkoutStore
         {
             System.IO.Directory.CreateDirectory(Directory);
             foreach (var w in Workout.Examples(Workout.ExamplesDate)) Save(w);
-            MarkExamplesAdded();
+            foreach (var w in Workout.LaterExamples(Workout.ExamplesDate)) MarkAdded(w.Id);
         }
         else AddLaterExamples();
         var workouts = new List<Workout>();
@@ -32,18 +32,22 @@ public sealed class WorkoutStore
         return workouts;
     }
 
-    /// <summary>Marque (non synchronisée : pas un .json) que les exemples ajoutés après coup ont été proposés.</summary>
-    string ExamplesMarker => Path.Combine(Directory, ".exemple-endurance");
+    /// <summary>Marque (non synchronisée : pas un .json) qu'un exemple ajouté après coup a été proposé,
+    /// par exemple <c>.exemple-endurance</c>.</summary>
+    string MarkerOf(string id) => Path.Combine(Directory, "." + id);
 
-    void MarkExamplesAdded() => File.WriteAllText(ExamplesMarker, "");
+    void MarkAdded(string id) => File.WriteAllText(MarkerOf(id), "");
 
-    /// <summary>Exemple d'endurance ajouté après la première version : proposé une seule fois aux appareils
+    /// <summary>Exemples ajoutés après la première version : chacun est proposé une seule fois aux appareils
     /// qui ont déjà leurs entraînements (pas recréé s'il est supprimé ensuite).</summary>
     void AddLaterExamples()
     {
-        if (File.Exists(ExamplesMarker)) return;
-        if (!File.Exists(PathOf(Workout.EnduranceId))) Save(Workout.Endurance(Workout.ExamplesDate));
-        MarkExamplesAdded();
+        foreach (var w in Workout.LaterExamples(Workout.ExamplesDate))
+        {
+            if (File.Exists(MarkerOf(w.Id))) continue;
+            if (!File.Exists(PathOf(w.Id))) Save(w);
+            MarkAdded(w.Id);
+        }
     }
 
     public Workout? Load(string id) => File.Exists(PathOf(id)) ? Read(PathOf(id)) : null;

@@ -234,26 +234,27 @@ public sealed class SyncTests : IDisposable
     [Fact]
     public async Task Examples_are_not_duplicated_across_devices()
     {
+        int examples = Workout.Examples(DateTimeOffset.Now).Count;
         var a = NewDevice("a");
         var b = NewDevice("b");
-        Assert.Equal(3, a.Workouts.List().Count);
-        Assert.Equal(3, b.Workouts.List().Count);
+        Assert.Equal(examples, a.Workouts.List().Count);
+        Assert.Equal(examples, b.Workouts.List().Count);
         await a.Sync.RegisterAsync(Url, "black", "motdepasse");
         await a.Sync.SyncAsync();
         await b.Sync.LoginAsync(Url, "black", "motdepasse");
         await b.Sync.SyncAsync();
-        Assert.Equal(3, b.Workouts.List().Count);
+        Assert.Equal(examples, b.Workouts.List().Count);
 
         // Un exemple supprimé sur A disparaît sur B, et pas recréé.
         a.Workouts.Delete("exemple-pma");
         await a.Sync.SyncAsync();
         await b.Sync.SyncAsync();
-        Assert.Equal(2, b.Workouts.List().Count);
+        Assert.Equal(examples - 1, b.Workouts.List().Count);
         var c = NewDevice("c");
-        Assert.Equal(3, c.Workouts.List().Count); // nouvel appareil : les exemples sont créés
+        Assert.Equal(examples, c.Workouts.List().Count); // nouvel appareil : les exemples sont créés
         await c.Sync.LoginAsync(Url, "black", "motdepasse");
         await c.Sync.SyncAsync();
-        Assert.Equal(2, c.Workouts.List().Count); // la suppression, plus récente, l'emporte
+        Assert.Equal(examples - 1, c.Workouts.List().Count); // la suppression, plus récente, l'emporte
     }
 
     [Fact]
