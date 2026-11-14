@@ -93,7 +93,7 @@ public partial class GodotSmokeTest : Node
         await RideScreens(sim);
 
         hub.DisconnectDevice(SimulatedBackend.Trainer);
-        Check(hub.TrainerAddress == "" && hub.Devices.Get(SimulatedBackend.Trainer)?.State == LinkState.Available,
+        Check(!hub.HasTrainer && hub.Devices.Get(SimulatedBackend.Trainer)?.State == LinkState.Available,
             "Déconnexion du trainer");
 
         await RelayMode();

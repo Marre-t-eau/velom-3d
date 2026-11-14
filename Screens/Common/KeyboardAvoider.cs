@@ -17,7 +17,12 @@ public partial class KeyboardAvoider : Node
     float _shift;
     int _lastKeyboardPx;
 
-    public override void _Ready() => _screen = GetParent<Control>();
+    public override void _Ready()
+    {
+        _screen = GetParent<Control>();
+        // Sans clavier virtuel (ordinateur), rien à faire : Godot avertirait à chaque image.
+        SetProcess(DisplayServer.HasFeature(DisplayServer.Feature.VirtualKeyboard));
+    }
 
     public override void _Process(double delta)
     {
@@ -26,7 +31,7 @@ public partial class KeyboardAvoider : Node
             && GetViewport().GuiGetFocusOwner() is LineEdit or TextEdit && _screen.IsAncestorOf(GetViewport().GuiGetFocusOwner()))
             GetViewport().GuiReleaseFocus(); // clavier fermé : le champ rend la main (pas de clavier qui revient en faisant défiler)
         _lastKeyboardPx = keyboardPx;
-        float target = Target();
+        float target = Target(keyboardPx);
         if (Math.Abs(target - _shift) < 0.5f) return;
         // Glissement rapide plutôt qu'un saut.
         _shift = Mathf.Lerp(_shift, target, (float)Math.Min(1, delta * 18));
@@ -35,9 +40,8 @@ public partial class KeyboardAvoider : Node
     }
 
     /// <summary>Décalage vers le haut pour que le champ actif soit au-dessus du clavier, 0 sinon.</summary>
-    float Target()
+    float Target(int keyboardPx)
     {
-        int keyboardPx = DisplayServer.VirtualKeyboardGetHeight();
         if (keyboardPx <= 0) return 0;
         var viewport = GetViewport();
         if (viewport.GuiGetFocusOwner() is not Control field || field is not (LineEdit or TextEdit)
