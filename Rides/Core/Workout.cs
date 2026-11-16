@@ -152,18 +152,6 @@ public sealed class Workout
         }
     }
 
-    /// <summary>« 220 W », « 90 % FTP », « 150 → 250 W », « libre ».</summary>
-    public string DescribePower(WorkoutBlock block)
-    {
-        string unit = Unit == PowerUnit.Watts ? " W" : " % FTP";
-        return block.Kind switch
-        {
-            BlockPower.Free => "libre",
-            BlockPower.Ramp => $"{block.Power} → {block.PowerEnd}{unit}",
-            _ => $"{block.Power}{unit}",
-        };
-    }
-
     public static string NewId(DateTimeOffset at) => "w" + at.ToUniversalTime().ToString("yyyyMMdd-HHmmssfff");
 
     /// <summary>Nouvel entraînement : échauffement, un bloc de travail, retour au calme.</summary>

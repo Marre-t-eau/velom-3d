@@ -46,6 +46,8 @@ public partial class SensorHub : Node
         _reads.TryGetValue(address, out var list) ? list : [];
     /// <summary>Appareil qui expose FTMS : c'est lui qu'on pilote.</summary>
     public string TrainerAddress { get; private set; } = "";
+    /// <summary>Un home trainer pilotable (FTMS) est connecté.</summary>
+    public bool HasTrainer => TrainerAddress != "";
 
     public int Power => Fusion.Power;
     public double Cadence => Fusion.Cadence;
@@ -164,8 +166,6 @@ public partial class SensorHub : Node
     public void SetGrade(double gradePct, double windMps = 0.0, double crr = 0.004, double cw = 0.51) =>
         SendControl(FtmsCommands.SetSimulation(gradePct, windMps, crr, cw));
 
-    public void SetResistance(double level) => SendControl(FtmsCommands.SetTargetResistance(level));
-
     /// <summary>Passe en mode ERG (prise de contrôle, démarrage, consigne).</summary>
     public void EnterErg(int watts) => SendControl(FtmsCommands.EnterErg(watts));
 
@@ -175,7 +175,7 @@ public partial class SensorHub : Node
 
     void SendControl(params byte[][] frames)
     {
-        if (Backend is null || TrainerAddress == "")
+        if (Backend is null || !HasTrainer)
         {
             EmitSignal(SignalName.StatusMessage, "Aucun home trainer FTMS connecté");
             return;

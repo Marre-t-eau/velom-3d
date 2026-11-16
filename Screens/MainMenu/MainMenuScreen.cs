@@ -32,7 +32,7 @@ public partial class MainMenuScreen : Screen
         int connected = 0;
         foreach (var d in hub.Devices.Sorted) if (d.State == LinkState.Connected) connected++;
         _sensors.Text = connected == 0 ? "Aucun capteur connecté"
-            : hub.TrainerAddress == "" ? $"{connected} capteur(s) connecté(s), pas de home trainer pilotable"
+            : !hub.HasTrainer ? $"{connected} capteur(s) connecté(s), pas de home trainer pilotable"
             : $"{connected} capteur(s) connecté(s), home trainer prêt";
     }
 

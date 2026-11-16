@@ -207,6 +207,6 @@ public partial class RelayHost : Node
     static void ReleaseTrainer()
     {
         Hub.StopScan();
-        if (Hub.TrainerAddress != "") Hub.EnterSimulation(0.0);
+        if (Hub.HasTrainer) Hub.EnterSimulation(0.0);
     }
 }
