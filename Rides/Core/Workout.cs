@@ -382,6 +382,11 @@ public sealed class WorkoutProgress
     public WorkoutBlock? Current => IsFinished ? null : Workout.Blocks[BlockIndex];
     /// <summary>Temps restant dans le bloc en cours (s).</summary>
     public double BlockRemainingS => IsFinished ? 0 : Workout.StartOf(BlockIndex + 1) - PositionS;
+    /// <summary>Temps restant jusqu'à la fin de l'entraînement (s), bloc en cours compris.</summary>
+    public double RemainingS => Math.Max(0, Workout.TotalDurationS - PositionS);
+    /// <summary>Test rampe pas encore fini : le temps restant n'est qu'un maximum (il s'arrête
+    /// quand le cycliste ne tient plus le palier).</summary>
+    public bool RemainingIsMax => !IsFinished && Workout.Blocks.FindIndex(BlockIndex, b => b.RampTest) >= 0;
     /// <summary>Consigne en watts ; null si la puissance est libre ou l'entraînement fini.</summary>
     public int? TargetW
     {

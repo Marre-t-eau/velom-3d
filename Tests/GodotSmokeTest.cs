@@ -355,6 +355,8 @@ public partial class GodotSmokeTest : Node
         await Wait(2.5);
         Check(ride.Progress?.BlockIndex == 1, "Passage automatique au bloc 2 à la fin du bloc 1");
         Check(ride.UpcomingCount == 2, $"Le bloc passé n'est plus affiché ({ride.UpcomingCount})");
+        Check(ride.WorkoutRemainingText.StartsWith("Fin dans 2:") || ride.WorkoutRemainingText.StartsWith("Fin dans 3:"),
+            $"Temps restant de l'entraînement affiché ({ride.WorkoutRemainingText})");
         await Wait(1.5);
         Check(sim.Model.ErgMode && sim.Model.TargetPowerW is > 150 and < 175, $"Rampe : la consigne monte ({sim.Model.TargetPowerW} W)");
         ride.SkipBlock();
@@ -376,6 +378,7 @@ public partial class GodotSmokeTest : Node
         Check(ride.Progress?.IsFinished == true && !sim.Model.ErgMode, "Fin de l'entraînement : puissance libre");
         await Wait(0.1);
         Check(ride.FinishButtonShown, "Entraînement fini : Terminer réapparaît");
+        Check(ride.WorkoutRemainingText == "", "Entraînement fini : plus de temps restant affiché");
         var samples = ride.Recorder!.Ride.Samples;
         Check(samples.Any(x => x.TargetPowerW == 210 && x.TargetCadenceRpm == 90) && samples.Any(x => x.TargetPowerW == 0),
             "Les cibles sont enregistrées à chaque seconde");

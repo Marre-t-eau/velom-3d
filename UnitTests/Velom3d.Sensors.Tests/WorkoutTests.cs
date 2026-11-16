@@ -59,6 +59,8 @@ public class WorkoutTests
         Assert.Equal(150, p.TargetW);
         Assert.Equal(0, p.TargetCadenceRpm);
         Assert.Equal(30, p.BlockRemainingS, 3);
+        Assert.Equal(180, p.RemainingS, 3);
+        Assert.False(p.RemainingIsMax);
         p.SkipBlock();
         Assert.Equal(1, p.BlockIndex);
         Assert.Equal(250, p.TargetW);
@@ -67,6 +69,7 @@ public class WorkoutTests
         Assert.Null(p.TargetW); // bloc libre
         p.Advance(30);
         Assert.True(p.IsFinished);
+        Assert.Equal(0, p.RemainingS);
         Assert.Null(p.TargetW);
         p.SkipBlock();
         Assert.True(p.IsFinished);
@@ -322,8 +325,11 @@ public class RampTestTests
         Assert.Equal(11, p.BlockIndex); // échauffement + 10 paliers passés : 11e palier
         double best = p.RampBestMinuteW;
         Assert.Equal(280, best, 0); // palier 10 : 100 + 9 × 20 W
+        Assert.True(p.RemainingIsMax); // la fin dépend de quand le cycliste lâche
         p.EndRampTest();
         Assert.False(p.Current!.RampTest);
+        Assert.False(p.RemainingIsMax);
+        Assert.Equal(300, p.RemainingS, 3); // reste le retour au calme
         Assert.Equal(210, p.FtpTestResultW);
         p.Advance(300, 50);
         Assert.Equal(210, p.FtpTestResultW);
