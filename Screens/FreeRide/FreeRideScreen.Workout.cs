@@ -18,6 +18,8 @@ public partial class FreeRideScreen
     Label _blockTitle = null!, _blockRemaining = null!, _blockPower = null!, _blockCadence = null!;
     ProgressBar _blockBar = null!;
     VBoxContainer _upcoming = null!;
+    /// <summary>Temps restant jusqu'à la fin de l'entraînement, en tête des blocs à venir.</summary>
+    Label _workoutRemaining = null!;
     readonly System.Collections.Generic.List<(Label Label, int StartS)> _upcomingStarts = new();
     /// <summary>Test rampe : temps passé sous 40 tr/min (le cycliste ne tient plus le palier).</summary>
     double _rampStallS;
@@ -54,6 +56,7 @@ public partial class FreeRideScreen
         // Profil de l'entraînement sous le bloc en cours : où on en est, ce qui reste.
         _workoutChart = GetNode<WorkoutChart>("%WorkoutChart");
         _upcoming = GetNode<VBoxContainer>("%Upcoming");
+        _workoutRemaining = GetNode<Label>("%WorkoutRemaining");
     }
 
     /// <summary>Nombre de blocs à venir listés : au-delà, une ligne « + N autres blocs ».</summary>
@@ -197,6 +200,8 @@ public partial class FreeRideScreen
 
     /// <summary>Nombre de blocs listés « à venir » (pour les tests).</summary>
     internal int UpcomingCount => _upcomingStarts.Count;
+    /// <summary>Texte du temps restant de l'entraînement (pour les tests).</summary>
+    internal string WorkoutRemainingText => _workoutRemaining.Visible ? _workoutRemaining.Text : "";
 
     void RefreshWorkout()
     {
@@ -211,6 +216,10 @@ public partial class FreeRideScreen
             RebuildUpcoming(index);
         }
         foreach (var (label, start) in _upcomingStarts) label.Text = "dans " + Ui.Duration(Math.Ceiling(start - progress.PositionS));
+        // Test rampe : la fin dépend du moment où le cycliste lâche, le temps n'est qu'un maximum.
+        _workoutRemaining.Visible = !progress.IsFinished;
+        _workoutRemaining.Text = (progress.RemainingIsMax ? "Fin dans au plus " : "Fin dans ")
+            + Ui.Duration(Math.Ceiling(progress.RemainingS));
         _workoutChart.PositionS = progress.PositionS;
         _workoutChart.QueueRedraw();
 

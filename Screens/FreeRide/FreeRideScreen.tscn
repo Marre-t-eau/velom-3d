@@ -487,11 +487,24 @@ theme_type_variation = &"OverlayPanel"
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Title" type="Label" parent="RidingMargin/Riding/WorkoutPanel/Next/Box"]
+[node name="Header" type="HBoxContainer" parent="RidingMargin/Riding/WorkoutPanel/Next/Box"]
 layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="RidingMargin/Riding/WorkoutPanel/Next/Box/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_type_variation = &"MutedLabel"
 theme_override_font_sizes/font_size = 18
 text = "À venir"
+
+[node name="WorkoutRemaining" type="Label" parent="RidingMargin/Riding/WorkoutPanel/Next/Box/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AccentLabel"
+theme_override_font_sizes/font_size = 20
+text = "Fin dans 45:00"
+horizontal_alignment = 2
 
 [node name="Upcoming" type="VBoxContainer" parent="RidingMargin/Riding/WorkoutPanel/Next/Box"]
 unique_name_in_owner = true
